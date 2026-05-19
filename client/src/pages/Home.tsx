@@ -1,25 +1,37 @@
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import HeroSection from "@/components/HeroSection";
+import StrategicOverview from "@/components/StrategicOverview";
+import CityContext from "@/components/CityContext";
+import StrategicDiagnosis from "@/components/StrategicDiagnosis";
+import CampaignLogic from "@/components/CampaignLogic";
+import MainOffers from "@/components/MainOffers";
+import MetaAdsPlan from "@/components/MetaAdsPlan";
+import GoogleAdsPlan from "@/components/GoogleAdsPlan";
+import CreativeDemands from "@/components/CreativeDemands";
+import InfluencerScripts from "@/components/InfluencerScripts";
+import CommunicationPolicy from "@/components/CommunicationPolicy";
+import KPIs from "@/components/KPIs";
+import ImplementationPlan from "@/components/ImplementationPlan";
+import VisualSection from "@/components/VisualSection";
+import Footer from "@/components/Footer";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Best Practices, Design Guide and Common Pitfalls
- */
 export default function Home() {
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
-
   return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
+    <div className="min-h-screen bg-white">
+      <HeroSection />
+      <StrategicOverview />
+      <CityContext />
+      <StrategicDiagnosis />
+      <CampaignLogic />
+      <MainOffers />
+      <VisualSection />
+      <MetaAdsPlan />
+      <GoogleAdsPlan />
+      <CreativeDemands />
+      <InfluencerScripts />
+      <CommunicationPolicy />
+      <KPIs />
+      <ImplementationPlan />
+      <Footer />
     </div>
   );
 }

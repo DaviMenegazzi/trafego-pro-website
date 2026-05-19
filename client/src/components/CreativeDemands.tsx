@@ -44,8 +44,8 @@ export default function CreativeDemands() {
     <section className="vida-section bg-[#f5f7fa]">
       <div className="container">
         <div className="flex items-center gap-3 mb-4">
-          <Palette className="w-8 h-8 text-[#00a896]" />
-          <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#0f1b3c]">
+          <Palette className="w-8 h-8 text-[#1FBD8F]" />
+          <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#1FBD8F]">
             Demandas de Criativos
           </h2>
         </div>
@@ -57,10 +57,10 @@ export default function CreativeDemands() {
           {demands.map((demand, index) => (
             <div key={index} className="vida-card">
               <div className="mb-4">
-                <div className="inline-block px-3 py-1 bg-[#00a896] text-white rounded-full text-xs font-bold mb-3">
+                <div className="inline-block px-3 py-1 bg-[#1FBD8F] text-white rounded-full text-xs font-bold mb-3">
                   Demanda {index + 1}
                 </div>
-                <h3 className="text-lg font-bold font-poppins text-[#0f1b3c]">
+                <h3 className="text-lg font-bold font-poppins text-[#1FBD8F]">
                   {demand.name}
                 </h3>
               </div>

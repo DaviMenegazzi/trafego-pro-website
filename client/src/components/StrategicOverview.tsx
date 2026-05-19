@@ -22,7 +22,7 @@ export default function StrategicOverview() {
   return (
     <section className="vida-section bg-white">
       <div className="container">
-        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-4 text-[#0f1b3c]">
+        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-4 text-[#1FBD8F]">
           Visão Geral da Estratégia
         </h2>
         <p className="text-gray-600 mb-12 text-lg">
@@ -36,10 +36,10 @@ export default function StrategicOverview() {
               <div key={index} className="vida-card">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
-                    <Icon className="w-8 h-8 text-[#00a896]" />
+                    <Icon className="w-8 h-8 text-[#1FBD8F]" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold font-poppins text-[#0f1b3c] mb-2">
+                    <h3 className="text-xl font-bold font-poppins text-[#1FBD8F] mb-2">
                       {card.title}
                     </h3>
                     <p className="text-gray-600 leading-relaxed">

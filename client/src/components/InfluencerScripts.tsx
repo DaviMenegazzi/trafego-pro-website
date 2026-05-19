@@ -78,8 +78,8 @@ export default function InfluencerScripts() {
     <section className="vida-section bg-white">
       <div className="container">
         <div className="flex items-center gap-3 mb-4">
-          <Film className="w-8 h-8 text-[#00a896]" />
-          <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#0f1b3c]">
+          <Film className="w-8 h-8 text-[#1FBD8F]" />
+          <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#1FBD8F]">
             Roteiros para Influencer
           </h2>
         </div>
@@ -91,10 +91,10 @@ export default function InfluencerScripts() {
           {scripts.map((script, index) => (
             <div key={index} className="vida-card">
               <div className="mb-6">
-                <div className="inline-block px-3 py-1 bg-[#00a896] text-white rounded-full text-xs font-bold mb-3">
+                <div className="inline-block px-3 py-1 bg-[#1FBD8F] text-white rounded-full text-xs font-bold mb-3">
                   Script {index + 1}
                 </div>
-                <h3 className="text-2xl font-bold font-poppins text-[#0f1b3c] mb-2">
+                <h3 className="text-2xl font-bold font-poppins text-[#1FBD8F] mb-2">
                   {script.title}
                 </h3>
                 <p className="text-sm text-gray-500 font-semibold">
@@ -104,7 +104,7 @@ export default function InfluencerScripts() {
 
               <div className="space-y-4">
                 {script.scenes.map((scene, sceneIndex) => (
-                  <div key={sceneIndex} className="border-l-4 border-[#00a896] pl-4 py-2">
+                  <div key={sceneIndex} className="border-l-4 border-[#1FBD8F] pl-4 py-2">
                     <p className="text-xs font-bold text-gray-500 uppercase mb-1">
                       {scene.label}
                     </p>

@@ -42,7 +42,7 @@ export default function KPIs() {
   return (
     <section className="vida-section bg-white">
       <div className="container">
-        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-4 text-[#0f1b3c]">
+        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-4 text-[#1FBD8F]">
           Indicadores de Acompanhamento
         </h2>
         <p className="text-gray-600 mb-12 text-lg">
@@ -55,15 +55,15 @@ export default function KPIs() {
             return (
               <div key={index} className="vida-card">
                 <div className="flex items-center gap-3 mb-6">
-                  <Icon className="w-6 h-6 text-[#00a896]" />
-                  <h3 className="text-xl font-bold font-poppins text-[#0f1b3c]">
+                  <Icon className="w-6 h-6 text-[#1FBD8F]" />
+                  <h3 className="text-xl font-bold font-poppins text-[#1FBD8F]">
                     {group.title}
                   </h3>
                 </div>
                 <ul className="space-y-3">
                   {group.metrics.map((metric, mIndex) => (
                     <li key={mIndex} className="flex gap-3 text-gray-700">
-                      <span className="text-[#00a896] font-bold">✓</span>
+                      <span className="text-[#1FBD8F] font-bold">✓</span>
                       <span>{metric}</span>
                     </li>
                   ))}

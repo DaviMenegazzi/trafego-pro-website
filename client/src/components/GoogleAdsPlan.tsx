@@ -68,8 +68,8 @@ export default function GoogleAdsPlan() {
     <section className="vida-section bg-white">
       <div className="container">
         <div className="flex items-center gap-3 mb-4">
-          <Search className="w-8 h-8 text-[#00a896]" />
-          <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#0f1b3c]">
+          <Search className="w-8 h-8 text-[#1FBD8F]" />
+          <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#1FBD8F]">
             Plano de Google Ads
           </h2>
         </div>
@@ -80,10 +80,10 @@ export default function GoogleAdsPlan() {
         {/* Campaign Header */}
         <div className="vida-card mb-8">
           <div className="mb-4">
-            <div className="inline-block px-3 py-1 bg-[#00a896] text-white rounded-full text-xs font-bold mb-3">
+            <div className="inline-block px-3 py-1 bg-[#1FBD8F] text-white rounded-full text-xs font-bold mb-3">
               Campanha Principal
             </div>
-            <h3 className="text-xl font-bold font-poppins text-[#0f1b3c]">
+            <h3 className="text-xl font-bold font-poppins text-[#1FBD8F]">
               [PESQUISA] [LEADS] - VIDA CARD TUPANCIRETÃ
             </h3>
           </div>
@@ -94,19 +94,19 @@ export default function GoogleAdsPlan() {
 
         {/* Ad Groups */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold font-poppins text-[#0f1b3c] mb-6">
+          <h3 className="text-2xl font-bold font-poppins text-[#1FBD8F] mb-6">
             Grupos de Anúncios
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {adGroups.map((group, index) => (
               <div key={index} className="vida-card">
-                <h4 className="font-bold font-poppins text-[#0f1b3c] mb-3">
+                <h4 className="font-bold font-poppins text-[#1FBD8F] mb-3">
                   {group.name}
                 </h4>
                 <ul className="space-y-2">
                   {group.keywords.map((keyword, kIndex) => (
                     <li key={kIndex} className="text-sm text-gray-600 flex gap-2">
-                      <span className="text-[#00a896]">•</span>
+                      <span className="text-[#1FBD8F]">•</span>
                       <span>{keyword}</span>
                     </li>
                   ))}
@@ -120,7 +120,7 @@ export default function GoogleAdsPlan() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Titles */}
           <div className="vida-card">
-            <h4 className="font-bold font-poppins text-[#0f1b3c] mb-4">
+            <h4 className="font-bold font-poppins text-[#1FBD8F] mb-4">
               Títulos de Anúncios
             </h4>
             <div className="grid grid-cols-2 gap-2">
@@ -134,7 +134,7 @@ export default function GoogleAdsPlan() {
 
           {/* Descriptions */}
           <div className="vida-card">
-            <h4 className="font-bold font-poppins text-[#0f1b3c] mb-4">
+            <h4 className="font-bold font-poppins text-[#1FBD8F] mb-4">
               Descrições
             </h4>
             <div className="space-y-3">
@@ -148,12 +148,12 @@ export default function GoogleAdsPlan() {
 
           {/* Callouts */}
           <div className="vida-card">
-            <h4 className="font-bold font-poppins text-[#0f1b3c] mb-4">
+            <h4 className="font-bold font-poppins text-[#1FBD8F] mb-4">
               Callouts
             </h4>
             <div className="grid grid-cols-2 gap-2">
               {callouts.map((callout, index) => (
-                <div key={index} className="p-2 bg-[#c4d600] text-[#0f1b3c] rounded text-sm font-semibold">
+                <div key={index} className="p-2 bg-[#FF8C42] text-[#1FBD8F] rounded text-sm font-semibold">
                   {callout}
                 </div>
               ))}
@@ -162,13 +162,13 @@ export default function GoogleAdsPlan() {
 
           {/* Sitelinks */}
           <div className="vida-card">
-            <h4 className="font-bold font-poppins text-[#0f1b3c] mb-4">
+            <h4 className="font-bold font-poppins text-[#1FBD8F] mb-4">
               Sitelinks
             </h4>
             <div className="space-y-2">
               {sitelinks.map((link, index) => (
                 <div key={index} className="p-2 bg-gray-50 rounded text-sm text-gray-700 flex gap-2">
-                  <span className="text-[#00a896]">→</span>
+                  <span className="text-[#1FBD8F]">→</span>
                   <span>{link}</span>
                 </div>
               ))}

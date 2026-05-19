@@ -33,7 +33,7 @@ export default function MetaAdsPlan() {
   return (
     <section className="vida-section bg-[#f5f7fa]">
       <div className="container">
-        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-12 text-[#0f1b3c]">
+        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-12 text-[#1FBD8F]">
           Plano de Meta Ads
         </h2>
 
@@ -41,10 +41,10 @@ export default function MetaAdsPlan() {
           {campaigns.map((campaign, index) => (
             <div key={index} className="vida-card">
               <div className="mb-4">
-                <div className="inline-block px-3 py-1 bg-[#00a896] text-white rounded-full text-xs font-bold mb-3">
+                <div className="inline-block px-3 py-1 bg-[#1FBD8F] text-white rounded-full text-xs font-bold mb-3">
                   Campanha {index + 1}
                 </div>
-                <h3 className="text-xl font-bold font-poppins text-[#0f1b3c] mb-4">
+                <h3 className="text-xl font-bold font-poppins text-[#1FBD8F] mb-4">
                   {campaign.name}
                 </h3>
               </div>
@@ -64,7 +64,7 @@ export default function MetaAdsPlan() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-1">CTA</p>
-                  <p className="text-[#00a896] font-semibold">{campaign.cta}</p>
+                  <p className="text-[#1FBD8F] font-semibold">{campaign.cta}</p>
                 </div>
               </div>
             </div>

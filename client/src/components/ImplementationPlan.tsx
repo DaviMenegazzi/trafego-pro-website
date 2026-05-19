@@ -44,7 +44,7 @@ export default function ImplementationPlan() {
   return (
     <section className="vida-section bg-[#f5f7fa]">
       <div className="container">
-        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-12 text-[#0f1b3c]">
+        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-12 text-[#1FBD8F]">
           Plano de Implantação
         </h2>
 
@@ -54,12 +54,12 @@ export default function ImplementationPlan() {
             return (
               <div key={index} className="vida-card flex flex-col">
                 <div className="flex items-center gap-3 mb-4">
-                  <Icon className="w-6 h-6 text-[#00a896]" />
+                  <Icon className="w-6 h-6 text-[#1FBD8F]" />
                   <div>
                     <p className="text-xs font-bold text-gray-500 uppercase">
                       {item.week}
                     </p>
-                    <h3 className="text-lg font-bold font-poppins text-[#0f1b3c]">
+                    <h3 className="text-lg font-bold font-poppins text-[#1FBD8F]">
                       {item.title}
                     </h3>
                   </div>
@@ -67,7 +67,7 @@ export default function ImplementationPlan() {
                 <ul className="space-y-2 flex-1">
                   {item.tasks.map((task, tIndex) => (
                     <li key={tIndex} className="text-sm text-gray-700 flex gap-2">
-                      <span className="text-[#c4d600] font-bold">→</span>
+                      <span className="text-[#FF8C42] font-bold">→</span>
                       <span>{task}</span>
                     </li>
                   ))}

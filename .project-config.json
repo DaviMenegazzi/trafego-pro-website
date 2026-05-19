@@ -1,0 +1,35 @@
+{
+  "build_command": "pnpm run build",
+  "capabilities": [],
+  "dev_command": "pnpm run dev",
+  "env_vars": {},
+  "experiments": null,
+  "git_remote": {
+    "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663655133524/HCdtznE9dNy8ZoAnjMwrWj",
+    "access_key_id": "ASIAZV3A2ECZA5QLXCX7",
+    "secret_access_key": "DhTmEmnais9ZKEOuaGjCh7j45oNV4ke5vrvO71j/",
+    "session_token": "IQoJb3JpZ2luX2VjEBgaCXVzLWVhc3QtMSJGMEQCICj8m65u7SnSlGy6aArpkIiYMEOIzIVfk9eQhYYafz40AiAIgFbkA42bU1U5X1K10Hu0UpHZpR1HTmQQ+eg+eIHjKCr/Awjh//////////8BEAQaDDY2NTM4NjA5ODg2NiIMyltWHdI2OuiU/jiKKtMD4ziW7pTFSccVFwCA2Qh8Is2zl/8OAy2I/ksA3kwz35i781FZqP4R4rd7IqQ4FDdPBR2OV65z1YpTwvux4d37mp3qvU9wG5SLmPhXyI+QWLY6T0ZRvZbna2V0dYoaAsvPZ6KkKrI/ridqy5SX2uw90X6vZzP/UtuzNnQnZ6DmKofvmGgNhLUblWZAzdKGHMDrpbIkbg3T1YVbhFKAqhgdK+ta/FPKI6YIwukQSj8YvEr6r7T0Nd7o1P1/AHdIYB/Fz/vLg1G1207sX7HWSjACa5bLiF13Xw8W8lwS8rNRD+Eozl5/5wHeVKUo6cgTspPvOsKjmk8pbZNx14Csn6e74J+7i8+O9bca/RMV66Ai7a2sEVeIjsOzsARXxXXO8JoSj0IP+D+/i/JwOb9EFC8caV4AQa2XyCqNREKZ27N323daFSHW8T/wfifW05JBC5nqLMF4yy/ls3AKyoJ1rTNZR/tQIVfhycR6jEn270fh0ICtEt5aas71kK0/fJaKs60ttIJ9Y6KaQ/G3PPypKN33cArkIMmp1UjAMRxT0AY8ElFASWQQm+xogvgOaidKG99Ji70h5Q6G/DBqIx7JufFpfzv6liy4mFtRRn7j+m395Z16iAAw9uqz0AY6ngFXmtRsvkdNAgAghJWNiimXZpJieQKJfex1yiAPqg0I5TJKWy/m9F4XWRnwRRgXsGPHDIi0828ZwjApd5EseG6u+4ssmbvSzQvmkTURKZ9f+jpJW7BC0xMqxpSJ6ADTsiD8PTEYHLoMXsxwvckBL0MGlP9DAUV1p9zZAvuQcT1edOa5Pf3XsjlhI8GWZQFn1IX5kVgWEyqxMSb637l7Ew==",
+    "expiration": "2026-05-20T11:42:46.000Z"
+  },
+  "name": "vidacard-tupan-lp",
+  "path": "/home/ubuntu/vidacard-tupan-lp",
+  "port": 3000,
+  "secrets": {
+    "BUILT_IN_FORGE_API_KEY": "QqhX4sSfaEUg9MRuP6S4UU",
+    "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
+    "JWT_SECRET": "V7acck2whE2FeVpB5kScab",
+    "OAUTH_SERVER_URL": "https://api.manus.im",
+    "OWNER_NAME": "Davi",
+    "OWNER_OPEN_ID": "aedygS7YmRoTGS3ZjtZzMr",
+    "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
+    "VITE_ANALYTICS_WEBSITE_ID": "202f67cb-1a4a-4c78-954a-fabaa81b1d12",
+    "VITE_APP_ID": "HCdtznE9dNy8ZoAnjMwrWj",
+    "VITE_APP_LOGO": "",
+    "VITE_APP_TITLE": "Vida Card Tupanciretã | Tráfego Pro",
+    "VITE_FRONTEND_FORGE_API_KEY": "V6mqDi9rVbLKiHaEXdbMWp",
+    "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",
+    "VITE_OAUTH_PORTAL_URL": "https://manus.im"
+  },
+  "template_id": "web-static",
+  "test_command": "pnpm test"
+}

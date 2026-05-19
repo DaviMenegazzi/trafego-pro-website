@@ -18,8 +18,8 @@ export default function CommunicationPolicy() {
     <section className="vida-section bg-[#f5f7fa]">
       <div className="container">
         <div className="flex items-center gap-3 mb-4">
-          <AlertTriangle className="w-8 h-8 text-[#00a896]" />
-          <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#0f1b3c]">
+          <AlertTriangle className="w-8 h-8 text-[#1FBD8F]" />
+          <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#1FBD8F]">
             Cuidados de Política e Comunicação
           </h2>
         </div>
@@ -32,7 +32,7 @@ export default function CommunicationPolicy() {
           <div className="vida-card border-l-4 border-red-500">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle className="w-5 h-5 text-red-500" />
-              <h3 className="text-xl font-bold font-poppins text-[#0f1b3c]">
+              <h3 className="text-xl font-bold font-poppins text-[#1FBD8F]">
                 Evitar
               </h3>
             </div>
@@ -48,17 +48,17 @@ export default function CommunicationPolicy() {
           </div>
 
           {/* Safe */}
-          <div className="vida-card border-l-4 border-[#00a896]">
+          <div className="vida-card border-l-4 border-[#1FBD8F]">
             <div className="flex items-center gap-2 mb-4">
-              <CheckCircle2 className="w-5 h-5 text-[#00a896]" />
-              <h3 className="text-xl font-bold font-poppins text-[#0f1b3c]">
+              <CheckCircle2 className="w-5 h-5 text-[#1FBD8F]" />
+              <h3 className="text-xl font-bold font-poppins text-[#1FBD8F]">
                 Usar
               </h3>
             </div>
             <div className="space-y-3">
               {safe.map((phrase, index) => (
                 <div key={index} className="p-3 bg-green-50 rounded text-gray-700">
-                  <p className="text-sm text-[#00a896] font-semibold">
+                  <p className="text-sm text-[#1FBD8F] font-semibold">
                     "{phrase}"
                   </p>
                 </div>

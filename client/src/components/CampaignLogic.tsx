@@ -27,7 +27,7 @@ export default function CampaignLogic() {
   return (
     <section className="vida-section bg-[#f5f7fa]">
       <div className="container">
-        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-12 text-[#0f1b3c]">
+        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-12 text-[#1FBD8F]">
           Lógica da Campanha
         </h2>
 
@@ -38,12 +38,12 @@ export default function CampaignLogic() {
               <div key={index} className="flex flex-col">
                 <div className="vida-card flex-1 flex flex-col">
                   <div className="flex items-center gap-3 mb-3">
-                    <Icon className="w-6 h-6 text-[#00a896]" />
-                    <span className="inline-block px-2 py-1 bg-[#c4d600] text-[#0f1b3c] rounded text-xs font-bold">
+                    <Icon className="w-6 h-6 text-[#1FBD8F]" />
+                    <span className="inline-block px-2 py-1 bg-[#FF8C42] text-[#1FBD8F] rounded text-xs font-bold">
                       {index + 1}
                     </span>
                   </div>
-                  <h3 className="text-lg font-bold font-poppins text-[#0f1b3c] mb-2">
+                  <h3 className="text-lg font-bold font-poppins text-[#1FBD8F] mb-2">
                     {step.title}
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed flex-1">
@@ -52,7 +52,7 @@ export default function CampaignLogic() {
                 </div>
                 {index < steps.length - 1 && (
                   <div className="hidden md:flex justify-center py-4">
-                    <ArrowRight className="w-5 h-5 text-[#00a896] transform rotate-90 md:rotate-0" />
+                    <ArrowRight className="w-5 h-5 text-[#1FBD8F] transform rotate-90 md:rotate-0" />
                   </div>
                 )}
               </div>

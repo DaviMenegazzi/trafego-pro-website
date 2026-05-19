@@ -2,7 +2,7 @@ export default function VisualSection() {
   return (
     <section className="vida-section bg-white">
       <div className="container">
-        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-12 text-[#0f1b3c]">
+        <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-12 text-[#1FBD8F]">
           Estratégia Visual
         </h2>
 

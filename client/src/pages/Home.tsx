@@ -7,7 +7,6 @@ import MainOffers from "@/components/MainOffers";
 import MetaAdsPlan from "@/components/MetaAdsPlan";
 import GoogleAdsPlan from "@/components/GoogleAdsPlan";
 import CreativeDemands from "@/components/CreativeDemands";
-import InfluencerScripts from "@/components/InfluencerScripts";
 import CommunicationPolicy from "@/components/CommunicationPolicy";
 import KPIs from "@/components/KPIs";
 import ImplementationPlan from "@/components/ImplementationPlan";
@@ -27,7 +26,6 @@ export default function Home() {
       <MetaAdsPlan />
       <GoogleAdsPlan />
       <CreativeDemands />
-      <InfluencerScripts />
       <CommunicationPolicy />
       <KPIs />
       <ImplementationPlan />

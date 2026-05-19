@@ -14,8 +14,8 @@ export default function StrategicDiagnosis() {
       <div className="container">
         <div className="max-w-4xl">
           <div className="flex items-start gap-3 mb-6">
-            <AlertCircle className="w-8 h-8 text-[#00a896] flex-shrink-0 mt-1" />
-            <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#0f1b3c]">
+            <AlertCircle className="w-8 h-8 text-[#1FBD8F] flex-shrink-0 mt-1" />
+            <h2 className="text-3xl md:text-4xl font-bold font-poppins text-[#1FBD8F]">
               O problema não é só mídia, é clareza de oferta
             </h2>
           </div>
@@ -24,7 +24,7 @@ export default function StrategicDiagnosis() {
             {points.map((point, index) => (
               <div key={index} className="flex gap-4 pb-4 border-b border-gray-200 last:border-b-0">
                 <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-8 w-8 rounded-full bg-[#c4d600] text-[#0f1b3c] font-bold text-sm">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-full bg-[#FF8C42] text-[#1FBD8F] font-bold text-sm">
                     {index + 1}
                   </div>
                 </div>

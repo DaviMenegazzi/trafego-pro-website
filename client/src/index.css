@@ -43,73 +43,73 @@
 }
 
 :root {
-  /* Vida Card Color Palette */
-  --vida-navy: #0f1b3c;
-  --vida-navy-light: #1a2a52;
-  --vida-teal: #00a896;
-  --vida-teal-light: #00d4b4;
-  --vida-lime: #c4d600;
+  /* Vida Card Color Palette - Green */
+  --vida-green: #1FBD8F;
+  --vida-green-light: #2FD4A5;
+  --vida-green-dark: #17A577;
+  --vida-lime: #B8D400;
+  --vida-orange: #FF8C42;
   --vida-gray-light: #f5f7fa;
   --vida-gray-medium: #e8ecf1;
   --vida-white: #ffffff;
   
-  --primary: var(--vida-teal);
+  --primary: var(--vida-green);
   --primary-foreground: var(--vida-white);
-  --sidebar-primary: var(--vida-teal);
+  --sidebar-primary: var(--vida-green);
   --sidebar-primary-foreground: var(--vida-white);
-  --chart-1: var(--vida-teal);
-  --chart-2: var(--vida-teal-light);
-  --chart-3: #00c9a3;
-  --chart-4: #009d8a;
-  --chart-5: #008076;
+  --chart-1: var(--vida-green);
+  --chart-2: var(--vida-green-light);
+  --chart-3: #1FA580;
+  --chart-4: #178A6E;
+  --chart-5: #0F6F57;
   --radius: 0.75rem;
   --background: var(--vida-white);
-  --foreground: var(--vida-navy);
+  --foreground: #1a1a1a;
   --card: var(--vida-white);
-  --card-foreground: var(--vida-navy);
+  --card-foreground: #1a1a1a;
   --popover: var(--vida-white);
-  --popover-foreground: var(--vida-navy);
+  --popover-foreground: #1a1a1a;
   --secondary: var(--vida-gray-light);
-  --secondary-foreground: var(--vida-navy);
+  --secondary-foreground: #1a1a1a;
   --muted: var(--vida-gray-medium);
   --muted-foreground: #6b7280;
-  --accent: var(--vida-lime);
-  --accent-foreground: var(--vida-navy);
+  --accent: var(--vida-orange);
+  --accent-foreground: var(--vida-white);
   --destructive: #ef4444;
   --destructive-foreground: var(--vida-white);
   --border: var(--vida-gray-medium);
   --input: var(--vida-gray-medium);
-  --ring: var(--vida-teal);
+  --ring: var(--vida-green);
   --sidebar: var(--vida-white);
-  --sidebar-foreground: var(--vida-navy);
+  --sidebar-foreground: #1a1a1a;
   --sidebar-accent: var(--vida-gray-light);
-  --sidebar-accent-foreground: var(--vida-navy);
+  --sidebar-accent-foreground: #1a1a1a;
   --sidebar-border: var(--vida-gray-medium);
-  --sidebar-ring: var(--vida-teal);
+  --sidebar-ring: var(--vida-green);
 }
 
 .dark {
-  --background: var(--vida-navy);
+  --background: #0f1f1a;
   --foreground: var(--vida-white);
-  --card: var(--vida-navy-light);
+  --card: #1a3a33;
   --card-foreground: var(--vida-white);
-  --popover: var(--vida-navy-light);
+  --popover: #1a3a33;
   --popover-foreground: var(--vida-white);
-  --secondary: var(--vida-navy-light);
+  --secondary: #2a4a43;
   --secondary-foreground: var(--vida-gray-light);
-  --muted: #4b5563;
+  --muted: #3a5a53;
   --muted-foreground: #9ca3af;
-  --accent: var(--vida-lime);
-  --accent-foreground: var(--vida-navy);
-  --border: #2d3e5f;
-  --input: #2d3e5f;
-  --ring: var(--vida-teal);
-  --sidebar: var(--vida-navy-light);
+  --accent: var(--vida-orange);
+  --accent-foreground: var(--vida-white);
+  --border: #2a4a43;
+  --input: #2a4a43;
+  --ring: var(--vida-green);
+  --sidebar: #1a3a33;
   --sidebar-foreground: var(--vida-white);
-  --sidebar-accent: #2d3e5f;
-  --sidebar-accent-foreground: var(--vida-teal);
-  --sidebar-border: #2d3e5f;
-  --sidebar-ring: var(--vida-teal);
+  --sidebar-accent: #2a4a43;
+  --sidebar-accent-foreground: var(--vida-green);
+  --sidebar-border: #2a4a43;
+  --sidebar-ring: var(--vida-green);
 }
 
 @layer base {
@@ -171,11 +171,11 @@
   }
 
   .vida-badge-primary {
-    @apply bg-[#0f1b3c] text-white;
+    @apply bg-[#1FBD8F] text-white;
   }
 
   .vida-badge-accent {
-    @apply bg-[#c4d600] text-[#0f1b3c];
+    @apply bg-[#FF8C42] text-white;
   }
 
   .vida-section {
@@ -183,14 +183,14 @@
   }
 
   .vida-hero {
-    @apply bg-gradient-to-br from-[#0f1b3c] to-[#1a2a52] text-white;
+    @apply bg-gradient-to-br from-[#1FBD8F] to-[#17A577] text-white;
   }
 
-  .vida-text-teal {
-    @apply text-[#00a896];
+  .vida-text-green {
+    @apply text-[#1FBD8F];
   }
 
-  .vida-text-lime {
-    @apply text-[#c4d600];
+  .vida-text-orange {
+    @apply text-[#FF8C42];
   }
 }

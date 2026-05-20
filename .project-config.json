@@ -1,15 +1,22 @@
 {
   "build_command": "pnpm run build",
-  "capabilities": [],
+  "capabilities": [
+    "db",
+    "server",
+    "user"
+  ],
   "dev_command": "pnpm run dev",
-  "env_vars": {},
+  "env_vars": {
+    "DATABASE_URL": "mysql://2GrmLjqk6jqj6xH.root:kzLM2DL97sNK71J3uxry@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/HCdtznE9dNy8ZoAnjMwrWj?ssl={\"rejectUnauthorized\":true}",
+    "DRIZZLE_DATABASE_URL": "mysql://2GrmLjqk6jqj6xH.root:kzLM2DL97sNK71J3uxry@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/HCdtznE9dNy8ZoAnjMwrWj?ssl={\"rejectUnauthorized\":true}"
+  },
   "experiments": null,
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663655133524/HCdtznE9dNy8ZoAnjMwrWj",
-    "access_key_id": "ASIAZV3A2ECZA5QLXCX7",
-    "secret_access_key": "DhTmEmnais9ZKEOuaGjCh7j45oNV4ke5vrvO71j/",
-    "session_token": "IQoJb3JpZ2luX2VjEBgaCXVzLWVhc3QtMSJGMEQCICj8m65u7SnSlGy6aArpkIiYMEOIzIVfk9eQhYYafz40AiAIgFbkA42bU1U5X1K10Hu0UpHZpR1HTmQQ+eg+eIHjKCr/Awjh//////////8BEAQaDDY2NTM4NjA5ODg2NiIMyltWHdI2OuiU/jiKKtMD4ziW7pTFSccVFwCA2Qh8Is2zl/8OAy2I/ksA3kwz35i781FZqP4R4rd7IqQ4FDdPBR2OV65z1YpTwvux4d37mp3qvU9wG5SLmPhXyI+QWLY6T0ZRvZbna2V0dYoaAsvPZ6KkKrI/ridqy5SX2uw90X6vZzP/UtuzNnQnZ6DmKofvmGgNhLUblWZAzdKGHMDrpbIkbg3T1YVbhFKAqhgdK+ta/FPKI6YIwukQSj8YvEr6r7T0Nd7o1P1/AHdIYB/Fz/vLg1G1207sX7HWSjACa5bLiF13Xw8W8lwS8rNRD+Eozl5/5wHeVKUo6cgTspPvOsKjmk8pbZNx14Csn6e74J+7i8+O9bca/RMV66Ai7a2sEVeIjsOzsARXxXXO8JoSj0IP+D+/i/JwOb9EFC8caV4AQa2XyCqNREKZ27N323daFSHW8T/wfifW05JBC5nqLMF4yy/ls3AKyoJ1rTNZR/tQIVfhycR6jEn270fh0ICtEt5aas71kK0/fJaKs60ttIJ9Y6KaQ/G3PPypKN33cArkIMmp1UjAMRxT0AY8ElFASWQQm+xogvgOaidKG99Ji70h5Q6G/DBqIx7JufFpfzv6liy4mFtRRn7j+m395Z16iAAw9uqz0AY6ngFXmtRsvkdNAgAghJWNiimXZpJieQKJfex1yiAPqg0I5TJKWy/m9F4XWRnwRRgXsGPHDIi0828ZwjApd5EseG6u+4ssmbvSzQvmkTURKZ9f+jpJW7BC0xMqxpSJ6ADTsiD8PTEYHLoMXsxwvckBL0MGlP9DAUV1p9zZAvuQcT1edOa5Pf3XsjlhI8GWZQFn1IX5kVgWEyqxMSb637l7Ew==",
-    "expiration": "2026-05-20T11:42:46.000Z"
+    "access_key_id": "ASIAZV3A2ECZHCYQRVGP",
+    "secret_access_key": "dqVc0M6SutcCzE2enihtpPzjiiuQLqMULa2Av9Li",
+    "session_token": "IQoJb3JpZ2luX2VjECkaCXVzLWVhc3QtMSJHMEUCIEEStrL7F46M0D87V7UpLFpomIWs+jTpyOeVuVeD6IYaAiEAh9UoSvPQFDE3VaW/K3y2qCtI4/RdfvWZNsLdXBgmhvQq/wMI8v//////////ARAEGgw2NjUzODYwOTg4NjYiDD0n53cYUPvKo1vEPCrTA4aQ9JyWR9TGIMMHbbnbJTTF9JPyEd4KkN4Fv8/5enUux7/4Lwo0b4GvhZmzcP3IDwC5NEa6XGOC2H/KSDFXyrPBHAH1J7UWkhf99LaqyyzBT6B1iosEhm6KBX0PLzgkCi5j3EQhBepA+LRztjFEXGeAW1EvMqV010RodKuxU6bHM3W/5r0zmTB/I2yyh8LMR1GfV+zH8/roeAT+rPDLqM4ix6zioC/OUEGUpTCI9dv1AKvq8dPxmKPZCQZj04z3AXqC4wOhfsi0jYVdDJ0+L/AL/1zqXJlxfW8zRqjmSKrQ6b7uxxdJCOlzL4JkQCxSZN9k9N5eBBqA0g9L/YLAwZ6ziaQlznjyMPmI1NVr2+6yFN5ICNufpS8tDVR905fdgZnSGF7Ip7HYxOFKS4sOoyZZ7+bw6R1bUuaLm6k7ZyqbJk5QKOeQORdQwxIFhCfZIn8Q8RwsV+Qj9OERLl7b4dqxZ31KArUoGV52L2pe/pvFLIOBr1PlQaRQBr58SxbJA3xNKi9FLmTa3D9cptcK9h7620aZ83JN3ovnOYlruvoblxXVPw/BGPt4EBRxi7pbzD8CoFM5nBFa4nEGCtDqp76D+oU905tenHeNNVdL5t3XDz3MMP7Bt9AGOp0B7Fvkqd8TnQ2ojK0s+Ub1HG9VMHAjQrkvtqHyX6AFH/ccBUCSK45Y7CSA4z1XesPU+4ZrRdC7NMD0Vfjct4PZ4uxDIDbSQzgfyE4zhUzqFw86EY1x6O+aVESMXnbbFLfq5TvTm4zHDKUB385UJVkXaaSNbnucCzF+yzuRgcugle1+5yRojBpe033TfpZM5xX68ySqPdPrlMX20tuKgg==",
+    "expiration": "2026-05-21T04:27:42.000Z"
   },
   "name": "vidacard-tupan-lp",
   "path": "/home/ubuntu/vidacard-tupan-lp",
@@ -24,8 +31,8 @@
     "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
     "VITE_ANALYTICS_WEBSITE_ID": "202f67cb-1a4a-4c78-954a-fabaa81b1d12",
     "VITE_APP_ID": "HCdtznE9dNy8ZoAnjMwrWj",
-    "VITE_APP_LOGO": "",
-    "VITE_APP_TITLE": "Vida Card Tupanciretã | Tráfego Pro",
+    "VITE_APP_LOGO": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310519663655133524/IClziiAaYHNQNKWs.webp",
+    "VITE_APP_TITLE": "Tráfego Pro - Impulsionando suas vendas",
     "VITE_FRONTEND_FORGE_API_KEY": "V6mqDi9rVbLKiHaEXdbMWp",
     "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",
     "VITE_OAUTH_PORTAL_URL": "https://manus.im"

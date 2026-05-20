@@ -129,7 +129,7 @@ export default function TrafegoProHome() {
         {/* Subtitle */}
         <p 
           className="text-lg md:text-xl text-gray-400 text-center max-w-2xl mb-12 leading-relaxed"
-          style={{ fontWeight: 100 }}
+          style={{ fontWeight: 300 }}
         >
           Maximize suas vendas com estratégias de tráfego pago e conteúdo orgânico de alto impacto. Resultados reais, dados comprovados.
         </p>
@@ -164,13 +164,13 @@ export default function TrafegoProHome() {
           
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="text-lg leading-relaxed text-gray-400 mb-6" style={{ fontWeight: 100 }}>
+              <p className="text-lg leading-relaxed text-gray-400 mb-6" style={{ fontWeight: 300 }}>
                 A Tráfego Pro é uma assessoria especializada em marketing digital que ajuda empresas a alcançarem seus objetivos de vendas através de estratégias integradas de tráfego pago e conteúdo orgânico.
               </p>
-              <p className="text-lg leading-relaxed text-gray-400 mb-6" style={{ fontWeight: 100 }}>
+              <p className="text-lg leading-relaxed text-gray-400 mb-6" style={{ fontWeight: 300 }}>
                 Nosso foco é transformar dados em decisões estratégicas, maximizando o retorno de cada real investido em marketing.
               </p>
-              <p className="text-lg leading-relaxed text-gray-400" style={{ fontWeight: 100 }}>
+              <p className="text-lg leading-relaxed text-gray-400" style={{ fontWeight: 300 }}>
                 Trabalhamos com empresas de todos os tamanhos, sempre com a mesma dedicação e excelência.
               </p>
             </div>
@@ -178,15 +178,15 @@ export default function TrafegoProHome() {
               <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }} className="space-y-8">
                 <div>
                   <h3 className="text-4xl font-black text-white mb-2">+500</h3>
-                  <p className="text-gray-400" style={{ fontWeight: 100 }}>Campanhas gerenciadas com sucesso</p>
+                  <p className="text-gray-400" style={{ fontWeight: 300 }}>Campanhas gerenciadas com sucesso</p>
                 </div>
                 <div>
                   <h3 className="text-4xl font-black text-white mb-2">+50M</h3>
-                  <p className="text-gray-400" style={{ fontWeight: 100 }}>Em vendas geradas para clientes</p>
+                  <p className="text-gray-400" style={{ fontWeight: 300 }}>Em vendas geradas para clientes</p>
                 </div>
                 <div>
                   <h3 className="text-4xl font-black text-white mb-2">98%</h3>
-                  <p className="text-gray-400" style={{ fontWeight: 100 }}>Taxa de satisfação de clientes</p>
+                  <p className="text-gray-400" style={{ fontWeight: 300 }}>Taxa de satisfação de clientes</p>
                 </div>
               </div>
             </div>
@@ -230,7 +230,7 @@ export default function TrafegoProHome() {
                 >
                   {service.title}
                 </h3>
-                <p className="text-gray-400" style={{ fontWeight: 100 }}>
+                <p className="text-gray-400" style={{ fontWeight: 300 }}>
                   {service.desc}
                 </p>
               </div>
@@ -266,7 +266,7 @@ export default function TrafegoProHome() {
                 <h3 className="text-xl font-black text-white mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
                   {step.title}
                 </h3>
-                <p className="text-gray-400 text-sm" style={{ fontWeight: 100 }}>
+                <p className="text-gray-400 text-sm" style={{ fontWeight: 300 }}>
                   {step.desc}
                 </p>
               </div>
@@ -288,7 +288,7 @@ export default function TrafegoProHome() {
           >
             Pronto para Transformar Seus Resultados?
           </h2>
-          <p className="text-lg text-gray-400 mb-12 leading-relaxed" style={{ fontWeight: 100 }}>
+          <p className="text-lg text-gray-400 mb-12 leading-relaxed" style={{ fontWeight: 300 }}>
             Vamos conversar sobre como a Tráfego Pro pode ajudar seu negócio a crescer exponencialmente com estratégias de marketing digital comprovadas.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -312,12 +312,12 @@ export default function TrafegoProHome() {
                 alt="Tráfego Pro" 
                 style={{ width: '259px', height: '24px' }}
               />
-              <p className="text-gray-500 text-sm mt-4" style={{ fontWeight: 100 }}>
+              <p className="text-gray-500 text-sm mt-4" style={{ fontWeight: 300 }}>
                 Assessoria de marketing focada em resultados reais.
               </p>
             </div>
             <div className="text-center md:text-right">
-              <p className="text-gray-400 text-sm" style={{ fontWeight: 100 }}>
+              <p className="text-gray-400 text-sm" style={{ fontWeight: 300 }}>
                 © 2026 Tráfego Pro. Todos os direitos reservados.
               </p>
               <div className="flex gap-6 justify-center md:justify-end mt-4">

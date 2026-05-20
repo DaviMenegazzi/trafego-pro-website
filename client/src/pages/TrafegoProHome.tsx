@@ -20,7 +20,8 @@ export default function TrafegoProHome() {
             <img 
               src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" 
               alt="Tráfego Pro" 
-              className="h-12"
+              className="h-8"
+              style={{ width: 'auto', aspectRatio: 'auto' }}
             />
           </div>
           <nav className="hidden md:flex gap-8 text-sm font-medium">
@@ -36,11 +37,11 @@ export default function TrafegoProHome() {
       <section className="bg-black text-white py-32 px-4">
         <div className="max-w-6xl mx-auto">
           <div style={{ fontFamily: "'Archivo', sans-serif" }} className="mb-8">
-            <h1 className="text-7xl md:text-8xl font-black leading-tight mb-6">
-              Tráfego<br />que converte
+            <h1 className="text-6xl md:text-7xl font-black leading-tight mb-6">
+              Tráfego que<br />converte
             </h1>
           </div>
-          <p className="text-xl md:text-2xl opacity-80 max-w-2xl mb-8 leading-relaxed">
+          <p className="text-xl md:text-2xl opacity-80 max-w-2xl mb-8 leading-relaxed" style={{ fontWeight: 300 }}>
             Assessoria de marketing focada em maximizar suas vendas através de estratégias de tráfego pago e conteúdo orgânico de alto impacto.
           </p>
           <div className="flex gap-4">
@@ -191,15 +192,15 @@ export default function TrafegoProHome() {
 
           <div className="grid md:grid-cols-2 gap-12">
             {[
-              { icon: "📊", title: "Data-Driven", desc: "Todas as decisões baseadas em dados e análises profundas" },
-              { icon: "🎯", title: "Resultados Comprovados", desc: "Histórico de sucesso com empresas de diversos segmentos" },
-              { icon: "⚡", title: "Execução Rápida", desc: "Implementação ágil sem comprometer a qualidade" },
-              { icon: "🔄", title: "Otimização Contínua", desc: "Melhorias constantes baseadas em performance real" },
-              { icon: "💡", title: "Criatividade + Estratégia", desc: "Combinação perfeita de arte e ciência" },
-              { icon: "🤝", title: "Parceria Real", desc: "Seu sucesso é nosso sucesso" }
+              { icon: "■", title: "Data-Driven", desc: "Todas as decisões baseadas em dados e análises profundas" },
+              { icon: "■", title: "Resultados Comprovados", desc: "Histórico de sucesso com empresas de diversos segmentos" },
+              { icon: "■", title: "Execução Rápida", desc: "Implementação ágil sem comprometer a qualidade" },
+              { icon: "■", title: "Otimização Contínua", desc: "Melhorias constantes baseadas em performance real" },
+              { icon: "■", title: "Criatividade + Estratégia", desc: "Combinação perfeita de arte e ciência" },
+              { icon: "■", title: "Parceria Real", desc: "Seu sucesso é nosso sucesso" }
             ].map((item, idx) => (
               <Card key={idx} className="p-8 bg-white border-0 shadow-md">
-                <p className="text-5xl mb-4">{item.icon}</p>
+                <p className="text-3xl mb-4 text-black font-bold">{item.icon}</p>
                 <h3 style={{ fontFamily: "'Archivo', sans-serif" }} className="text-2xl font-black mb-3 text-black">
                   {item.title}
                 </h3>
@@ -235,15 +236,16 @@ export default function TrafegoProHome() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-4">
+      <footer className="bg-black text-white py-12 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8 mb-12">
             <div>
-              <img 
-                src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" 
-                alt="Tráfego Pro" 
-                className="h-10 mb-4"
-              />
+            <img 
+              src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" 
+              alt="Tráfego Pro" 
+              className="h-8 mb-4"
+              style={{ width: 'auto', aspectRatio: 'auto' }}
+            />
               <p className="text-gray-400 text-sm">
                 Assessoria de marketing focada em resultados reais.
               </p>

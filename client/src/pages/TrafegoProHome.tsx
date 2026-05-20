@@ -15,27 +15,24 @@ export default function TrafegoProHome() {
     <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
       {/* Header com Logo */}
       <header className="bg-black text-white py-6 px-4 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img 
-              src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" 
-              alt="Tráfego Pro" 
-              className="h-8"
-              style={{ width: 'auto', aspectRatio: 'auto' }}
-            />
-          </div>
-          <nav className="hidden md:flex gap-8 text-sm font-medium">
-            <a href="#sobre" className="hover:opacity-70 transition">Sobre</a>
-            <a href="#servicos" className="hover:opacity-70 transition">Serviços</a>
-            <a href="#estrategia" className="hover:opacity-70 transition">Estratégia</a>
-            <a href="#contato" className="hover:opacity-70 transition">Contato</a>
-          </nav>
+        <div className="max-w-6xl mx-auto flex items-center justify-center">
+          <img 
+            src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" 
+            alt="Tráfego Pro" 
+            style={{ width: '299px', height: '24px' }}
+          />
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="bg-black text-white py-32 px-4">
-        <div className="max-w-6xl mx-auto">
+      <section className="bg-black text-white py-32 px-4 relative overflow-hidden" style={{
+        backgroundImage: 'url("https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&h=600&fit=crop")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}>
+        <div className="absolute inset-0 bg-black/70"></div>
+        <div className="max-w-6xl mx-auto relative z-10">
           <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="mb-8">
             <h1 className="text-6xl md:text-7xl font-black leading-tight mb-6">
               Tráfego que<br />converte
@@ -243,8 +240,7 @@ export default function TrafegoProHome() {
             <img 
               src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" 
               alt="Tráfego Pro" 
-              className="h-8 mb-4"
-              style={{ width: 'auto', aspectRatio: 'auto' }}
+              style={{ width: '259px', height: '24px', marginBottom: '1rem' }}
             />
               <p className="text-gray-400 text-sm">
                 Assessoria de marketing focada em resultados reais.

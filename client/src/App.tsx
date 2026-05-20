@@ -7,12 +7,15 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import JulioDeCastilhos from "./pages/JulioDeCastilhos";
+import TrafegoProHome from "./pages/TrafegoProHome";
 
 
 function Router() {
   return (
     <Switch>
       <Route path={"/ "} component={Index} />
+      <Route path={"/trafego-pro"} component={TrafegoProHome} />
+      <Route path={"/trafego-pro/"} component={TrafegoProHome} />
       <Route path={"/tupancireta"} component={Home} />
       <Route path={"/tupancireta/"} component={Home} />
       <Route path={"/juliodecastilhos"} component={JulioDeCastilhos} />

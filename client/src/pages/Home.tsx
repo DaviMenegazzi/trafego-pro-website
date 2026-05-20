@@ -10,7 +10,6 @@ import CreativeDemands from "@/components/CreativeDemands";
 import CommunicationPolicy from "@/components/CommunicationPolicy";
 import KPIs from "@/components/KPIs";
 import ImplementationPlan from "@/components/ImplementationPlan";
-import VisualSection from "@/components/VisualSection";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -22,7 +21,6 @@ export default function Home() {
       <StrategicDiagnosis />
       <CampaignLogic />
       <MainOffers />
-      <VisualSection />
       <MetaAdsPlan />
       <GoogleAdsPlan />
       <CreativeDemands />

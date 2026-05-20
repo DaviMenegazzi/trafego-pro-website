@@ -13,15 +13,6 @@ export default function HeroSection() {
       {/* Content */}
       <div className="container relative z-10 flex items-center justify-center min-h-screen">
         <div className="text-center max-w-3xl">
-          {/* Logo */}
-          <div className="mb-8 flex justify-center">
-            <img 
-              src="/manus-storage/vida-card-logo_d2bca5b5.png"
-              alt="Vida Card Logo"
-              className="h-32 w-auto"
-            />
-          </div>
-          
           <h1 className="text-5xl md:text-7xl font-bold font-poppins text-white mb-6 leading-tight">
             VIDA CARD TUPANCIRETÃ
           </h1>

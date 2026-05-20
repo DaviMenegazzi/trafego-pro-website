@@ -13,7 +13,7 @@ import TrafegoProHome from "./pages/TrafegoProHome";
 function Router() {
   return (
     <Switch>
-      <Route path={"/ "} component={TrafegoProHome} />
+      <Route path={"/"} component={TrafegoProHome} />
       <Route path={"/tupancireta"} component={Home} />
       <Route path={"/tupancireta/"} component={Home} />
       <Route path={"/juliodecastilhos"} component={JulioDeCastilhos} />

@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 /**
  * Design Philosophy: Tráfego Pro - Moderno, Minimalista
  * - Paleta: Preto (#1a1a1a), Branco (#ffffff), Cinza (#f5f5f5)
- * - Tipografia: Inter Extra Light (títulos - weight 100) + Inter (corpo)
+ * - Tipografia: Space Grotesk (títulos - weight 600) + Inter Extra Light (corpo - weight 100)
  * - Design limpo e profissional
  * - Foco em apresentação da assessoria
  * - SEM links para clientes
@@ -33,7 +33,7 @@ export default function TrafegoProHome() {
       }}>
         <div className="absolute inset-0 bg-black/70"></div>
         <div className="max-w-6xl mx-auto relative z-10">
-          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="mb-8">
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="mb-8">
             <h1 className="text-6xl md:text-7xl font-black leading-tight mb-6">
               Tráfego que<br />converte
             </h1>
@@ -55,7 +55,7 @@ export default function TrafegoProHome() {
       {/* Sobre */}
       <section id="sobre" className="py-24 px-4 bg-gray-50">
         <div className="max-w-6xl mx-auto">
-          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="mb-16">
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="mb-16">
             <h2 className="text-5xl md:text-6xl font-black text-black mb-6">
               Quem Somos
             </h2>
@@ -64,29 +64,29 @@ export default function TrafegoProHome() {
           
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="text-lg leading-relaxed text-gray-700 mb-6">
+              <p className="text-lg leading-relaxed text-gray-700" style={{ fontWeight: 100 }} mb-6">
                 A Tráfego Pro é uma assessoria especializada em marketing digital que ajuda empresas a alcançarem seus objetivos de vendas através de estratégias integradas de tráfego pago e conteúdo orgânico.
               </p>
-              <p className="text-lg leading-relaxed text-gray-700 mb-6">
+              <p className="text-lg leading-relaxed text-gray-700" style={{ fontWeight: 100 }} mb-6">
                 Nosso foco é transformar dados em decisões estratégicas, maximizando o retorno de cada real investido em marketing.
               </p>
-              <p className="text-lg leading-relaxed text-gray-700">
+              <p className="text-lg leading-relaxed text-gray-700" style={{ fontWeight: 100 }}">
                 Trabalhamos com empresas de todos os tamanhos, desde startups até grandes corporações, sempre com a mesma dedicação e excelência.
               </p>
             </div>
             <div className="bg-black text-white p-12 rounded-lg">
-              <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="space-y-8">
+              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="space-y-8">
                 <div>
                   <h3 className="text-4xl font-black mb-2">+500</h3>
-                  <p className="text-gray-300">Campanhas executadas</p>
+                  <p className="text-gray-300" style={{ fontWeight: 100 }}">Campanhas executadas</p>
                 </div>
                 <div>
                   <h3 className="text-4xl font-black mb-2">+50M</h3>
-                  <p className="text-gray-300">Em vendas geradas</p>
+                  <p className="text-gray-300" style={{ fontWeight: 100 }}">Em vendas geradas</p>
                 </div>
                 <div>
                   <h3 className="text-4xl font-black mb-2">98%</h3>
-                  <p className="text-gray-300">Taxa de satisfação</p>
+                  <p className="text-gray-300" style={{ fontWeight: 100 }}">Taxa de satisfação</p>
                 </div>
               </div>
             </div>
@@ -97,7 +97,7 @@ export default function TrafegoProHome() {
       {/* Serviços */}
       <section id="servicos" className="py-24 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="mb-16">
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="mb-16">
             <h2 className="text-5xl md:text-6xl font-black text-black mb-6">
               Nossos Serviços
             </h2>
@@ -132,7 +132,7 @@ export default function TrafegoProHome() {
               }
             ].map((service, idx) => (
               <Card key={idx} className="p-8 border-2 border-black hover:shadow-lg transition">
-                <h3 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="text-2xl font-black mb-4 text-black">
+                <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="text-2xl font-black mb-4 text-black">
                   {service.title}
                 </h3>
                 <p className="text-gray-700 leading-relaxed">
@@ -147,7 +147,7 @@ export default function TrafegoProHome() {
       {/* Estratégia */}
       <section id="estrategia" className="py-24 px-4 bg-black text-white">
         <div className="max-w-6xl mx-auto">
-          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="mb-16">
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="mb-16">
             <h2 className="text-5xl md:text-6xl font-black mb-6">
               Nossa Metodologia
             </h2>
@@ -162,13 +162,13 @@ export default function TrafegoProHome() {
               { step: "04", title: "Otimização", desc: "Monitoramento contínuo e ajustes para máximo desempenho" }
             ].map((item, idx) => (
               <div key={idx} className="border-l-4 border-white pl-6">
-                <p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="text-5xl font-black mb-4 opacity-50">
+                <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="text-5xl font-black mb-4 opacity-50">
                   {item.step}
                 </p>
-                <h3 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="text-2xl font-black mb-3">
+                <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="text-2xl font-black mb-3">
                   {item.title}
                 </h3>
-                <p className="text-gray-300">
+                <p className="text-gray-300" style={{ fontWeight: 100 }}">
                   {item.desc}
                 </p>
               </div>
@@ -180,7 +180,7 @@ export default function TrafegoProHome() {
       {/* Diferencial */}
       <section className="py-24 px-4 bg-gray-50">
         <div className="max-w-6xl mx-auto">
-          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="mb-16">
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="mb-16">
             <h2 className="text-5xl md:text-6xl font-black text-black mb-6">
               Por que Tráfego Pro?
             </h2>
@@ -198,10 +198,10 @@ export default function TrafegoProHome() {
             ].map((item, idx) => (
               <Card key={idx} className="p-8 bg-white border-0 shadow-md">
                 <p className="text-3xl mb-4 text-black font-bold">{item.icon}</p>
-                <h3 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="text-2xl font-black mb-3 text-black">
+                <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="text-2xl font-black mb-3 text-black">
                   {item.title}
                 </h3>
-                <p className="text-gray-700">
+                <p className="text-gray-700" style={{ fontWeight: 100 }}>
                   {item.desc}
                 </p>
               </Card>
@@ -213,7 +213,7 @@ export default function TrafegoProHome() {
       {/* CTA Final */}
       <section id="contato" className="py-32 px-4 bg-black text-white">
         <div className="max-w-4xl mx-auto text-center">
-          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }}>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
             <h2 className="text-6xl md:text-7xl font-black mb-8 leading-tight">
               Pronto para<br />crescer?
             </h2>
@@ -247,7 +247,7 @@ export default function TrafegoProHome() {
               </p>
             </div>
             <div>
-              <h4 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="font-black mb-4">Serviços</h4>
+              <h4 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="font-black mb-4">Serviços</h4>
               <ul className="space-y-2 text-gray-400 text-sm">
                 <li><a href="#" className="hover:text-white transition">Tráfego Pago</a></li>
                 <li><a href="#" className="hover:text-white transition">Conteúdo Orgânico</a></li>
@@ -255,7 +255,7 @@ export default function TrafegoProHome() {
               </ul>
             </div>
             <div>
-              <h4 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="font-black mb-4">Empresa</h4>
+              <h4 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="font-black mb-4">Empresa</h4>
               <ul className="space-y-2 text-gray-400 text-sm">
                 <li><a href="#sobre" className="hover:text-white transition">Sobre</a></li>
                 <li><a href="#" className="hover:text-white transition">Blog</a></li>
@@ -263,7 +263,7 @@ export default function TrafegoProHome() {
               </ul>
             </div>
             <div>
-              <h4 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 100 }} className="font-black mb-4">Redes Sociais</h4>
+              <h4 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }} className="font-black mb-4">Redes Sociais</h4>
               <ul className="space-y-2 text-gray-400 text-sm">
                 <li><a href="#" className="hover:text-white transition">Instagram</a></li>
                 <li><a href="#" className="hover:text-white transition">LinkedIn</a></li>

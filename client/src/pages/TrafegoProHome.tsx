@@ -145,40 +145,75 @@ export default function TrafegoProHome() {
         </div>
       </section>
 
-      {/* Clients Logo Strip */}
-      <section className="relative z-10 py-14 px-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="max-w-5xl mx-auto">
-          <p
-            className="text-center text-xs uppercase tracking-widest mb-10"
-            style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 300, letterSpacing: '0.2em' }}
-          >
-            Empresas que confiam na Tráfego Pro
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-10 md:gap-16">
-            {[
-              { src: '/manus-storage/logo_vidacard_branca_2df5c5e7.png', alt: 'Vida Card', h: 28 },
-              { src: '/manus-storage/logo_oralsin_branca_034f07ac.png', alt: 'Oralsin', h: 26 },
-              { src: '/manus-storage/logo_univates_12651e4a.png', alt: 'Unopar', h: 40 },
-              { src: '/manus-storage/logo_hospital_santa_lucia_89e92c94.png', alt: 'Hospital Regional Santa Lúcia', h: 44 },
-              { src: '/manus-storage/logo_anhanguera_7d6176ba.webp', alt: 'Anhanguera', h: 26 },
-              { src: '/manus-storage/logo_naxia_990a83d9.png', alt: 'Naxia', h: 26 },
-            ].map((logo) => (
+      {/* Clients Logo Marquee */}
+      <section
+        className="relative z-10 py-14 overflow-hidden"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <style>{`
+          @keyframes marquee {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+          }
+          .marquee-track {
+            display: flex;
+            width: max-content;
+            animation: marquee 22s linear infinite;
+          }
+          .marquee-track:hover {
+            animation-play-state: paused;
+          }
+        `}</style>
+
+        <p
+          className="text-center text-xs uppercase tracking-widest mb-10"
+          style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 300, letterSpacing: '0.2em' }}
+        >
+          Empresas que confiam na Tráfego Pro
+        </p>
+
+        {/* Fade edges */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-32 z-10"
+          style={{ background: 'linear-gradient(to right, #000 0%, transparent 100%)' }} />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-32 z-10"
+          style={{ background: 'linear-gradient(to left, #000 0%, transparent 100%)' }} />
+
+        <div className="marquee-track">
+          {[
+            { src: '/manus-storage/logo_vidacard_branca_2df5c5e7.png', alt: 'Vida Card', h: 44 },
+            { src: '/manus-storage/logo_oralsin_branca_034f07ac.png', alt: 'Oralsin', h: 40 },
+            { src: '/manus-storage/logo_univates_12651e4a.png', alt: 'Unopar', h: 52 },
+            { src: '/manus-storage/logo_hospital_santa_lucia_89e92c94.png', alt: 'Hospital Regional Santa Lúcia', h: 60 },
+            { src: '/manus-storage/logo_anhanguera_7d6176ba.webp', alt: 'Anhanguera', h: 40 },
+            { src: '/manus-storage/logo_naxia_990a83d9.png', alt: 'Naxia', h: 40 },
+            /* duplicate set for seamless loop */
+            { src: '/manus-storage/logo_vidacard_branca_2df5c5e7.png', alt: 'Vida Card 2', h: 44 },
+            { src: '/manus-storage/logo_oralsin_branca_034f07ac.png', alt: 'Oralsin 2', h: 40 },
+            { src: '/manus-storage/logo_univates_12651e4a.png', alt: 'Unopar 2', h: 52 },
+            { src: '/manus-storage/logo_hospital_santa_lucia_89e92c94.png', alt: 'Hospital Regional Santa Lúcia 2', h: 60 },
+            { src: '/manus-storage/logo_anhanguera_7d6176ba.webp', alt: 'Anhanguera 2', h: 40 },
+            { src: '/manus-storage/logo_naxia_990a83d9.png', alt: 'Naxia 2', h: 40 },
+          ].map((logo) => (
+            <div
+              key={logo.alt}
+              className="flex items-center justify-center flex-shrink-0"
+              style={{ padding: '0 56px' }}
+            >
               <img
-                key={logo.alt}
                 src={logo.src}
-                alt={logo.alt}
+                alt={logo.alt.replace(/ \d$/, '')}
                 style={{
                   height: `${logo.h}px`,
                   width: 'auto',
-                  opacity: 0.45,
+                  opacity: 0.4,
                   filter: 'brightness(0) invert(1)',
                   transition: 'opacity 0.3s ease',
                 }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = '0.85')}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = '0.45')}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = '0.9')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = '0.4')}
               />
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </section>
 

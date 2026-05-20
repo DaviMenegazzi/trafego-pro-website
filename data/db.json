@@ -25,14 +25,31 @@
       "status": "active",
       "plan": "Meta Ads + Google Ads",
       "startDate": "2024-04-01",
-      "monthlyBudget": 2000,
+      "monthlyBudget": 1500,
       "contact": "Gerente Júlio de Castilhos",
       "phone": "(55) 99999-0002",
       "email": "juliodecastilhos@vidacard.com.br",
       "lpUrl": "/juliodecastilhos",
       "notes": "Praça menor, foco em awareness e conversão direta. Público 30-60 anos.",
       "createdAt": 1779300642433,
-      "updatedAt": 1779300642433
+      "updatedAt": 1779301388347
+    },
+    {
+      "id": 4,
+      "name": "Vida Card Ijuí",
+      "city": "Ijuí",
+      "state": "",
+      "status": "active",
+      "plan": "Meta Ads + Google Ads",
+      "startDate": "2026-05-13",
+      "monthlyBudget": 1500,
+      "contact": "Rosangela",
+      "phone": "559941802",
+      "email": "",
+      "lpUrl": "https://www.vidacardijui.com.br/",
+      "notes": "",
+      "createdAt": 1779301348033,
+      "updatedAt": 1779301348033
     }
   ],
   "campaigns": [
@@ -107,6 +124,6 @@
       "updatedAt": 1779300642433
     }
   ],
-  "_nextClientId": 4,
+  "_nextClientId": 5,
   "_nextCampaignId": 9
 }

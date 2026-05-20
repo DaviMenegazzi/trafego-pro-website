@@ -41,7 +41,7 @@ export default function TrafegoProHome() {
               Tráfego que<br />converte
             </h1>
           </div>
-          <p className="text-xl md:text-2xl opacity-80 max-w-2xl mb-8 leading-relaxed" style={{ fontWeight: '100', fontWeight: '100' }}>
+          <p className="text-xl md:text-2xl opacity-80 max-w-2xl mb-8 leading-relaxed" style={{ fontWeight: 100 }}>
             Assessoria de marketing focada em maximizar suas vendas através de estratégias de tráfego pago e conteúdo orgânico de alto impacto.
           </p>
           <div className="flex gap-4">

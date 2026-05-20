@@ -1,5 +1,28 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+// Hook para detectar quando elemento entra em view
+function useInView(options = {}) {
+  const ref = useRef(null);
+  const [isInView, setIsInView] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setIsInView(true);
+      }
+    }, { threshold: 0.1, ...options });
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, isInView];
+}
 
 /**
  * Design Philosophy: Tráfego Pro - Moderno, Minimalista
@@ -8,17 +31,38 @@ import { ArrowRight } from "lucide-react";
  * - Design limpo e profissional com efeito de esfera/círculo
  * - Foco em apresentação da assessoria
  * - SEM links para clientes
+ * - Animações: Fade-in e Slide-up ao scroll
  */
 
 export default function TrafegoProHome() {
+  const [aboutRef, aboutInView] = useInView();
+  const [servicesRef, servicesInView] = useInView();
+  const [ctaRef, ctaInView] = useInView();
+
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
-
 
       <style>{`
         @keyframes twinkle {
           0%, 100% { opacity: 0.2; }
           50% { opacity: 0.8; }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(40px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-on-scroll {
+          opacity: 0;
+          transform: translateY(40px);
+          transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        .animate-on-scroll.in-view {
+          opacity: 1;
+          transform: translateY(0);
         }
       `}</style>
 
@@ -63,11 +107,12 @@ export default function TrafegoProHome() {
             ></div>
           ))}
         </div>
+
         {/* NEW Badge */}
         <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-700 bg-gray-900/50 backdrop-blur-sm">
           <span className="text-xs font-semibold text-gray-400 uppercase">NOVO</span>
           <span className="text-sm text-gray-300">Maximize suas vendas com IA</span>
-          <ArrowRight className="w-4 h-4 text-gray-400" />
+          <ArrowRight size={14} className="text-gray-400" />
         </div>
 
         {/* Main Title */}
@@ -98,12 +143,14 @@ export default function TrafegoProHome() {
             Saiba Mais
           </Button>
         </div>
-
-
       </section>
 
       {/* About Section */}
-      <section id="sobre" className="relative z-10 py-24 px-4 bg-gradient-to-b from-black to-gray-900/20">
+      <section 
+        id="sobre" 
+        ref={aboutRef}
+        className={`relative z-10 py-24 px-4 bg-gradient-to-b from-black to-gray-900/20 animate-on-scroll ${aboutInView ? 'in-view' : ''}`}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="mb-16">
             <h2 
@@ -131,15 +178,15 @@ export default function TrafegoProHome() {
               <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }} className="space-y-8">
                 <div>
                   <h3 className="text-4xl font-black text-white mb-2">+500</h3>
-                  <p className="text-gray-400">Campanhas executadas</p>
+                  <p className="text-gray-400" style={{ fontWeight: 100 }}>Campanhas gerenciadas com sucesso</p>
                 </div>
                 <div>
-                  <h3 className="text-4xl font-black text-white mb-2">10x</h3>
-                  <p className="text-gray-400">ROI médio</p>
+                  <h3 className="text-4xl font-black text-white mb-2">+50M</h3>
+                  <p className="text-gray-400" style={{ fontWeight: 100 }}>Em vendas geradas para clientes</p>
                 </div>
                 <div>
                   <h3 className="text-4xl font-black text-white mb-2">98%</h3>
-                  <p className="text-gray-400">Taxa de satisfação</p>
+                  <p className="text-gray-400" style={{ fontWeight: 100 }}>Taxa de satisfação de clientes</p>
                 </div>
               </div>
             </div>
@@ -148,7 +195,11 @@ export default function TrafegoProHome() {
       </section>
 
       {/* Services Section */}
-      <section id="servicos" className="relative z-10 py-24 px-4">
+      <section 
+        id="servicos"
+        ref={servicesRef}
+        className={`relative z-10 py-24 px-4 bg-black animate-on-scroll ${servicesInView ? 'in-view' : ''}`}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="mb-16">
             <h2 
@@ -162,16 +213,19 @@ export default function TrafegoProHome() {
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { title: "Google Ads", desc: "Campanhas de pesquisa e display de alto desempenho" },
-              { title: "Meta Ads", desc: "Facebook e Instagram com segmentação precisa" },
-              { title: "Conteúdo Orgânico", desc: "Estratégia de redes sociais e SEO" },
+              { title: "Google Ads", desc: "Campanhas de pesquisa otimizadas para máxima conversão" },
+              { title: "Meta Ads", desc: "Estratégias de tráfego pago em Facebook e Instagram" },
+              { title: "Conteúdo Orgânico", desc: "Estratégias de marketing de conteúdo de alto impacto" },
               { title: "Análise de Dados", desc: "Relatórios detalhados e insights acionáveis" },
-              { title: "Consultoria", desc: "Planejamento estratégico personalizado" },
-              { title: "Otimização", desc: "Testes A/B e melhoria contínua" }
+              { title: "Otimização de Funil", desc: "Melhoria contínua de conversão e ROI" },
+              { title: "Consultoria", desc: "Orientação estratégica personalizada para seu negócio" }
             ].map((service, i) => (
-              <div key={i} className="p-8 rounded-2xl border border-gray-800 bg-gradient-to-br from-gray-900/50 to-black hover:border-gray-600 transition">
+              <div 
+                key={i}
+                className="bg-gradient-to-br from-gray-900 to-black p-8 rounded-xl border border-gray-800 hover:border-gray-600 transition"
+              >
                 <h3 
-                  className="text-2xl font-black text-white mb-3"
+                  className="text-2xl font-black text-white mb-4"
                   style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}
                 >
                   {service.title}
@@ -185,65 +239,93 @@ export default function TrafegoProHome() {
         </div>
       </section>
 
+      {/* Strategy Section */}
+      <section id="estrategia" className="relative z-10 py-24 px-4 bg-gradient-to-b from-black to-gray-900/20">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-16">
+            <h2 
+              className="text-5xl md:text-6xl font-black text-white mb-6"
+              style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}
+            >
+              Nossa Metodologia
+            </h2>
+            <div className="h-1 w-24 bg-gradient-to-r from-white to-gray-600"></div>
+          </div>
+
+          <div className="grid md:grid-cols-4 gap-6">
+            {[
+              { num: "01", title: "Diagnóstico", desc: "Análise completa do seu negócio e concorrência" },
+              { num: "02", title: "Estratégia", desc: "Planejamento de campanhas personalizadas" },
+              { num: "03", title: "Execução", desc: "Implementação e otimização contínua" },
+              { num: "04", title: "Resultados", desc: "Relatórios e ajustes baseados em dados" }
+            ].map((step, i) => (
+              <div key={i} className="text-center">
+                <div className="text-6xl font-black text-gray-800 mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {step.num}
+                </div>
+                <h3 className="text-xl font-black text-white mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+                  {step.title}
+                </h3>
+                <p className="text-gray-400 text-sm" style={{ fontWeight: 100 }}>
+                  {step.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
-      <section className="relative z-10 py-24 px-4 bg-gradient-to-b from-gray-900/20 to-black">
+      <section 
+        id="contato"
+        ref={ctaRef}
+        className={`relative z-10 py-24 px-4 bg-black animate-on-scroll ${ctaInView ? 'in-view' : ''}`}
+      >
         <div className="max-w-4xl mx-auto text-center">
           <h2 
-            className="text-5xl md:text-6xl font-black text-white mb-8"
+            className="text-5xl md:text-6xl font-black text-white mb-6"
             style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}
           >
-            Pronto para crescer?
+            Pronto para Transformar Seus Resultados?
           </h2>
-          <p className="text-xl text-gray-400 mb-12" style={{ fontWeight: 100 }}>
-            Comece agora e veja seus resultados em 30 dias
+          <p className="text-lg text-gray-400 mb-12 leading-relaxed" style={{ fontWeight: 100 }}>
+            Vamos conversar sobre como a Tráfego Pro pode ajudar seu negócio a crescer exponencialmente com estratégias de marketing digital comprovadas.
           </p>
-          <Button className="bg-white text-black hover:bg-gray-100 font-bold px-10 py-6 text-lg rounded-full transition">
-            Solicitar Consultoria Gratuita
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button className="bg-white text-black hover:bg-gray-100 font-bold px-8 py-6 text-lg rounded-full transition">
+              Solicitar Demo
+            </Button>
+            <Button className="border-2 border-gray-600 bg-transparent text-white hover:bg-gray-900 hover:border-gray-400 font-bold px-8 py-6 text-lg rounded-full transition">
+              Falar com Especialista
+            </Button>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-gray-800 py-12 px-4 bg-black">
+      <footer className="relative z-10 py-12 px-4 border-t border-gray-800/50 bg-black">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-12">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div>
               <img 
                 src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" 
                 alt="Tráfego Pro" 
-                style={{ width: '180px', height: '18px', marginBottom: '1rem' }}
+                style={{ width: '259px', height: '24px' }}
               />
-              <p className="text-gray-500 text-sm">
+              <p className="text-gray-500 text-sm mt-4" style={{ fontWeight: 100 }}>
                 Assessoria de marketing focada em resultados reais.
               </p>
             </div>
-            <div>
-              <h4 className="font-bold text-white mb-4">Produto</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
-                <li><a href="#" className="hover:text-white transition">Recursos</a></li>
-                <li><a href="#" className="hover:text-white transition">Preços</a></li>
-                <li><a href="#" className="hover:text-white transition">Segurança</a></li>
-              </ul>
+            <div className="text-center md:text-right">
+              <p className="text-gray-400 text-sm" style={{ fontWeight: 100 }}>
+                © 2026 Tráfego Pro. Todos os direitos reservados.
+              </p>
+              <div className="flex gap-6 justify-center md:justify-end mt-4">
+                <a href="#" className="text-gray-500 hover:text-white transition text-sm">Privacidade</a>
+                <a href="#" className="text-gray-500 hover:text-white transition text-sm">Termos</a>
+                <a href="#" className="text-gray-500 hover:text-white transition text-sm">Contato</a>
+              </div>
             </div>
-            <div>
-              <h4 className="font-bold text-white mb-4">Empresa</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
-                <li><a href="#" className="hover:text-white transition">Sobre</a></li>
-                <li><a href="#" className="hover:text-white transition">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition">Contato</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold text-white mb-4">Legal</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
-                <li><a href="#" className="hover:text-white transition">Privacidade</a></li>
-                <li><a href="#" className="hover:text-white transition">Termos</a></li>
-                <li><a href="#" className="hover:text-white transition">Cookies</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
-            <p>&copy; 2026 Tráfego Pro. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>

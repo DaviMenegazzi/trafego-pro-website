@@ -18,17 +18,7 @@ async function startServer() {
 
   app.use(express.static(staticPath));
 
-  // Handle client-side routing for /tupancireta subroute
-  app.get("/tupancireta/*", (_req, res) => {
-    res.sendFile(path.join(staticPath, "index.html"));
-  });
-
-  // Handle root route
-  app.get("/", (_req, res) => {
-    res.sendFile(path.join(staticPath, "index.html"));
-  });
-
-  // Fallback for any other routes
+  // Handle client-side routing - serve index.html for all routes
   app.get("*", (_req, res) => {
     res.sendFile(path.join(staticPath, "index.html"));
   });

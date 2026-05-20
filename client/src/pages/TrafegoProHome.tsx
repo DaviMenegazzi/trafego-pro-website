@@ -13,27 +13,7 @@ import { ArrowRight } from "lucide-react";
 export default function TrafegoProHome() {
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Animated Background */}
-      <div className="fixed inset-0 z-0">
-        {/* Gradient sphere effect */}
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-gradient-to-t from-gray-800/30 to-transparent rounded-full blur-3xl"></div>
-        
-        {/* Animated stars/particles */}
-        <div className="absolute inset-0">
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-1 h-1 bg-white rounded-full"
-              style={{
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-                opacity: Math.random() * 0.5 + 0.2,
-                animation: `twinkle ${3 + Math.random() * 4}s infinite`
-              }}
-            ></div>
-          ))}
-        </div>
-      </div>
+
 
       <style>{`
         @keyframes twinkle {
@@ -68,6 +48,21 @@ export default function TrafegoProHome() {
 
       {/* Hero Section */}
       <section className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-20">
+        {/* Animated stars/particles - Only in Hero */}
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-1 h-1 bg-white rounded-full"
+              style={{
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                opacity: Math.random() * 0.5 + 0.2,
+                animation: `twinkle ${3 + Math.random() * 4}s infinite`
+              }}
+            ></div>
+          ))}
+        </div>
         {/* NEW Badge */}
         <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-700 bg-gray-900/50 backdrop-blur-sm">
           <span className="text-xs font-semibold text-gray-400 uppercase">NOVO</span>
@@ -104,13 +99,7 @@ export default function TrafegoProHome() {
           </Button>
         </div>
 
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-2">
-          <span className="text-xs text-gray-500 uppercase">Scroll</span>
-          <div className="w-6 h-10 border border-gray-600 rounded-full flex items-start justify-center p-2">
-            <div className="w-1 h-2 bg-gray-600 rounded-full animate-bounce"></div>
-          </div>
-        </div>
+
       </section>
 
       {/* About Section */}

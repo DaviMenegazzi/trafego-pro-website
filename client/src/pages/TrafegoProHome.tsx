@@ -113,7 +113,7 @@ export default function TrafegoProHome() {
         {/* NEW Badge */}
         <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-700 bg-gray-900/50 backdrop-blur-sm">
           <span className="text-xs font-semibold text-gray-400 uppercase">NOVO</span>
-          <span className="text-sm text-gray-300">com tráfego pago</span>
+          <span className="text-sm text-gray-300">Impulsione suas vendas com Tráfego Pago!</span>
           <ArrowRight size={14} className="text-gray-400" />
         </div>
 

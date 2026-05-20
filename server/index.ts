@@ -15,10 +15,16 @@ import {
   createCampaign,
   updateCampaign,
   deleteCampaign,
+  getUserByEmail,
+  getUserByName,
+  getAllUsers,
+  createUser,
+  deleteUser,
   type ClientInput,
   type CampaignInput,
   type Client,
   type Campaign,
+  type User,
 } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -80,13 +86,54 @@ async function startServer() {
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
   app.post("/api/auth/login", (req, res) => {
-    const { email, password } = req.body as { email: string; password: string };
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      const token = signToken({ email, role: "admin" });
-      res.json({ token, user: { email, role: "admin", name: "Lucas Dorneles" } });
-    } else {
-      res.status(401).json({ error: "Credenciais inválidas" });
+    const { email, password, name } = req.body as { email?: string; password: string; name?: string };
+
+    // Tenta login pelo banco de dados (por nome ou email)
+    let dbUser: User | undefined;
+    if (name) dbUser = getUserByName(name);
+    if (!dbUser && email) dbUser = getUserByEmail(email);
+
+    if (dbUser && dbUser.password === password) {
+      const token = signToken({ email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id });
+      res.json({ token, user: { email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id } });
+      return;
     }
+
+    // Fallback: credenciais fixas do admin principal
+    if ((email === ADMIN_EMAIL || name?.toLowerCase() === "lucas") && password === ADMIN_PASSWORD) {
+      const token = signToken({ email: ADMIN_EMAIL, role: "admin", name: "Lucas Dorneles" });
+      res.json({ token, user: { email: ADMIN_EMAIL, role: "admin", name: "Lucas Dorneles" } });
+      return;
+    }
+
+    res.status(401).json({ error: "Credenciais inválidas" });
+  });
+
+  // ─── Users (admin only) ──────────────────────────────────────────────────────
+  app.get("/api/users", requireAuth, (_req, res) => {
+    const users = getAllUsers().map(({ password: _p, ...u }) => u);
+    res.json(users);
+  });
+
+  app.post("/api/users", requireAuth, (req, res) => {
+    const { name, email, password, role } = req.body as { name: string; email: string; password: string; role?: "admin" | "user" };
+    if (!name?.trim() || !password?.trim()) {
+      res.status(400).json({ error: "Nome e senha são obrigatórios" });
+      return;
+    }
+    if (getUserByName(name)) {
+      res.status(409).json({ error: "Já existe um usuário com esse nome" });
+      return;
+    }
+    const user = createUser({ name, email: email || `${name.toLowerCase().replace(/\s+/g, '.')}@trafego.pro`, password, role });
+    const { password: _p, ...safeUser } = user;
+    res.status(201).json(safeUser);
+  });
+
+  app.delete("/api/users/:id", requireAuth, (req, res) => {
+    const id = parseInt(req.params.id);
+    deleteUser(id);
+    res.json({ success: true });
   });
 
   app.get("/api/auth/me", requireAuth, (req, res) => {

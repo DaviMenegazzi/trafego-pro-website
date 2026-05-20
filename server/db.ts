@@ -37,11 +37,22 @@ export interface Client {
   updatedAt: number;
 }
 
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+  role: "admin" | "user";
+  createdAt: number;
+}
+
 interface DbSchema {
   clients: Client[];
   campaigns: Campaign[];
+  users: User[];
   _nextClientId: number;
   _nextCampaignId: number;
+  _nextUserId: number;
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -53,11 +64,23 @@ const adapter = new JSONFileSync<DbSchema>(DB_PATH);
 const db = new LowSync<DbSchema>(adapter, {
   clients: [],
   campaigns: [],
+  users: [],
   _nextClientId: 1,
   _nextCampaignId: 1,
+  _nextUserId: 1,
 });
 
 db.read();
+
+// ─── Migrations para arquivos de banco antigos ────────────────────────────────
+if (!db.data.users) {
+  (db.data as DbSchema).users = [];
+  db.write();
+}
+if (db.data._nextUserId === undefined) {
+  (db.data as DbSchema)._nextUserId = 1;
+  db.write();
+}
 
 // ─── Seed inicial ─────────────────────────────────────────────────────────────
 if (db.data.clients.length === 0) {
@@ -117,6 +140,43 @@ if (db.data.clients.length === 0) {
     }
   }
 
+  db.write();
+}
+
+// ─── User helpers ─────────────────────────────────────────────────────────────
+export function getUserByEmail(email: string): User | undefined {
+  db.read();
+  return db.data.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+}
+
+export function getUserByName(name: string): User | undefined {
+  db.read();
+  return db.data.users.find((u) => u.name.toLowerCase() === name.toLowerCase());
+}
+
+export function getAllUsers(): User[] {
+  db.read();
+  return db.data.users;
+}
+
+export function createUser(data: { name: string; email: string; password: string; role?: "admin" | "user" }): User {
+  db.read();
+  const user: User = {
+    id: db.data._nextUserId++,
+    name: data.name,
+    email: data.email,
+    password: data.password,
+    role: data.role ?? "admin",
+    createdAt: Date.now(),
+  };
+  db.data.users.push(user);
+  db.write();
+  return user;
+}
+
+export function deleteUser(id: number): void {
+  db.read();
+  db.data.users = db.data.users.filter((u) => u.id !== id);
   db.write();
 }
 

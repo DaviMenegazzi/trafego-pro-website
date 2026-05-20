@@ -125,5 +125,16 @@
     }
   ],
   "_nextClientId": 5,
-  "_nextCampaignId": 9
+  "_nextCampaignId": 9,
+  "users": [
+    {
+      "id": 1,
+      "name": "Davi",
+      "email": "davi@trafego.pro",
+      "password": "Trafego2026",
+      "role": "admin",
+      "createdAt": 1779304799636
+    }
+  ],
+  "_nextUserId": 2
 }

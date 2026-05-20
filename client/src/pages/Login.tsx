@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 
 export default function Login() {
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,10 +18,16 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
+      // Detecta se o identificador é email ou nome de usuário
+      const isEmail = identifier.includes("@");
+      const body = isEmail
+        ? { email: identifier, password }
+        : { name: identifier, password };
+
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -91,14 +97,14 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <label className="text-gray-400 text-xs uppercase tracking-widest" style={{ fontWeight: 300 }}>
-              E-mail
+              Usuário ou E-mail
             </label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
-              placeholder="seu@email.com"
+              placeholder="nome ou email"
               className="w-full rounded-lg px-4 py-3 text-white text-sm outline-none transition-all"
               style={{
                 background: "rgba(255,255,255,0.06)",

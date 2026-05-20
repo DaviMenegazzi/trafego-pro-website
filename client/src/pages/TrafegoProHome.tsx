@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 // Hook para detectar quando elemento entra em view
 function useInView(options = {}) {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const [isInView, setIsInView] = useState(false);
 
   useEffect(() => {
@@ -21,7 +21,7 @@ function useInView(options = {}) {
     return () => observer.disconnect();
   }, []);
 
-  return [ref, isInView];
+  return [ref, isInView] as const;
 }
 
 /**

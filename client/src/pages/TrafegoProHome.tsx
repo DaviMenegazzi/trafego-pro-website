@@ -113,7 +113,7 @@ export default function TrafegoProHome() {
         {/* NEW Badge */}
         <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-700 bg-gray-900/50 backdrop-blur-sm">
           <span className="text-xs font-semibold text-gray-400 uppercase">NOVO</span>
-          <span className="text-sm text-gray-300">Maximize suas vendas com IA</span>
+          <span className="text-sm text-gray-300">com tráfego pago</span>
           <ArrowRight size={14} className="text-gray-400" />
         </div>
 
@@ -140,7 +140,7 @@ export default function TrafegoProHome() {
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
           <a href="https://wa.me/5555559994063?text=Ol%C3%A1!%20Olhei%20o%20site%20da%20Tr%C3%A1fego%20Pro%20e%20queria%20saber%20mais." target="_blank" rel="noopener noreferrer">
             <Button className="bg-white text-black hover:bg-gray-100 font-bold px-8 py-6 text-lg rounded-full transition">
-              Solicitar Demo
+              Entrar em contato
             </Button>
           </a>
           <a href="https://wa.me/5555559994063?text=Ol%C3%A1!%20Olhei%20o%20site%20da%20Tr%C3%A1fego%20Pro%20e%20queria%20saber%20mais." target="_blank" rel="noopener noreferrer">
@@ -372,7 +372,7 @@ export default function TrafegoProHome() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="https://wa.me/5555559994063?text=Ol%C3%A1!%20Olhei%20o%20site%20da%20Tr%C3%A1fego%20Pro%20e%20queria%20saber%20mais." target="_blank" rel="noopener noreferrer">
               <Button className="bg-white text-black hover:bg-gray-100 font-bold px-8 py-6 text-lg rounded-full transition">
-                Solicitar Demo
+                Entrar em contato
               </Button>
             </a>
             <a href="https://wa.me/5555559994063?text=Ol%C3%A1!%20Olhei%20o%20site%20da%20Tr%C3%A1fego%20Pro%20e%20queria%20saber%20mais." target="_blank" rel="noopener noreferrer">

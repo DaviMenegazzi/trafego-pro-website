@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import Home from "./pages/Home";
 import JulioDeCastilhos from "./pages/JulioDeCastilhos";
 import TrafegoProHome from "./pages/TrafegoProHome";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
 
 
 function Router() {
@@ -18,6 +20,9 @@ function Router() {
       <Route path={"/tupancireta/"} component={Home} />
       <Route path={"/juliodecastilhos"} component={JulioDeCastilhos} />
       <Route path={"/juliodecastilhos/"} component={JulioDeCastilhos} />
+      <Route path={"/login"} component={Login} />
+      <Route path={"/dashboard"} component={Dashboard} />
+      <Route path={"/dashboard/"} component={Dashboard} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

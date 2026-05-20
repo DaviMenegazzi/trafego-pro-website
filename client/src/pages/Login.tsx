@@ -84,7 +84,7 @@ export default function Login() {
         >
           Acesso restrito
         </h1>
-        <p className="text-gray-500 text-sm mb-8" style={{ fontWeight: 100 }}>
+        <p className="text-gray-500 text-sm mb-8" style={{ fontWeight: 300 }}>
           Entre com suas credenciais para acessar o dashboard.
         </p>
 
@@ -160,7 +160,7 @@ export default function Login() {
         </form>
       </div>
 
-      <p className="z-10 mt-8 text-gray-700 text-xs" style={{ fontWeight: 100 }}>
+      <p className="z-10 mt-8 text-gray-700 text-xs" style={{ fontWeight: 300 }}>
         © 2024 Tráfego Pro. Acesso restrito.
       </p>
     </div>

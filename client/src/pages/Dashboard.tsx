@@ -161,7 +161,7 @@ export default function Dashboard() {
             </div>
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-gray-600 text-sm" style={{ fontWeight: 100 }}>
+            <span className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>
               Olá, {user.name}
             </span>
           </div>
@@ -178,7 +178,7 @@ export default function Dashboard() {
               >
                 Visão Geral
               </h1>
-              <p className="text-gray-600 text-sm mb-8" style={{ fontWeight: 100 }}>
+              <p className="text-gray-600 text-sm mb-8" style={{ fontWeight: 300 }}>
                 Resumo de todos os clientes e campanhas ativas.
               </p>
 
@@ -230,7 +230,7 @@ export default function Dashboard() {
                       </span>
                       <ChevronRight size={16} className="text-gray-700 group-hover:text-white transition-colors" />
                     </div>
-                    <p className="text-gray-600 text-xs mb-3" style={{ fontWeight: 100 }}>
+                    <p className="text-gray-600 text-xs mb-3" style={{ fontWeight: 300 }}>
                       {c.city}, {c.state} · {c.plan}
                     </p>
                     <div className="flex items-center justify-between">
@@ -244,7 +244,7 @@ export default function Dashboard() {
                       >
                         {c.status === "active" ? "Ativo" : "Pausado"}
                       </span>
-                      <span className="text-gray-600 text-xs" style={{ fontWeight: 100 }}>
+                      <span className="text-gray-600 text-xs" style={{ fontWeight: 300 }}>
                         R$ {c.monthlyBudget.toLocaleString("pt-BR")}/mês
                       </span>
                     </div>
@@ -263,7 +263,7 @@ export default function Dashboard() {
               >
                 Clientes
               </h1>
-              <p className="text-gray-600 text-sm mb-8" style={{ fontWeight: 100 }}>
+              <p className="text-gray-600 text-sm mb-8" style={{ fontWeight: 300 }}>
                 Gerencie todos os clientes e suas campanhas.
               </p>
 
@@ -289,7 +289,7 @@ export default function Dashboard() {
                         >
                           {c.name}
                         </p>
-                        <p className="text-gray-600 text-xs" style={{ fontWeight: 100 }}>
+                        <p className="text-gray-600 text-xs" style={{ fontWeight: 300 }}>
                           {c.city}, {c.state} · {c.plan} · R$ {c.monthlyBudget.toLocaleString("pt-BR")}/mês
                         </p>
                       </div>
@@ -332,7 +332,7 @@ export default function Dashboard() {
                   >
                     {selected.name}
                   </h1>
-                  <p className="text-gray-600 text-sm" style={{ fontWeight: 100 }}>
+                  <p className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>
                     {selected.city}, {selected.state} · Desde {new Date(selected.startDate).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
@@ -383,7 +383,7 @@ export default function Dashboard() {
                 <p className="text-gray-600 text-xs uppercase tracking-widest mb-2" style={{ fontWeight: 300 }}>
                   Observações Estratégicas
                 </p>
-                <p className="text-gray-300 text-sm leading-relaxed" style={{ fontWeight: 100 }}>
+                <p className="text-gray-300 text-sm leading-relaxed" style={{ fontWeight: 300 }}>
                   {selected.notes}
                 </p>
               </div>
@@ -406,12 +406,12 @@ export default function Dashboard() {
                       <p className="text-white text-sm mb-0.5" style={{ fontWeight: 300 }}>
                         {camp.name}
                       </p>
-                      <p className="text-gray-600 text-xs" style={{ fontWeight: 100 }}>
+                      <p className="text-gray-600 text-xs" style={{ fontWeight: 300 }}>
                         {camp.platform}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-gray-400 text-sm" style={{ fontWeight: 100 }}>
+                      <span className="text-gray-400 text-sm" style={{ fontWeight: 300 }}>
                         R$ {camp.budget.toLocaleString("pt-BR")}/mês
                       </span>
                       <span
@@ -439,8 +439,8 @@ export default function Dashboard() {
                 </p>
                 <div className="flex flex-col gap-1">
                   <p className="text-white text-sm" style={{ fontWeight: 300 }}>{selected.contact}</p>
-                  <p className="text-gray-500 text-sm" style={{ fontWeight: 100 }}>{selected.phone}</p>
-                  <p className="text-gray-500 text-sm" style={{ fontWeight: 100 }}>{selected.email}</p>
+                  <p className="text-gray-500 text-sm" style={{ fontWeight: 300 }}>{selected.phone}</p>
+                  <p className="text-gray-500 text-sm" style={{ fontWeight: 300 }}>{selected.email}</p>
                 </div>
               </div>
             </div>

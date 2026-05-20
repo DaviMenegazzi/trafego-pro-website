@@ -145,6 +145,43 @@ export default function TrafegoProHome() {
         </div>
       </section>
 
+      {/* Clients Logo Strip */}
+      <section className="relative z-10 py-14 px-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="max-w-5xl mx-auto">
+          <p
+            className="text-center text-xs uppercase tracking-widest mb-10"
+            style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 300, letterSpacing: '0.2em' }}
+          >
+            Empresas que confiam na Tráfego Pro
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-10 md:gap-16">
+            {[
+              { src: '/manus-storage/logo_vidacard_branca_2df5c5e7.png', alt: 'Vida Card', h: 28 },
+              { src: '/manus-storage/logo_oralsin_branca_034f07ac.png', alt: 'Oralsin', h: 26 },
+              { src: '/manus-storage/logo_univates_12651e4a.png', alt: 'Unopar', h: 40 },
+              { src: '/manus-storage/logo_hospital_santa_lucia_89e92c94.png', alt: 'Hospital Regional Santa Lúcia', h: 44 },
+              { src: '/manus-storage/logo_anhanguera_7d6176ba.webp', alt: 'Anhanguera', h: 26 },
+              { src: '/manus-storage/logo_naxia_990a83d9.png', alt: 'Naxia', h: 26 },
+            ].map((logo) => (
+              <img
+                key={logo.alt}
+                src={logo.src}
+                alt={logo.alt}
+                style={{
+                  height: `${logo.h}px`,
+                  width: 'auto',
+                  opacity: 0.45,
+                  filter: 'brightness(0) invert(1)',
+                  transition: 'opacity 0.3s ease',
+                }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = '0.85')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = '0.45')}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* About Section */}
       <section 
         id="sobre" 

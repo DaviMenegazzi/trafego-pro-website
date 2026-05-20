@@ -658,8 +658,19 @@ export default function Dashboard() {
           {/* ── Overview ── */}
           {activeSection === "overview" && !selected && (
             <div>
-              <h1 className="text-white text-3xl mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>Visão Geral</h1>
-              <p className="text-gray-600 text-sm mb-8" style={{ fontWeight: 300 }}>Resumo de todos os clientes e campanhas ativas.</p>
+              <div className="flex items-start justify-between mb-8">
+                <div>
+                  <h1 className="text-white text-3xl mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>Visão Geral</h1>
+                  <p className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>Resumo de todos os clientes e campanhas ativas.</p>
+                </div>
+                <button
+                  onClick={() => setShowNewClient(true)}
+                  className="flex items-center gap-2 text-sm rounded-lg px-3 py-2 transition-all"
+                  style={{ background: "#fff", color: "#000", fontWeight: 400 }}
+                >
+                  <Plus size={14} /> Novo Cliente
+                </button>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 {[

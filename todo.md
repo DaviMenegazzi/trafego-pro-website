@@ -25,3 +25,15 @@
 - [x] Fontes Space Grotesk (títulos) + Inter Extra Light (corpo)
 - [x] Paleta Tráfego Pro: #0a0a0a, branco, cinzas
 - [x] Paleta Vida Card: verde #1FBD8F, azul escuro, branco
+
+## CRUD de Clientes com Excel
+
+- [x] Banco de dados JSON persistente com lowdb (LowSync) em data/db.json
+- [x] API REST completa: GET, POST, PUT, DELETE /api/clients e /api/campaigns
+- [x] Exportação para Excel (.xlsx) via GET /api/clients/export/excel
+- [x] Importação de Excel via POST /api/clients/import/excel
+- [x] Interface CRUD no dashboard: listagem, modal de criação, modal de edição, confirmação de exclusão
+- [x] CRUD de campanhas na tela de detalhe do cliente
+- [x] Botões Importar Excel e Exportar Excel na listagem de clientes
+- [x] Toast de feedback para todas as operações
+- [x] 17 testes vitest passando (CRUD de clientes e campanhas)

@@ -1,0 +1,112 @@
+{
+  "clients": [
+    {
+      "id": 1,
+      "name": "Vida Card Tupanciretã",
+      "city": "Tupanciretã",
+      "state": "RS",
+      "status": "active",
+      "plan": "Meta Ads + Google Ads",
+      "startDate": "2024-03-01",
+      "monthlyBudget": 2500,
+      "contact": "Gerente Tupanciretã",
+      "phone": "(55) 99999-0001",
+      "email": "tupancireta@vidacard.com.br",
+      "lpUrl": "/tupancireta",
+      "notes": "Foco em geração de conversas qualificadas no WhatsApp. Público 25-55 anos.",
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    },
+    {
+      "id": 2,
+      "name": "Vida Card Júlio de Castilhos",
+      "city": "Júlio de Castilhos",
+      "state": "RS",
+      "status": "active",
+      "plan": "Meta Ads + Google Ads",
+      "startDate": "2024-04-01",
+      "monthlyBudget": 2000,
+      "contact": "Gerente Júlio de Castilhos",
+      "phone": "(55) 99999-0002",
+      "email": "juliodecastilhos@vidacard.com.br",
+      "lpUrl": "/juliodecastilhos",
+      "notes": "Praça menor, foco em awareness e conversão direta. Público 30-60 anos.",
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    }
+  ],
+  "campaigns": [
+    {
+      "id": 1,
+      "clientId": 1,
+      "name": "Campanha Família",
+      "platform": "Meta Ads",
+      "status": "active",
+      "budget": 800,
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    },
+    {
+      "id": 2,
+      "clientId": 1,
+      "name": "Campanha Individual",
+      "platform": "Meta Ads",
+      "status": "active",
+      "budget": 600,
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    },
+    {
+      "id": 3,
+      "clientId": 1,
+      "name": "Pesquisa Marca",
+      "platform": "Google Ads",
+      "status": "active",
+      "budget": 500,
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    },
+    {
+      "id": 4,
+      "clientId": 1,
+      "name": "Pesquisa Concorrência",
+      "platform": "Google Ads",
+      "status": "active",
+      "budget": 600,
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    },
+    {
+      "id": 6,
+      "clientId": 2,
+      "name": "Campanha Individual",
+      "platform": "Meta Ads",
+      "status": "active",
+      "budget": 500,
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    },
+    {
+      "id": 7,
+      "clientId": 2,
+      "name": "Pesquisa Marca",
+      "platform": "Google Ads",
+      "status": "active",
+      "budget": 400,
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    },
+    {
+      "id": 8,
+      "clientId": 2,
+      "name": "Pesquisa Concorrência",
+      "platform": "Google Ads",
+      "status": "paused",
+      "budget": 400,
+      "createdAt": 1779300642433,
+      "updatedAt": 1779300642433
+    }
+  ],
+  "_nextClientId": 4,
+  "_nextCampaignId": 9
+}

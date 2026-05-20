@@ -3,6 +3,23 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
+import multer from "multer";
+import * as XLSX from "xlsx";
+import {
+  getAllClients,
+  getClientById,
+  getCampaignsByClientId,
+  createClient,
+  updateClient,
+  deleteClient,
+  createCampaign,
+  updateCampaign,
+  deleteCampaign,
+  type ClientInput,
+  type CampaignInput,
+  type Client,
+  type Campaign,
+} from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,52 +49,6 @@ function verifyToken(token: string): Record<string, unknown> | null {
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "lucas@trafego.pro";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "trafego2024";
 
-// ─── Mock data ───────────────────────────────────────────────────────────────
-const clients = [
-  {
-    id: 1,
-    name: "Vida Card Tupanciretã",
-    city: "Tupanciretã",
-    state: "RS",
-    status: "active",
-    plan: "Meta Ads + Google Ads",
-    startDate: "2024-03-01",
-    monthlyBudget: 2500,
-    contact: "Gerente Tupanciretã",
-    phone: "(55) 99999-0001",
-    email: "tupancireta@vidacard.com.br",
-    lpUrl: "/tupancireta",
-    notes: "Foco em geração de conversas qualificadas no WhatsApp. Público 25-55 anos.",
-    campaigns: [
-      { name: "Campanha Família", platform: "Meta Ads", status: "active", budget: 800 },
-      { name: "Campanha Individual", platform: "Meta Ads", status: "active", budget: 600 },
-      { name: "Pesquisa Marca", platform: "Google Ads", status: "active", budget: 500 },
-      { name: "Pesquisa Concorrência", platform: "Google Ads", status: "active", budget: 600 },
-    ],
-  },
-  {
-    id: 2,
-    name: "Vida Card Júlio de Castilhos",
-    city: "Júlio de Castilhos",
-    state: "RS",
-    status: "active",
-    plan: "Meta Ads + Google Ads",
-    startDate: "2024-04-01",
-    monthlyBudget: 2000,
-    contact: "Gerente Júlio de Castilhos",
-    phone: "(55) 99999-0002",
-    email: "juliodecastilhos@vidacard.com.br",
-    lpUrl: "/juliodecastilhos",
-    notes: "Praça menor, foco em awareness e conversão direta. Público 30-60 anos.",
-    campaigns: [
-      { name: "Campanha Família", platform: "Meta Ads", status: "active", budget: 700 },
-      { name: "Campanha Individual", platform: "Meta Ads", status: "active", budget: 500 },
-      { name: "Pesquisa Marca", platform: "Google Ads", status: "active", budget: 400 },
-      { name: "Pesquisa Concorrência", platform: "Google Ads", status: "paused", budget: 400 },
-    ],
-  },
-];
-
 // ─── Auth middleware ─────────────────────────────────────────────────────────
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authHeader = req.headers.authorization;
@@ -98,14 +69,16 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
   next();
 }
 
+// ─── Multer (in-memory for Excel upload) ────────────────────────────────────
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
 
   app.use(express.json());
 
-  // ─── API Routes ─────────────────────────────────────────────────────────
-  // Login
+  // ─── Auth ─────────────────────────────────────────────────────────────────
   app.post("/api/auth/login", (req, res) => {
     const { email, password } = req.body as { email: string; password: string };
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
@@ -116,33 +89,166 @@ async function startServer() {
     }
   });
 
-  // Verify token
   app.get("/api/auth/me", requireAuth, (req, res) => {
     const token = req.headers.authorization!.slice(7);
     const payload = verifyToken(token);
     res.json(payload);
   });
 
-  // List clients
+  // ─── Clients — List & Create ──────────────────────────────────────────────
   app.get("/api/clients", requireAuth, (_req, res) => {
-    res.json(clients.map(({ campaigns: _c, ...c }) => c));
+    const clients = getAllClients();
+    res.json(clients);
   });
 
-  // Get single client
-  app.get("/api/clients/:id", requireAuth, (req, res) => {
-    const client = clients.find((c) => c.id === Number(req.params.id));
-    if (!client) {
-      res.status(404).json({ error: "Cliente não encontrado" });
+  app.post("/api/clients", requireAuth, (req, res) => {
+    const body = req.body as Partial<ClientInput> & { name: string };
+    if (!body.name?.trim()) {
+      res.status(400).json({ error: "Nome é obrigatório" });
       return;
     }
-    res.json(client);
+    const client = createClient(body);
+    res.status(201).json(client);
+  });
+
+  // ─── Clients — Single ────────────────────────────────────────────────────
+  app.get("/api/clients/:id", requireAuth, (req, res) => {
+    const client = getClientById(Number(req.params.id));
+    if (!client) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
+    const campaigns = getCampaignsByClientId(client.id);
+    res.json({ ...client, campaigns });
+  });
+
+  app.put("/api/clients/:id", requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    if (!getClientById(id)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
+    const updated = updateClient(id, req.body as Partial<ClientInput>);
+    res.json(updated);
+  });
+
+  app.delete("/api/clients/:id", requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    if (!getClientById(id)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
+    deleteClient(id);
+    res.json({ ok: true });
+  });
+
+  // ─── Campaigns ────────────────────────────────────────────────────────────
+  app.post("/api/clients/:clientId/campaigns", requireAuth, (req, res) => {
+    const clientId = Number(req.params.clientId);
+    if (!getClientById(clientId)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
+    const body = req.body as Partial<CampaignInput> & { name: string };
+    if (!body.name?.trim()) { res.status(400).json({ error: "Nome da campanha é obrigatório" }); return; }
+    const campaign = createCampaign(clientId, body);
+    res.status(201).json(campaign);
+  });
+
+  app.put("/api/campaigns/:id", requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    const updated = updateCampaign(id, req.body as Partial<CampaignInput>);
+    if (!updated) { res.status(404).json({ error: "Campanha não encontrada" }); return; }
+    res.json(updated);
+  });
+
+  app.delete("/api/campaigns/:id", requireAuth, (req, res) => {
+    deleteCampaign(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
+  // ─── Excel Export ─────────────────────────────────────────────────────────
+  app.get("/api/clients/export/excel", requireAuth, (_req, res) => {
+    const clients = getAllClients();
+
+    // Aba de clientes
+    const clientsSheet = XLSX.utils.json_to_sheet(
+      clients.map((c) => ({
+        ID: c.id,
+        Nome: c.name,
+        Cidade: c.city,
+        Estado: c.state,
+        Status: c.status === "active" ? "Ativo" : "Pausado",
+        Plano: c.plan,
+        "Data de Início": c.startDate,
+        "Orçamento Mensal (R$)": c.monthlyBudget,
+        Contato: c.contact,
+        Telefone: c.phone,
+        Email: c.email,
+        "URL da LP": c.lpUrl,
+        Observações: c.notes,
+      }))
+    );
+
+    // Aba de campanhas
+    const allCampaigns = clients.flatMap((c) =>
+      getCampaignsByClientId(c.id).map((camp) => ({
+        "ID Cliente": c.id,
+        "Nome do Cliente": c.name,
+        "ID Campanha": camp.id,
+        "Nome da Campanha": camp.name,
+        Plataforma: camp.platform,
+        Status: camp.status === "active" ? "Ativa" : "Pausada",
+        "Orçamento (R$)": camp.budget,
+      }))
+    );
+    const campaignsSheet = XLSX.utils.json_to_sheet(allCampaigns);
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, clientsSheet, "Clientes");
+    XLSX.utils.book_append_sheet(wb, campaignsSheet, "Campanhas");
+
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=\"clientes-trafego-pro.xlsx\"");
+    res.send(buf);
+  });
+
+  // ─── Excel Import ─────────────────────────────────────────────────────────
+  app.post("/api/clients/import/excel", requireAuth, upload.single("file"), (req, res) => {
+    if (!req.file) { res.status(400).json({ error: "Nenhum arquivo enviado" }); return; }
+
+    try {
+      const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+
+      let imported = 0;
+      let errors: string[] = [];
+
+      for (const row of rows) {
+        const name = String(row["Nome"] || row["name"] || "").trim();
+        if (!name) { errors.push(`Linha ignorada: nome vazio`); continue; }
+
+        try {
+          createClient({
+            name,
+            city: String(row["Cidade"] || row["city"] || ""),
+            state: String(row["Estado"] || row["state"] || ""),
+            status: String(row["Status"] || row["status"] || "active") === "Ativo" ? "active" : "paused",
+            plan: String(row["Plano"] || row["plan"] || ""),
+            startDate: String(row["Data de Início"] || row["startDate"] || row["start_date"] || ""),
+            monthlyBudget: Number(row["Orçamento Mensal (R$)"] || row["monthlyBudget"] || row["monthly_budget"] || 0),
+            contact: String(row["Contato"] || row["contact"] || ""),
+            phone: String(row["Telefone"] || row["phone"] || ""),
+            email: String(row["Email"] || row["email"] || ""),
+            lpUrl: String(row["URL da LP"] || row["lpUrl"] || row["lp_url"] || ""),
+            notes: String(row["Observações"] || row["notes"] || ""),
+          });
+          imported++;
+        } catch (e) {
+          errors.push(`Erro ao importar "${name}": ${(e as Error).message}`);
+        }
+      }
+
+      res.json({ imported, errors, total: rows.length });
+    } catch (e) {
+      res.status(400).json({ error: `Erro ao processar planilha: ${(e as Error).message}` });
+    }
   });
 
   // ─── Static files (production only) ────────────────────────────────────────
   if (process.env.NODE_ENV === "production") {
     const staticPath = path.resolve(__dirname, "public");
     app.use(express.static(staticPath));
-    // Handle client-side routing - serve index.html for all non-API routes
     app.get("*", (_req, res) => {
       res.sendFile(path.join(staticPath, "index.html"));
     });

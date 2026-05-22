@@ -10,6 +10,7 @@ import JulioDeCastilhos from "./pages/JulioDeCastilhos";
 import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Ijui from "./pages/Ijui";
 
 
 function Router() {
@@ -20,6 +21,8 @@ function Router() {
       <Route path={"/tupancireta/"} component={Home} />
       <Route path={"/juliodecastilhos"} component={JulioDeCastilhos} />
       <Route path={"/juliodecastilhos/"} component={JulioDeCastilhos} />
+      <Route path={"/ijui"} component={Ijui} />
+      <Route path={"/ijui/"} component={Ijui} />
       <Route path={"/login"} component={Login} />
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/dashboard/"} component={Dashboard} />

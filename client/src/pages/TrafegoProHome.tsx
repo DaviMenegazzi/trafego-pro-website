@@ -35,6 +35,10 @@ function useInView(options = {}) {
  */
 
 export default function TrafegoProHome() {
+  useEffect(() => {
+    document.title = "Tráfego Pro";
+  }, []);
+
   const [aboutRef, aboutInView] = useInView();
   const [servicesRef, servicesInView] = useInView();
   const [ctaRef, ctaInView] = useInView();

@@ -188,6 +188,13 @@ function BudgetCard({
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function Ijui() {
+  useEffect(() => {
+    document.title = "Tráfego Pro - Ijuí";
+    return () => {
+      document.title = "Tráfego Pro";
+    };
+  }, []);
+
   return (
     <div className="min-h-screen" style={{ background: "#f8fafc", fontFamily: "'Inter', sans-serif" }}>
       {/* Header */}

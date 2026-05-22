@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import HeroSection from "@/components/HeroSection";
 import StrategicOverview from "@/components/StrategicOverview";
 import CityContext from "@/components/CityContext";
@@ -13,6 +14,11 @@ import ImplementationPlan from "@/components/ImplementationPlan";
 import Footer from "@/components/Footer";
 
 export default function Home() {
+  useEffect(() => {
+    document.title = "Tráfego Pro - Tupanciretã";
+    return () => { document.title = "Tráfego Pro"; };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       <HeroSection />

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -11,6 +12,11 @@ import { Card } from "@/components/ui/card";
  */
 
 export default function JulioDeCastilhos() {
+  useEffect(() => {
+    document.title = "Tráfego Pro - Júlio de Castilhos";
+    return () => { document.title = "Tráfego Pro"; };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}

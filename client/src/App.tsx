@@ -5,8 +5,6 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ClientProvider } from "./contexts/ClientContext";
-import Home from "./pages/Home";
-import JulioDeCastilhos from "./pages/JulioDeCastilhos";
 import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -17,18 +15,11 @@ import DashboardMeuTrabalho from "./pages/DashboardMeuTrabalho";
 import DashboardAtualizacoes from "./pages/DashboardAtualizacoes";
 import DashboardConfiguracoes from "./pages/DashboardConfiguracoes";
 import DashboardFeedbackLeads from "./pages/DashboardFeedbackLeads";
-import Ijui from "./pages/Ijui";
 
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={TrafegoProHome} />
-      <Route path={"/tupancireta"} component={Home} />
-      <Route path={"/tupancireta/"} component={Home} />
-      <Route path={"/juliodecastilhos"} component={JulioDeCastilhos} />
-      <Route path={"/juliodecastilhos/"} component={JulioDeCastilhos} />
-      <Route path={"/ijui"} component={Ijui} />
-      <Route path={"/ijui/"} component={Ijui} />
       <Route path={"/login"} component={Login} />
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/dashboard/"} component={Dashboard} />

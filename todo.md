@@ -40,17 +40,17 @@
 
 ## Novo Dashboard (Dashboard.zip)
 
-- [ ] Adicionar tokens de cor dark e classes glass-card, brand-border-glow, ambient-glow ao index.css
-- [ ] Criar componente AppLayout com sidebar colapsável, seletor de cliente, nav links e UserProfileButton
-- [ ] Criar componente KpiCard fiel ao Dashboard.zip
-- [ ] Criar contexto ClientContext para seletor de cliente global
-- [ ] Implementar página /dashboard (Visão Geral) com KPIs, gráficos e tabela de campanhas
-- [ ] Implementar página /dashboard/pipeline (Kanban de demandas)
-- [ ] Implementar página /dashboard/clientes (CRUD de clientes)
-- [ ] Implementar página /dashboard/pagamentos (controle de pagamentos)
-- [ ] Implementar página /dashboard/meu-trabalho (tarefas atribuídas)
-- [ ] Implementar página /dashboard/atualizacoes (posts/updates)
-- [ ] Implementar página /dashboard/configuracoes
-- [ ] Remover páginas Dashboard.tsx e DashboardAdvanced.tsx antigas
-- [ ] Atualizar App.tsx com novas rotas /dashboard/*
-- [ ] Testar autenticação e navegação completa
+- [x] Adicionar tokens de cor dark e classes glass-card, brand-border-glow, ambient-glow ao index.css
+- [x] Criar componente AppLayout com sidebar colapsável, seletor de cliente, nav links e UserProfileButton
+- [x] Criar componente KpiCard fiel ao Dashboard.zip
+- [x] Criar contexto ClientContext para seletor de cliente global
+- [x] Implementar página /dashboard (Visão Geral) com KPIs, gráficos e tabela de campanhas
+- [x] Implementar página /dashboard/pipeline (Kanban de demandas)
+- [x] Implementar página /dashboard/clientes (CRUD de clientes)
+- [x] Implementar página /dashboard/pagamentos (controle de pagamentos)
+- [x] Implementar página /dashboard/meu-trabalho (tarefas atribuídas)
+- [x] Implementar página /dashboard/atualizacoes (posts/updates)
+- [x] Implementar página /dashboard/configuracoes
+- [x] Remover páginas Dashboard.tsx e DashboardAdvanced.tsx antigas
+- [x] Atualizar App.tsx com novas rotas /dashboard/*
+- [x] Testar autenticação e navegação completa

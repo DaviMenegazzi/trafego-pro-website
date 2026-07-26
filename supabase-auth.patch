@@ -1,0 +1,173 @@
+diff --git a/.env.example b/.env.example
+index c59f1a3..51b211b 100644
+--- a/.env.example
++++ b/.env.example
+@@ -29,12 +29,21 @@ PORT=3000
+ # vai para o navegador). Pegue os valores em: Supabase → Project Settings → API.
+ # ─────────────────────────────────────────────────────────────────────────────
+ SUPABASE_URL=
+-# Use UMA das opções abaixo:
+-#  - SUPABASE_SERVICE_KEY: service_role (leitura server-side total). Só no servidor.
+-#  - SUPABASE_PUBLISHABLE_KEY: publishable/anon (só funciona se o RLS permitir ler
+-#    a view e as funções sem sessão de usuário).
+-SUPABASE_SERVICE_KEY=
+-# SUPABASE_PUBLISHABLE_KEY=
++# Escolha COMO o servidor vai autorizar a leitura (uma das opções):
++#
++# (A) service_role — ignora o RLS. Precisa do painel do Supabase (Settings → API).
++# SUPABASE_SERVICE_KEY=
++#
++# (B) Supabase Auth — o servidor loga com um usuário real (o MESMO login que você usa
++#     na dashboard antiga) e o RLS libera a leitura. Não precisa do painel.
++#     Preencha a publishable key + o e-mail/senha desse usuário:
++SUPABASE_PUBLISHABLE_KEY=
++SUPABASE_AUTH_EMAIL=
++SUPABASE_AUTH_PASSWORD=
++#
++# Ordem de preferência: se SUPABASE_SERVICE_KEY existir, ela é usada. Senão, se houver
++# SUPABASE_AUTH_EMAIL/PASSWORD, o servidor faz login. Senão, tenta anônimo (só funciona
++# se o RLS permitir). A senha fica SÓ no servidor — nunca use prefixo VITE_ nela.
+ 
+ # NOTA: as chaves "TrafegoPr0-<praça>" que você tem parecem ser de outro serviço
+ # (sync do Meta por praça), não do Supabase — a dash antiga usa um projeto só.
+diff --git a/server/index.ts b/server/index.ts
+index 2fbe6f0..f9f8f95 100644
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -7,7 +7,7 @@ import crypto from "crypto";
+ import bcrypt from "bcryptjs";
+ import multer from "multer";
+ import * as XLSX from "xlsx";
+-import { getSupabase, isSupabaseConfigured } from "./supabase.js";
++import { getAuthedSupabase, isSupabaseConfigured, supabaseAuthMode } from "./supabase.js";
+ import {
+   getAllClients,
+   getClientById,
+@@ -286,11 +286,11 @@ async function startServer() {
+   // Lê a view vw_meta_ads_daily_summary e as funções fn_campaign_period_summary /
+   // fn_campaign_daily_by_period, as mesmas fontes da dashboard antiga.
+   app.get("/api/metrics/status", requireAuth, (_req, res) => {
+-    res.json({ configured: isSupabaseConfigured() });
++    res.json({ configured: isSupabaseConfigured(), mode: supabaseAuthMode() });
+   });
+ 
+   app.get("/api/metrics/clients", requireAuth, async (_req, res) => {
+-    const sb = getSupabase();
++    const sb = await getAuthedSupabase();
+     if (!sb) { res.json({ configured: false, clients: [] }); return; }
+     const { data, error } = await sb.from("clients").select("id, name").order("name");
+     if (error) { res.status(502).json({ error: error.message }); return; }
+@@ -298,7 +298,7 @@ async function startServer() {
+   });
+ 
+   app.get("/api/metrics/daily", requireAuth, async (req, res) => {
+-    const sb = getSupabase();
++    const sb = await getAuthedSupabase();
+     if (!sb) { res.json({ configured: false, rows: [] }); return; }
+     const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+     let q = sb.from("vw_meta_ads_daily_summary").select("*");
+@@ -311,7 +311,7 @@ async function startServer() {
+   });
+ 
+   app.get("/api/metrics/campaigns", requireAuth, async (req, res) => {
+-    const sb = getSupabase();
++    const sb = await getAuthedSupabase();
+     if (!sb) { res.json({ configured: false, rows: [] }); return; }
+     const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+     const { data, error } = await sb.rpc("fn_campaign_period_summary", {
+diff --git a/server/supabase.ts b/server/supabase.ts
+index f969872..56b49a7 100644
+--- a/server/supabase.ts
++++ b/server/supabase.ts
+@@ -1,27 +1,80 @@
+ import "./env.js";
+ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+ 
+-// Client do Supabase para uso NO SERVIDOR. A chave nunca vai para o navegador.
+-// Prioriza a service key (leitura de agregados server-side); cai para a publishable
+-// se RLS já permitir leitura anônima das views/funções. Tudo vem de variáveis de ambiente.
++// Client do Supabase para uso NO SERVIDOR. Duas formas de autorizar a leitura:
++//
++// 1) SUPABASE_SERVICE_KEY (service_role): ignora o RLS. Se existir, é usada direto.
++// 2) SUPABASE_AUTH_EMAIL + SUPABASE_AUTH_PASSWORD: o servidor faz login no Supabase Auth
++//    (com a publishable key), obtendo uma sessão de usuário real — assim o RLS libera a
++//    leitura exatamente como acontecia na dashboard antiga. A senha fica só no servidor,
++//    nunca no bundle do front.
++//
++// Se nenhuma das duas estiver presente, cai no acesso anônimo (a publishable sozinha),
++// que só retorna dados se o RLS permitir leitura ao papel anon.
++
+ const SUPABASE_URL = process.env.SUPABASE_URL;
+-const SUPABASE_KEY =
+-  process.env.SUPABASE_SERVICE_KEY ||
+-  process.env.SUPABASE_KEY ||
+-  process.env.SUPABASE_PUBLISHABLE_KEY;
++const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
++const PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_KEY;
++const AUTH_EMAIL = process.env.SUPABASE_AUTH_EMAIL;
++const AUTH_PASSWORD = process.env.SUPABASE_AUTH_PASSWORD;
++
++const KEY = SERVICE_KEY || PUBLISHABLE_KEY;
+ 
+ let _client: SupabaseClient | null = null;
++let _signedInAt = 0;
++// Revalida a sessão a cada ~50 min (o access token do Supabase dura ~1h).
++const SESSION_TTL_MS = 50 * 60 * 1000;
+ 
+-export function getSupabase(): SupabaseClient | null {
+-  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
++function baseClient(): SupabaseClient | null {
++  if (!SUPABASE_URL || !KEY) return null;
+   if (!_client) {
+-    _client = createClient(SUPABASE_URL, SUPABASE_KEY, {
++    _client = createClient(SUPABASE_URL, KEY, {
+       auth: { persistSession: false, autoRefreshToken: false },
+     });
+   }
+   return _client;
+ }
+ 
++// Uso interno síncrono (ex.: rotas que não dependem de RLS ou quando há service key).
++export function getSupabase(): SupabaseClient | null {
++  return baseClient();
++}
++
++// Client autorizado para leitura protegida por RLS.
++// - service key: retorna direto (já ignora RLS).
++// - publishable + credenciais: garante uma sessão logada antes de retornar.
++export async function getAuthedSupabase(): Promise<SupabaseClient | null> {
++  const sb = baseClient();
++  if (!sb) return null;
++
++  // Com service key não é preciso logar.
++  if (SERVICE_KEY) return sb;
++
++  // Sem credenciais de login, devolve o client anônimo (pode esbarrar no RLS).
++  if (!AUTH_EMAIL || !AUTH_PASSWORD) return sb;
++
++  const fresh = Date.now() - _signedInAt < SESSION_TTL_MS;
++  const { data: sessionData } = await sb.auth.getSession();
++  if (fresh && sessionData.session) return sb;
++
++  const { error } = await sb.auth.signInWithPassword({ email: AUTH_EMAIL, password: AUTH_PASSWORD });
++  if (error) {
++    console.error(`[supabase] Falha no login (${AUTH_EMAIL}): ${error.message}`);
++    // Retorna o client mesmo assim; a query seguirá anônima e provavelmente vazia.
++    return sb;
++  }
++  _signedInAt = Date.now();
++  return sb;
++}
++
+ export function isSupabaseConfigured(): boolean {
+-  return Boolean(SUPABASE_URL && SUPABASE_KEY);
++  return Boolean(SUPABASE_URL && KEY);
++}
++
++// Diagnóstico para a rota de status: diz como a leitura está autorizada.
++export function supabaseAuthMode(): "service_key" | "user_login" | "anon" | "unconfigured" {
++  if (!isSupabaseConfigured()) return "unconfigured";
++  if (SERVICE_KEY) return "service_key";
++  if (AUTH_EMAIL && AUTH_PASSWORD) return "user_login";
++  return "anon";
+ }

@@ -46,13 +46,37 @@ export interface User {
   createdAt: number;
 }
 
+export interface FeedbackLead {
+  id: number;
+  unit: string;
+  responsible: string;
+  weekStart: string;
+  totalLeads: number;
+  leadsCard: number;
+  leadsConsultation: number;
+  leadsDentistry: number;
+  leadsBusinessPJ: number;
+  leadsOutOfArea: number;
+  leadsAnswered: number;
+  leadsNoAnswer: number;
+  salesClosed: number;
+  mainReason: string;
+  creativeFeedback: string;
+  generalObservations: string;
+  supportNeeded: string;
+  submittedAt: string;
+  createdAt: number;
+}
+
 interface DbSchema {
   clients: Client[];
   campaigns: Campaign[];
   users: User[];
+  feedbackLeads: FeedbackLead[];
   _nextClientId: number;
   _nextCampaignId: number;
   _nextUserId: number;
+  _nextFeedbackLeadId: number;
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -65,9 +89,11 @@ const db = new LowSync<DbSchema>(adapter, {
   clients: [],
   campaigns: [],
   users: [],
+  feedbackLeads: [],
   _nextClientId: 1,
   _nextCampaignId: 1,
   _nextUserId: 1,
+  _nextFeedbackLeadId: 1,
 });
 
 db.read();
@@ -79,6 +105,14 @@ if (!db.data.users) {
 }
 if (db.data._nextUserId === undefined) {
   (db.data as DbSchema)._nextUserId = 1;
+  db.write();
+}
+if (!db.data.feedbackLeads) {
+  (db.data as DbSchema).feedbackLeads = [];
+  db.write();
+}
+if (db.data._nextFeedbackLeadId === undefined) {
+  (db.data as DbSchema)._nextFeedbackLeadId = 1;
   db.write();
 }
 
@@ -271,5 +305,59 @@ export function updateCampaign(id: number, data: Partial<CampaignInput>): Campai
 export function deleteCampaign(id: number): void {
   db.read();
   db.data.campaigns = db.data.campaigns.filter((c) => c.id !== id);
+  db.write();
+}
+
+// ─── Feedback Leads ───────────────────────────────────────────────────────────
+export type FeedbackLeadInput = Omit<FeedbackLead, "id" | "createdAt">;
+
+export function getAllFeedbackLeads(): FeedbackLead[] {
+  db.read();
+  return [...db.data.feedbackLeads].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export function getFeedbackLeadById(id: number): FeedbackLead | undefined {
+  db.read();
+  return db.data.feedbackLeads.find((f) => f.id === id);
+}
+
+export function getFeedbackLeadsByUnit(unit: string): FeedbackLead[] {
+  db.read();
+  return db.data.feedbackLeads
+    .filter((f) => f.unit === unit)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export function createFeedbackLead(data: FeedbackLeadInput): FeedbackLead {
+  db.read();
+  const feedback: FeedbackLead = {
+    id: db.data._nextFeedbackLeadId++,
+    unit: data.unit,
+    responsible: data.responsible,
+    weekStart: data.weekStart,
+    totalLeads: data.totalLeads,
+    leadsCard: data.leadsCard,
+    leadsConsultation: data.leadsConsultation,
+    leadsDentistry: data.leadsDentistry,
+    leadsBusinessPJ: data.leadsBusinessPJ,
+    leadsOutOfArea: data.leadsOutOfArea,
+    leadsAnswered: data.leadsAnswered,
+    leadsNoAnswer: data.leadsNoAnswer,
+    salesClosed: data.salesClosed,
+    mainReason: data.mainReason,
+    creativeFeedback: data.creativeFeedback,
+    generalObservations: data.generalObservations,
+    supportNeeded: data.supportNeeded,
+    submittedAt: data.submittedAt,
+    createdAt: Date.now(),
+  };
+  db.data.feedbackLeads.push(feedback);
+  db.write();
+  return feedback;
+}
+
+export function deleteFeedbackLead(id: number): void {
+  db.read();
+  db.data.feedbackLeads = db.data.feedbackLeads.filter((f) => f.id !== id);
   db.write();
 }

@@ -54,3 +54,6 @@
 - [x] Remover páginas Dashboard.tsx e DashboardAdvanced.tsx antigas
 - [x] Atualizar App.tsx com novas rotas /dashboard/*
 - [x] Testar autenticação e navegação completa
+- [x] Criar página /dashboard/feedback-leads com formulário de feedback de leads
+- [x] Integrar com API backend para salvar respostas do formulário
+- [x] Adicionar rota no AppLayout sidebar

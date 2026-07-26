@@ -20,11 +20,15 @@ import {
   getAllUsers,
   createUser,
   deleteUser,
+  getAllFeedbackLeads,
+  createFeedbackLead,
   type ClientInput,
   type CampaignInput,
   type Client,
   type Campaign,
   type User,
+  type FeedbackLead,
+  type FeedbackLeadInput,
 } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -247,6 +251,40 @@ async function startServer() {
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", "attachment; filename=\"clientes-trafego-pro.xlsx\"");
     res.send(buf);
+  });
+
+  // ─── Feedback Leads ──────────────────────────────────────────────────────
+  app.get("/api/feedback-leads", requireAuth, (_req, res) => {
+    const feedbackLeads = getAllFeedbackLeads();
+    res.json(feedbackLeads);
+  });
+
+  app.post("/api/feedback-leads", requireAuth, (req, res) => {
+    const body = req.body as Partial<FeedbackLeadInput> & { unit: string; responsible: string; weekStart: string };
+    if (!body.unit?.trim() || !body.responsible?.trim() || !body.weekStart) {
+      res.status(400).json({ error: "Campos obrigatórios faltando" });
+      return;
+    }
+    const feedback = createFeedbackLead({
+      unit: body.unit,
+      responsible: body.responsible,
+      weekStart: body.weekStart,
+      totalLeads: Number(body.totalLeads) || 0,
+      leadsCard: Number(body.leadsCard) || 0,
+      leadsConsultation: Number(body.leadsConsultation) || 0,
+      leadsDentistry: Number(body.leadsDentistry) || 0,
+      leadsBusinessPJ: Number(body.leadsBusinessPJ) || 0,
+      leadsOutOfArea: Number(body.leadsOutOfArea) || 0,
+      leadsAnswered: Number(body.leadsAnswered) || 0,
+      leadsNoAnswer: Number(body.leadsNoAnswer) || 0,
+      salesClosed: Number(body.salesClosed) || 0,
+      mainReason: body.mainReason ?? "",
+      creativeFeedback: body.creativeFeedback ?? "",
+      generalObservations: body.generalObservations ?? "",
+      supportNeeded: body.supportNeeded ?? "",
+      submittedAt: body.submittedAt ?? new Date().toISOString(),
+    });
+    res.status(201).json(feedback);
   });
 
   // ─── Excel Import ─────────────────────────────────────────────────────────

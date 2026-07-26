@@ -61,7 +61,7 @@ export default function DashboardAdvanced() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const token = localStorage.getItem("auth_token");
+        const token = localStorage.getItem("tp_token");
         if (!token) {
           setIsAuthenticated(false);
           setIsLoading(false);

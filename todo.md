@@ -1,59 +1,50 @@
 # Projeto Tráfego Pro — TODO
 
-## Páginas e Rotas
+## 🔒 Segurança (prioridade máxima)
 
-- [x] Página institucional Tráfego Pro na raiz / (design dark, estrelas animadas, Space Grotesk + Inter)
-- [x] Landing page Vida Card Tupanciretã em /tupancireta (10 seções estratégicas)
-- [x] Landing page Vida Card Júlio de Castilhos em /juliodecastilhos
-- [x] Rota 404 corrigida (espaço extra removido)
-- [x] Animações de scroll (fade-in e slide-up) em todas as seções
+- [x] Remover credenciais de admin hardcoded do servidor (backdoor no login)
+- [x] Remover segredo do token (`JWT_SECRET`) fixo no código — agora só via env
+- [x] Passwords com hash bcrypt (com migração automática das senhas em texto puro)
+- [x] Admin inicial criado por env (`ADMIN_EMAIL` / `ADMIN_PASSWORD`) no 1º boot
+- [x] `data/db.json` removido do versionamento (agora no `.gitignore`)
+- [x] `data/db.json` do repositório saneado (sem senha e sem contatos reais)
+- [x] `data/db.example.json` criado como seed sem dados sensíveis
+- [x] `.env.example` documentando todas as variáveis
+- [ ] **Manual:** tornar o repositório privado
+- [ ] **Manual:** trocar TODAS as senhas/segredos antigos (considerar comprometidos)
+- [ ] **Manual:** `git rm --cached data/db.json` e commitar
+- [ ] **Manual:** rodar `pnpm install` (baixa o bcryptjs) e `pnpm check`
+- [ ] **Manual (opcional):** reescrever histórico do git para apagar o segredo antigo
+      (BFG ou `git filter-repo`), já que o valor ficou registrado em commits passados
 
-## Dashboard & Login
+## Deploy
 
-- [x] Criar rota de login com email/senha customizado (API Express /api/auth/login)
-- [x] Criar página de login com design Tráfego Pro (preto/branco)
-- [x] Criar dashboard com sidebar e gerenciamento de clientes
-- [x] Proteger rota /dashboard apenas para admin (hook useAdminAuth)
-- [x] Adicionar dados mockados de clientes (Vida Card Tupanciretã, Júlio de Castilhos)
-- [x] Criar página de detalhes de cada cliente no dashboard
-- [x] Configurar proxy Vite → Express para rotas /api/*
-- [x] Servidor Express rodando na porta 4000 (dev) com API JWT
+- [ ] Definir onde o back-end Express vai rodar (host com Node, não estático)
+- [ ] Configurar `JWT_SECRET` e variáveis de admin no ambiente de produção
+- [ ] Validar login + dashboard em produção (rotas `/api/*` no ar)
 
-## Identidade Visual
+## Produto / dados (backlog)
 
-- [x] Logo Tráfego Pro (branca) integrada no header e footer
-- [x] Fontes Space Grotesk (títulos) + Inter Extra Light (corpo)
-- [x] Paleta Tráfego Pro: #0a0a0a, branco, cinzas
-- [x] Paleta Vida Card: verde #1FBD8F, azul escuro, branco
+- [ ] Fechar o funil de métricas: incluir retenção/churn e LTV (hoje para na conversa do WhatsApp)
+- [ ] Rever orçamento por praça (evitar valor uniforme sem lógica de porte/potencial)
+- [ ] Padronizar cadastro de clientes (telefone/estado/datas) antes de usar como fonte de decisão
 
-## CRUD de Clientes com Excel
+## Páginas e Rotas (concluído)
 
-- [x] Banco de dados JSON persistente com lowdb (LowSync) em data/db.json
-- [x] API REST completa: GET, POST, PUT, DELETE /api/clients e /api/campaigns
-- [x] Exportação para Excel (.xlsx) via GET /api/clients/export/excel
-- [x] Importação de Excel via POST /api/clients/import/excel
-- [x] Interface CRUD no dashboard: listagem, modal de criação, modal de edição, confirmação de exclusão
-- [x] CRUD de campanhas na tela de detalhe do cliente
-- [x] Botões Importar Excel e Exportar Excel na listagem de clientes
-- [x] Toast de feedback para todas as operações
-- [x] 17 testes vitest passando (CRUD de clientes e campanhas)
+- [x] Site institucional Tráfego Pro em `/`
+- [x] Landing Vida Card Tupanciretã em `/tupancireta`
+- [x] Landing Vida Card Júlio de Castilhos em `/juliodecastilhos`
+- [x] Landing Vida Card Ijuí em `/ijui`
+- [x] Rota 404
 
-## Novo Dashboard (Dashboard.zip)
+## Dashboard & Login (concluído)
 
-- [x] Adicionar tokens de cor dark e classes glass-card, brand-border-glow, ambient-glow ao index.css
-- [x] Criar componente AppLayout com sidebar colapsável, seletor de cliente, nav links e UserProfileButton
-- [x] Criar componente KpiCard fiel ao Dashboard.zip
-- [x] Criar contexto ClientContext para seletor de cliente global
-- [x] Implementar página /dashboard (Visão Geral) com KPIs, gráficos e tabela de campanhas
-- [x] Implementar página /dashboard/pipeline (Kanban de demandas)
-- [x] Implementar página /dashboard/clientes (CRUD de clientes)
-- [x] Implementar página /dashboard/pagamentos (controle de pagamentos)
-- [x] Implementar página /dashboard/meu-trabalho (tarefas atribuídas)
-- [x] Implementar página /dashboard/atualizacoes (posts/updates)
-- [x] Implementar página /dashboard/configuracoes
-- [x] Remover páginas Dashboard.tsx e DashboardAdvanced.tsx antigas
-- [x] Atualizar App.tsx com novas rotas /dashboard/*
-- [x] Testar autenticação e navegação completa
-- [x] Criar página /dashboard/feedback-leads com formulário de feedback de leads
-- [x] Integrar com API backend para salvar respostas do formulário
-- [x] Adicionar rota no AppLayout sidebar
+- [x] Login com API Express (`/api/auth/login`)
+- [x] Rota `/dashboard` protegida para admin (hook `useAdminAuth`)
+- [x] CRUD de clientes e campanhas + import/export Excel
+- [x] Páginas: pipeline, clientes, pagamentos, meu-trabalho, atualizações, configurações, feedback-leads
+- [x] Testes vitest de CRUD
+
+## Identidade Visual (concluído)
+
+- [x] Logo, fontes (Space Grotesk + Inter) e paletas Tráfego Pro / Vida Card

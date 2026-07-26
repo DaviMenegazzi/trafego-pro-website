@@ -3,6 +3,7 @@ import { JSONFileSync } from "lowdb/node";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -116,6 +117,23 @@ if (db.data._nextFeedbackLeadId === undefined) {
   db.write();
 }
 
+// ─── Admin inicial a partir de variáveis de ambiente ──────────────────────────
+// No primeiro boot, se não houver nenhum usuário e ADMIN_EMAIL/ADMIN_PASSWORD
+// estiverem definidos, cria o admin com a senha já em hash. Substitui o antigo
+// admin fixo que ficava hardcoded no código.
+if (db.data.users.length === 0 && process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+  db.data.users.push({
+    id: db.data._nextUserId++,
+    name: process.env.ADMIN_NAME || "Admin",
+    email: process.env.ADMIN_EMAIL,
+    password: bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10),
+    role: "admin",
+    createdAt: Date.now(),
+  });
+  db.write();
+  console.log(`[db] Admin inicial criado para ${process.env.ADMIN_EMAIL}.`);
+}
+
 // ─── Seed inicial ─────────────────────────────────────────────────────────────
 if (db.data.clients.length === 0) {
   const now = Date.now();
@@ -199,13 +217,23 @@ export function createUser(data: { name: string; email: string; password: string
     id: db.data._nextUserId++,
     name: data.name,
     email: data.email,
-    password: data.password,
+    // Nunca guardamos senha em texto puro: armazenamos apenas o hash bcrypt.
+    password: bcrypt.hashSync(data.password, 10),
     role: data.role ?? "admin",
     createdAt: Date.now(),
   };
   db.data.users.push(user);
   db.write();
   return user;
+}
+
+// Usado pela migração automática de senhas legadas (texto puro -> hash).
+export function updateUserPassword(id: number, hashedPassword: string): void {
+  db.read();
+  const idx = db.data.users.findIndex((u) => u.id === id);
+  if (idx === -1) return;
+  db.data.users[idx].password = hashedPassword;
+  db.write();
 }
 
 export function deleteUser(id: number): void {

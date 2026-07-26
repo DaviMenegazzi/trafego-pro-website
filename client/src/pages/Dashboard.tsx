@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import {
@@ -14,84 +14,81 @@ function useAuthGuard() {
   }, [setLocation]);
 }
 
-// ─── Dados de performance (Vida Card | Canela) ────────────────────────────────
-// KPIs e tabela refletem o Performance Hub. A série diária é ilustrativa e será
-// substituída pelos dados reais ao sincronizar com a Meta.
-const KPIS = [
-  { label: "Investimento total", value: "R$ 1.403,58" },
-  { label: "Conversas iniciadas", value: "230" },
-  { label: "Custo por conversa", value: "R$ 6,10" },
-  { label: "Primeiras respostas", value: "145" },
-  { label: "Leads Meta", value: "1" },
-  { label: "Impressões", value: "205.456" },
-  { label: "Cliques", value: "2.116" },
-  { label: "CTR", value: "1,10%" },
-  { label: "CPC", value: "R$ 0,78" },
-  { label: "CPM", value: "R$ 8,43" },
-  { label: "Frequência", value: "1,68" },
-];
+// ─── Tipos das fontes de dados (view + função do Supabase) ────────────────────
+type DailyRow = {
+  date_start: string;
+  total_spend: number | null;
+  total_conversas_iniciadas: number | null;
+  total_messaging_connections: number | null;
+  total_primeiras_respostas: number | null;
+  total_conversas_respondidas: number | null;
+  total_leads_meta: number | null;
+  total_impressions: number | null;
+  total_clicks: number | null;
+  custo_por_conversa: number | null;
+  avg_cpc: number | null;
+  avg_cpm: number | null;
+  avg_ctr: number | null;
+  avg_frequency: number | null;
+};
+type CampaignRow = {
+  campaign_name: string;
+  total_spend: number | null;
+  total_conversas_iniciadas: number | null;
+  custo_por_conversa: number | null;
+  total_leads_meta: number | null;
+  total_impressions: number | null;
+  total_clicks: number | null;
+  avg_ctr: number | null;
+  avg_cpc: number | null;
+  avg_cpm: number | null;
+};
+type ClientOpt = { id: string; name: string };
 
-const FUNNEL = [
-  { label: "Conexões por mensagem", value: 230 },
-  { label: "Conversas iniciadas", value: 230 },
-  { label: "Primeiras respostas", value: 145 },
-  { label: "Conversas respondidas", value: 145 },
-];
+// ─── Formatação (pt-BR) ───────────────────────────────────────────────────────
+const n = (v: number) => v.toLocaleString("pt-BR");
+const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const pct = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+const num = (v: number | null | undefined) => Number(v ?? 0);
 
-const CAMPAIGNS = [
-  {
-    name: "[TP] - [ENG] - [WHATS] - [CARTÃO] - [MAIO/26]",
-    invest: "R$ 1.117,77", conversas: 212, custo: "R$ 5,27", leads: 0,
-    impressoes: "179.701", cliques: "1.804", ctr: "1,00%", cpc: "R$ 0,62", cpm: "R$ 6,22",
-    status: "Positivo",
-  },
-  {
-    name: "[TP] - [ENG] - [WHATS] - [EMPRESARIAL] - [JUNHO/26]",
-    invest: "R$ 285,81", conversas: 18, custo: "R$ 15,88", leads: 1,
-    impressoes: "25.755", cliques: "312", ctr: "1,21%", cpc: "R$ 0,92", cpm: "R$ 11,10",
-    status: "Crítico",
-  },
+// ─── Fallback ilustrativo (usado só enquanto o Supabase não está configurado) ──
+const FALLBACK_DAILY: DailyRow[] = [
+  { date_start: "2026-06-30", total_spend: 42, total_conversas_iniciadas: 4, total_messaging_connections: 4, total_primeiras_respostas: 3, total_conversas_respondidas: 3, total_leads_meta: 0, total_impressions: 7200, total_clicks: 78, custo_por_conversa: 10.5, avg_cpc: 0.78, avg_cpm: 8.4, avg_ctr: 1.1, avg_frequency: 1.68 },
+  { date_start: "2026-07-04", total_spend: 66, total_conversas_iniciadas: 15, total_messaging_connections: 15, total_primeiras_respostas: 9, total_conversas_respondidas: 9, total_leads_meta: 0, total_impressions: 9800, total_clicks: 110, custo_por_conversa: 4.4, avg_cpc: 0.6, avg_cpm: 6.2, avg_ctr: 1.0, avg_frequency: 1.68 },
+  { date_start: "2026-07-10", total_spend: 96, total_conversas_iniciadas: 22, total_messaging_connections: 22, total_primeiras_respostas: 14, total_conversas_respondidas: 14, total_leads_meta: 1, total_impressions: 12400, total_clicks: 140, custo_por_conversa: 4.4, avg_cpc: 0.62, avg_cpm: 6.4, avg_ctr: 1.2, avg_frequency: 1.68 },
+  { date_start: "2026-07-16", total_spend: 49, total_conversas_iniciadas: 9, total_messaging_connections: 9, total_primeiras_respostas: 6, total_conversas_respondidas: 6, total_leads_meta: 0, total_impressions: 8100, total_clicks: 90, custo_por_conversa: 5.4, avg_cpc: 0.72, avg_cpm: 7.1, avg_ctr: 1.05, avg_frequency: 1.68 },
+  { date_start: "2026-07-23", total_spend: 40, total_conversas_iniciadas: 6, total_messaging_connections: 6, total_primeiras_respostas: 4, total_conversas_respondidas: 4, total_leads_meta: 0, total_impressions: 6900, total_clicks: 74, custo_por_conversa: 6.7, avg_cpc: 0.79, avg_cpm: 8.4, avg_ctr: 1.1, avg_frequency: 1.68 },
 ];
-
-const daily = [
-  { d: "30/06", conversas: 4, investimento: 42, custo: 10.5 },
-  { d: "01/07", conversas: 9, investimento: 58, custo: 6.4 },
-  { d: "02/07", conversas: 12, investimento: 61, custo: 5.1 },
-  { d: "03/07", conversas: 8, investimento: 47, custo: 5.9 },
-  { d: "04/07", conversas: 15, investimento: 66, custo: 4.4 },
-  { d: "05/07", conversas: 6, investimento: 39, custo: 6.5 },
-  { d: "06/07", conversas: 5, investimento: 33, custo: 6.6 },
-  { d: "07/07", conversas: 14, investimento: 70, custo: 5.0 },
-  { d: "08/07", conversas: 18, investimento: 82, custo: 4.6 },
-  { d: "09/07", conversas: 11, investimento: 54, custo: 4.9 },
-  { d: "10/07", conversas: 22, investimento: 96, custo: 4.4 },
-  { d: "11/07", conversas: 13, investimento: 60, custo: 4.6 },
-  { d: "12/07", conversas: 7, investimento: 41, custo: 5.9 },
-  { d: "13/07", conversas: 6, investimento: 35, custo: 5.8 },
-  { d: "14/07", conversas: 16, investimento: 74, custo: 4.6 },
-  { d: "15/07", conversas: 12, investimento: 58, custo: 4.8 },
-  { d: "16/07", conversas: 9, investimento: 49, custo: 5.4 },
-  { d: "17/07", conversas: 10, investimento: 52, custo: 5.2 },
-  { d: "18/07", conversas: 8, investimento: 44, custo: 5.5 },
-  { d: "19/07", conversas: 5, investimento: 31, custo: 6.2 },
-  { d: "20/07", conversas: 7, investimento: 38, custo: 5.4 },
-  { d: "23/07", conversas: 6, investimento: 40, custo: 6.7 },
+const FALLBACK_CAMPAIGNS: CampaignRow[] = [
+  { campaign_name: "[TP] - [ENG] - [WHATS] - [CARTÃO] - [MAIO/26]", total_spend: 1117.77, total_conversas_iniciadas: 212, custo_por_conversa: 5.27, total_leads_meta: 0, total_impressions: 179701, total_clicks: 1804, avg_ctr: 1.0, avg_cpc: 0.62, avg_cpm: 6.22 },
+  { campaign_name: "[TP] - [ENG] - [WHATS] - [EMPRESARIAL] - [JUNHO/26]", total_spend: 285.81, total_conversas_iniciadas: 18, custo_por_conversa: 15.88, total_leads_meta: 1, total_impressions: 25755, total_clicks: 312, avg_ctr: 1.21, avg_cpc: 0.92, avg_cpm: 11.1 },
 ];
 
 const tooltipStyle: React.CSSProperties = {
-  background: "var(--color-popover)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 14,
-  fontSize: 12,
-  color: "var(--color-foreground)",
+  background: "var(--color-popover)", border: "1px solid var(--color-border)",
+  borderRadius: 14, fontSize: 12, color: "var(--color-foreground)",
 };
 const axisTick = { fontSize: 11, fill: "var(--color-muted-foreground)" };
 
-const STATUS: Record<string, string> = {
+// Regra de status provisória (a confirmar): custo por conversa.
+function statusFor(custo: number): "Positivo" | "Atenção" | "Crítico" {
+  if (custo > 0 && custo <= 8) return "Positivo";
+  if (custo <= 15) return "Atenção";
+  return "Crítico";
+}
+const STATUS_CLS: Record<string, string> = {
   Positivo: "bg-[color:var(--color-success)]/15 text-[color:var(--color-success)]",
   Atenção: "bg-[color:var(--color-warning)]/15 text-[color:var(--color-warning)]",
   Crítico: "bg-[color:var(--color-destructive)]/15 text-[color:var(--color-destructive)]",
 };
+
+function ymd(d: Date) { return d.toISOString().slice(0, 10); }
+function rangeFor(period: string): { start: string; end: string } {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - (parseInt(period, 10) || 30));
+  return { start: ymd(start), end: ymd(end) };
+}
 
 function Panel({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
@@ -110,20 +107,112 @@ export default function DashboardPage() {
   useEffect(() => { document.title = "Tráfego Pro — Dashboard"; }, []);
 
   const [period, setPeriod] = useState("30");
-  const [campaign, setCampaign] = useState("all");
+  const [clientId, setClientId] = useState("");
+  const [clientOpts, setClientOpts] = useState<ClientOpt[]>([]);
+  const [daily, setDaily] = useState<DailyRow[]>(FALLBACK_DAILY);
+  const [campaigns, setCampaigns] = useState<CampaignRow[]>(FALLBACK_CAMPAIGNS);
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+  // Lista de clientes (do Supabase) para o filtro
+  useEffect(() => {
+    if (!authHeaders) return;
+    fetch("/api/metrics/clients", { headers: authHeaders })
+      .then((r) => r.json())
+      .then((d) => { if (d.configured) setClientOpts(d.clients ?? []); })
+      .catch(() => {});
+  }, [token]);
+
+  // Carrega métricas ao mudar período/cliente
+  useEffect(() => {
+    if (!authHeaders) return;
+    const { start, end } = rangeFor(period);
+    const qs = new URLSearchParams({ start, end, ...(clientId ? { clientId } : {}) }).toString();
+    setLoading(true); setError(null);
+    Promise.all([
+      fetch(`/api/metrics/daily?${qs}`, { headers: authHeaders }).then((r) => r.json()),
+      fetch(`/api/metrics/campaigns?${qs}`, { headers: authHeaders }).then((r) => r.json()),
+    ])
+      .then(([d, c]) => {
+        const ok = d.configured !== false;
+        setConfigured(ok);
+        if (ok && Array.isArray(d.rows) && d.rows.length > 0) setDaily(d.rows);
+        else if (ok) setDaily([]);
+        if (ok && Array.isArray(c.rows)) setCampaigns(c.rows);
+        if (d.error || c.error) setError(d.error || c.error);
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [token, period, clientId]);
+
+  // ─── Agregações (mesma lógica da dashboard antiga) ──────────────────────────
+  const kpi = useMemo(() => {
+    const rows = daily;
+    const sum = (k: keyof DailyRow) => rows.reduce((a, r) => a + num(r[k] as number), 0);
+    const avg = (k: keyof DailyRow) => (rows.length ? sum(k) / rows.length : 0);
+    const spend = sum("total_spend");
+    const conv = sum("total_conversas_iniciadas");
+    return {
+      spend, conv,
+      custoConversa: conv > 0 ? spend / conv : 0,
+      primeiras: sum("total_primeiras_respostas"),
+      respondidas: sum("total_conversas_respondidas"),
+      connections: sum("total_messaging_connections"),
+      leads: sum("total_leads_meta"),
+      impressions: sum("total_impressions"),
+      clicks: sum("total_clicks"),
+      ctr: avg("avg_ctr"),
+      cpc: avg("avg_cpc"),
+      cpm: avg("avg_cpm"),
+      frequency: avg("avg_frequency"),
+    };
+  }, [daily]);
+
+  const KPIS = [
+    { label: "Investimento total", value: brl(kpi.spend) },
+    { label: "Conversas iniciadas", value: n(kpi.conv) },
+    { label: "Custo por conversa", value: brl(kpi.custoConversa) },
+    { label: "Primeiras respostas", value: n(kpi.primeiras) },
+    { label: "Leads Meta", value: n(kpi.leads) },
+    { label: "Impressões", value: n(kpi.impressions) },
+    { label: "Cliques", value: n(kpi.clicks) },
+    { label: "CTR", value: pct(kpi.ctr) },
+    { label: "CPC", value: brl(kpi.cpc) },
+    { label: "CPM", value: brl(kpi.cpm) },
+    { label: "Frequência", value: kpi.frequency.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+  ];
+
+  const FUNNEL = [
+    { label: "Conexões por mensagem", value: kpi.connections },
+    { label: "Conversas iniciadas", value: kpi.conv },
+    { label: "Primeiras respostas", value: kpi.primeiras },
+    { label: "Conversas respondidas", value: kpi.respondidas },
+  ];
+  const funnelMax = Math.max(1, ...FUNNEL.map((f) => f.value));
+
+  const chart = useMemo(() => daily.map((r) => ({
+    d: r.date_start ? r.date_start.slice(5).split("-").reverse().join("/") : "",
+    conversas: num(r.total_conversas_iniciadas),
+    investimento: num(r.total_spend),
+    custo: num(r.custo_por_conversa) || (num(r.total_conversas_iniciadas) > 0 ? num(r.total_spend) / num(r.total_conversas_iniciadas) : 0),
+  })), [daily]);
+
+  const notSynced = configured === false;
 
   return (
     <AppLayout>
       <div className="p-6 md:p-10 space-y-8 max-w-[1400px]">
         {/* Header */}
         <div className="flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Vida Card | Canela</p>
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div>
-              <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-[-0.02em]">Dashboard</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Visão geral da performance de mídia.</p>
-            </div>
-          </div>
+          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+            {clientOpts.find((c) => c.id === clientId)?.name ?? "Todos os clientes"}
+          </p>
+          <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-[-0.02em]">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Visão geral da performance de mídia.</p>
         </div>
 
         {/* Filtros */}
@@ -138,21 +227,30 @@ export default function DashboardPage() {
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           </div>
           <div className="relative">
-            <select value={campaign} onChange={(e) => setCampaign(e.target.value)}
+            <select value={clientId} onChange={(e) => setClientId(e.target.value)}
               className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              <option value="all">Todas as campanhas</option>
-              {CAMPAIGNS.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+              <option value="">Todos os clientes</option>
+              {clientOpts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           </div>
           <button className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-surface transition-colors">
             <Download className="size-4" /> Baixar dados
           </button>
-          <button className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity">
-            <RefreshCw className="size-4" /> Atualizar dados
+          <button onClick={() => setPeriod((p) => p)} disabled={loading}
+            className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Atualizar dados
           </button>
-          <span className="text-xs text-muted-foreground">Última atualização: ainda não sincronizado nesta sessão</span>
+          <span className="text-xs text-muted-foreground">
+            {loading ? "Carregando…" : notSynced ? "Supabase não configurado — exibindo dados de exemplo" : "Dados sincronizados do Supabase"}
+          </span>
         </div>
+
+        {error && (
+          <div className="rounded-2xl border border-[color:var(--color-destructive)]/30 bg-[color:var(--color-destructive)]/10 px-4 py-3 text-sm text-[color:var(--color-destructive)]">
+            Erro ao buscar métricas: {error}
+          </div>
+        )}
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-px bg-border border border-border rounded-3xl overflow-hidden">
@@ -169,9 +267,9 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Panel title="Conversas iniciadas por dia">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={daily} margin={{ left: -18, right: 8, top: 8 }}>
+              <LineChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval={2} />
+                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
                 <YAxis tick={axisTick} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Line type="monotone" dataKey="conversas" stroke="var(--color-foreground)" strokeWidth={2} dot={false} name="Conversas" />
@@ -181,9 +279,9 @@ export default function DashboardPage() {
 
           <Panel title="Investimento x Conversas">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={daily} margin={{ left: -18, right: 8, top: 8 }}>
+              <LineChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval={2} />
+                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
                 <YAxis yAxisId="l" tick={axisTick} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="r" orientation="right" tick={axisTick} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
@@ -198,33 +296,29 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Panel title="Custo por conversa" note="R$ por conversa iniciada">
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={daily} margin={{ left: -18, right: 8, top: 8 }}>
+              <LineChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval={2} />
+                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
                 <YAxis tick={axisTick} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(Number(v))} />
                 <Line type="monotone" dataKey="custo" stroke="var(--color-foreground)" strokeWidth={2} dot={false} name="Custo/conversa" />
               </LineChart>
             </ResponsiveContainer>
           </Panel>
 
-          {/* Funil de mensagens */}
           <Panel title="Funil de mensagens">
             <div className="space-y-5">
-              {FUNNEL.map((f) => {
-                const pct = Math.round((f.value / FUNNEL[0].value) * 100);
-                return (
-                  <div key={f.label}>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-sm text-muted-foreground">{f.label}</span>
-                      <span className="font-display text-lg font-semibold tracking-[-0.01em]">{f.value}</span>
-                    </div>
-                    <div className="mt-2 h-2.5 rounded-full bg-surface-2 overflow-hidden">
-                      <div className="h-full rounded-full bg-foreground/80" style={{ width: `${pct}%` }} />
-                    </div>
+              {FUNNEL.map((f) => (
+                <div key={f.label}>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-muted-foreground">{f.label}</span>
+                    <span className="font-display text-lg font-semibold tracking-[-0.01em]">{n(f.value)}</span>
                   </div>
-                );
-              })}
+                  <div className="mt-2 h-2.5 rounded-full bg-surface-2 overflow-hidden">
+                    <div className="h-full rounded-full bg-foreground/80" style={{ width: `${Math.round((f.value / funnelMax) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
           </Panel>
         </div>
@@ -249,31 +343,32 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {CAMPAIGNS.map((c) => (
-                  <tr key={c.name} className="border-b border-border/50 hover:bg-surface/40 transition-colors">
-                    <td className="py-3 pr-4 font-medium max-w-[280px]">{c.name}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.invest}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.conversas}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.custo}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.leads}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.impressoes}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.cliques}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.ctr}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.cpc}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">{c.cpm}</td>
-                    <td className="py-3 pl-3 text-right">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-medium ${STATUS[c.status] ?? "bg-surface-2 text-muted-foreground"}`}>
-                        {c.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {campaigns.length === 0 ? (
+                  <tr><td colSpan={11} className="py-8 text-center text-muted-foreground">Sem campanhas no período.</td></tr>
+                ) : campaigns.map((c) => {
+                  const custo = num(c.custo_por_conversa) || (num(c.total_conversas_iniciadas) > 0 ? num(c.total_spend) / num(c.total_conversas_iniciadas) : 0);
+                  const st = statusFor(custo);
+                  return (
+                    <tr key={c.campaign_name} className="border-b border-border/50 hover:bg-surface/40 transition-colors">
+                      <td className="py-3 pr-4 font-medium max-w-[280px]">{c.campaign_name}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{brl(num(c.total_spend))}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{n(num(c.total_conversas_iniciadas))}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{brl(custo)}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{n(num(c.total_leads_meta))}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{n(num(c.total_impressions))}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{n(num(c.total_clicks))}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{pct(num(c.avg_ctr))}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{brl(num(c.avg_cpc))}</td>
+                      <td className="py-3 px-3 text-right tabular-nums">{brl(num(c.avg_cpm))}</td>
+                      <td className="py-3 pl-3 text-right">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-medium ${STATUS_CLS[st]}`}>{st}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          <p className="mt-4 text-[11px] text-muted-foreground/70">
-            Série diária dos gráficos é ilustrativa — substituída pelos dados reais ao sincronizar com a Meta.
-          </p>
         </Panel>
       </div>
     </AppLayout>

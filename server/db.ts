@@ -1,3 +1,4 @@
+import "./env.js";
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 import path from "path";

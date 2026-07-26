@@ -1,3 +1,4 @@
+import "./env.js";
 import express from "express";
 import { createServer } from "http";
 import path from "path";
@@ -6,6 +7,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { getSupabase, isSupabaseConfigured } from "./supabase.js";
 import {
   getAllClients,
   getClientById,
@@ -278,6 +280,47 @@ async function startServer() {
   app.get("/api/feedback-leads", requireAuth, (_req, res) => {
     const feedbackLeads = getAllFeedbackLeads();
     res.json(feedbackLeads);
+  });
+
+  // ─── Métricas (Supabase / Meta Ads) ──────────────────────────────────────
+  // Lê a view vw_meta_ads_daily_summary e as funções fn_campaign_period_summary /
+  // fn_campaign_daily_by_period, as mesmas fontes da dashboard antiga.
+  app.get("/api/metrics/status", requireAuth, (_req, res) => {
+    res.json({ configured: isSupabaseConfigured() });
+  });
+
+  app.get("/api/metrics/clients", requireAuth, async (_req, res) => {
+    const sb = getSupabase();
+    if (!sb) { res.json({ configured: false, clients: [] }); return; }
+    const { data, error } = await sb.from("clients").select("id, name").order("name");
+    if (error) { res.status(502).json({ error: error.message }); return; }
+    res.json({ configured: true, clients: data ?? [] });
+  });
+
+  app.get("/api/metrics/daily", requireAuth, async (req, res) => {
+    const sb = getSupabase();
+    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+    let q = sb.from("vw_meta_ads_daily_summary").select("*");
+    if (clientId) q = q.eq("client_id", clientId);
+    if (start) q = q.gte("date_start", start);
+    if (end) q = q.lte("date_start", end);
+    const { data, error } = await q.order("date_start", { ascending: true });
+    if (error) { res.status(502).json({ error: error.message }); return; }
+    res.json({ configured: true, rows: data ?? [] });
+  });
+
+  app.get("/api/metrics/campaigns", requireAuth, async (req, res) => {
+    const sb = getSupabase();
+    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+    const { data, error } = await sb.rpc("fn_campaign_period_summary", {
+      p_client_id: clientId ?? null,
+      p_date_start: start ?? null,
+      p_date_stop: end ?? null,
+    });
+    if (error) { res.status(502).json({ error: error.message }); return; }
+    res.json({ configured: true, rows: data ?? [] });
   });
 
   app.post("/api/feedback-leads", requireAuth, (req, res) => {

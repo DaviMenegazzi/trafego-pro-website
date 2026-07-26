@@ -119,26 +119,61 @@ async function startServer() {
   app.use(express.json());
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
-  app.post("/api/auth/login", (req, res) => {
-    const { email, password, name } = req.body as { email?: string; password: string; name?: string };
+  app.post("/api/auth/login", async (req, res) => {
+    const { email, password } = req.body as { email: string; password: string };
 
-    // Se nao houver nenhum usuario, cria um admin padrao
-    if (getAllUsers().length === 0) {
-      createUser({
-        name: "Davi",
-        email: "davi@trafego.pro",
-        password: "123456",
-        role: "admin",
-      });
-      console.log("[auth] Admin padrao criado: davi@trafego.pro / 123456");
+    if (!email || !password) {
+      res.status(400).json({ error: "Email e senha são obrigatórios" });
+      return;
     }
 
-    // Tenta login pelo banco de dados (por nome ou email)
-    let dbUser: User | undefined;
-    if (name) dbUser = getUserByName(name);
-    if (!dbUser && email) dbUser = getUserByEmail(email);
+    // Tenta autenticar contra o Supabase Auth
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error || !data.user) {
+          res.status(401).json({ error: "Credenciais inválidas (Supabase)" });
+          return;
+        }
 
-    if (dbUser && password && checkPassword(password, dbUser.password, dbUser.id)) {
+        // Usuário autenticado no Supabase. Cria/atualiza no banco local
+        let dbUser = getUserByEmail(email);
+        if (!dbUser) {
+          dbUser = createUser({
+            name: data.user.user_metadata?.name || email.split("@")[0],
+            email,
+            password: "[supabase-auth]", // Senha não é usada quando autenticado via Supabase
+            role: "admin", // Novo usuário começa como admin
+          });
+          console.log(`[auth] Novo usuário criado via Supabase: ${email}`);
+        }
+
+        // Gera token JWT local
+        const token = signToken({ email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id });
+        res.json({ token, user: { email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id } });
+        return;
+      } catch (err) {
+        console.error("[auth] Erro ao autenticar com Supabase:", err);
+        res.status(500).json({ error: "Erro de autenticação" });
+        return;
+      }
+    }
+
+    // Fallback: se Supabase não estiver configurado, usa banco local
+    console.warn("[auth] Supabase não configurado, usando autenticação local");
+    let dbUser = getUserByEmail(email);
+    if (!dbUser) {
+      dbUser = createUser({
+        name: email.split("@")[0],
+        email,
+        password,
+        role: "admin",
+      });
+      console.log(`[auth] Novo usuário criado localmente: ${email}`);
+    }
+
+    if (dbUser && checkPassword(password, dbUser.password, dbUser.id)) {
       const token = signToken({ email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id });
       res.json({ token, user: { email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id } });
       return;

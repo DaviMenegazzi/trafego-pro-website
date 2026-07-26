@@ -37,3 +37,20 @@
 - [x] Botões Importar Excel e Exportar Excel na listagem de clientes
 - [x] Toast de feedback para todas as operações
 - [x] 17 testes vitest passando (CRUD de clientes e campanhas)
+
+## Novo Dashboard (Dashboard.zip)
+
+- [ ] Adicionar tokens de cor dark e classes glass-card, brand-border-glow, ambient-glow ao index.css
+- [ ] Criar componente AppLayout com sidebar colapsável, seletor de cliente, nav links e UserProfileButton
+- [ ] Criar componente KpiCard fiel ao Dashboard.zip
+- [ ] Criar contexto ClientContext para seletor de cliente global
+- [ ] Implementar página /dashboard (Visão Geral) com KPIs, gráficos e tabela de campanhas
+- [ ] Implementar página /dashboard/pipeline (Kanban de demandas)
+- [ ] Implementar página /dashboard/clientes (CRUD de clientes)
+- [ ] Implementar página /dashboard/pagamentos (controle de pagamentos)
+- [ ] Implementar página /dashboard/meu-trabalho (tarefas atribuídas)
+- [ ] Implementar página /dashboard/atualizacoes (posts/updates)
+- [ ] Implementar página /dashboard/configuracoes
+- [ ] Remover páginas Dashboard.tsx e DashboardAdvanced.tsx antigas
+- [ ] Atualizar App.tsx com novas rotas /dashboard/*
+- [ ] Testar autenticação e navegação completa

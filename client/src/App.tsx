@@ -4,15 +4,19 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Index from "./pages/Index";
+import { ClientProvider } from "./contexts/ClientContext";
 import Home from "./pages/Home";
 import JulioDeCastilhos from "./pages/JulioDeCastilhos";
 import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import DashboardAdvanced from "./pages/DashboardAdvanced";
+import DashboardPipeline from "./pages/DashboardPipeline";
+import DashboardClientes from "./pages/DashboardClientes";
+import DashboardPagamentos from "./pages/DashboardPagamentos";
+import DashboardMeuTrabalho from "./pages/DashboardMeuTrabalho";
+import DashboardAtualizacoes from "./pages/DashboardAtualizacoes";
+import DashboardConfiguracoes from "./pages/DashboardConfiguracoes";
 import Ijui from "./pages/Ijui";
-
 
 function Router() {
   return (
@@ -27,30 +31,34 @@ function Router() {
       <Route path={"/login"} component={Login} />
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/dashboard/"} component={Dashboard} />
-      <Route path={"/dashboard-advanced"} component={DashboardAdvanced} />
-      <Route path={"/dashboard-advanced/"} component={DashboardAdvanced} />
+      <Route path={"/dashboard/pipeline"} component={DashboardPipeline} />
+      <Route path={"/dashboard/pipeline/"} component={DashboardPipeline} />
+      <Route path={"/dashboard/clientes"} component={DashboardClientes} />
+      <Route path={"/dashboard/clientes/"} component={DashboardClientes} />
+      <Route path={"/dashboard/pagamentos"} component={DashboardPagamentos} />
+      <Route path={"/dashboard/pagamentos/"} component={DashboardPagamentos} />
+      <Route path={"/dashboard/meu-trabalho"} component={DashboardMeuTrabalho} />
+      <Route path={"/dashboard/meu-trabalho/"} component={DashboardMeuTrabalho} />
+      <Route path={"/dashboard/atualizacoes"} component={DashboardAtualizacoes} />
+      <Route path={"/dashboard/atualizacoes/"} component={DashboardAtualizacoes} />
+      <Route path={"/dashboard/configuracoes"} component={DashboardConfiguracoes} />
+      <Route path={"/dashboard/configuracoes/"} component={DashboardConfiguracoes} />
       <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+      <ThemeProvider defaultTheme="dark">
+        <ClientProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </ClientProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

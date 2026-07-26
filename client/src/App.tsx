@@ -10,6 +10,7 @@ import JulioDeCastilhos from "./pages/JulioDeCastilhos";
 import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import DashboardAdvanced from "./pages/DashboardAdvanced";
 import Ijui from "./pages/Ijui";
 
 
@@ -26,6 +27,8 @@ function Router() {
       <Route path={"/login"} component={Login} />
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/dashboard/"} component={Dashboard} />
+      <Route path={"/dashboard-advanced"} component={DashboardAdvanced} />
+      <Route path={"/dashboard-advanced/"} component={DashboardAdvanced} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

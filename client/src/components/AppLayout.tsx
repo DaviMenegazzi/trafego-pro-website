@@ -14,6 +14,7 @@ import {
   ChevronRight,
   LogOut,
   User,
+  MessageSquare,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 
@@ -27,6 +28,7 @@ const nav = [
   { to: "/dashboard/pagamentos", label: "Pagamentos", icon: CreditCard },
   { to: "/dashboard/meu-trabalho", label: "Meu Trabalho", icon: ClipboardList },
   { to: "/dashboard/atualizacoes", label: "Atualizações", icon: Newspaper },
+  { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
   { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];
 

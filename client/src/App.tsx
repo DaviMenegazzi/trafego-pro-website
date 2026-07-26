@@ -16,6 +16,7 @@ import DashboardPagamentos from "./pages/DashboardPagamentos";
 import DashboardMeuTrabalho from "./pages/DashboardMeuTrabalho";
 import DashboardAtualizacoes from "./pages/DashboardAtualizacoes";
 import DashboardConfiguracoes from "./pages/DashboardConfiguracoes";
+import DashboardFeedbackLeads from "./pages/DashboardFeedbackLeads";
 import Ijui from "./pages/Ijui";
 
 function Router() {
@@ -43,6 +44,8 @@ function Router() {
       <Route path={"/dashboard/atualizacoes/"} component={DashboardAtualizacoes} />
       <Route path={"/dashboard/configuracoes"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/configuracoes/"} component={DashboardConfiguracoes} />
+      <Route path={"/dashboard/feedback-leads"} component={DashboardFeedbackLeads} />
+      <Route path={"/dashboard/feedback-leads/"} component={DashboardFeedbackLeads} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

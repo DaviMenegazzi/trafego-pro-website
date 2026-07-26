@@ -40,6 +40,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
 }
 
 :root {
@@ -52,7 +54,7 @@
   --vida-gray-light: #f5f7fa;
   --vida-gray-medium: #e8ecf1;
   --vida-white: #ffffff;
-  
+
   --primary: var(--vida-green);
   --primary-foreground: var(--vida-white);
   --sidebar-primary: var(--vida-green);
@@ -86,30 +88,40 @@
   --sidebar-accent-foreground: #1a1a1a;
   --sidebar-border: var(--vida-gray-medium);
   --sidebar-ring: var(--vida-green);
+  --success: #22c55e;
+  --warning: #f59e0b;
 }
 
-.dark {
-  --background: #0f1f1a;
-  --foreground: var(--vida-white);
-  --card: #1a3a33;
-  --card-foreground: var(--vida-white);
-  --popover: #1a3a33;
-  --popover-foreground: var(--vida-white);
-  --secondary: #2a4a43;
-  --secondary-foreground: var(--vida-gray-light);
-  --muted: #3a5a53;
-  --muted-foreground: #9ca3af;
-  --accent: var(--vida-orange);
-  --accent-foreground: var(--vida-white);
-  --border: #2a4a43;
-  --input: #2a4a43;
-  --ring: var(--vida-green);
-  --sidebar: #1a3a33;
-  --sidebar-foreground: var(--vida-white);
-  --sidebar-accent: #2a4a43;
-  --sidebar-accent-foreground: var(--vida-green);
-  --sidebar-border: #2a4a43;
-  --sidebar-ring: var(--vida-green);
+/* Dashboard dark theme (used inside .dashboard-dark wrapper) */
+.dashboard-dark {
+  --background: oklch(0.12 0.02 220);
+  --foreground: oklch(0.95 0.005 220);
+  --card: oklch(0.16 0.02 220);
+  --card-foreground: oklch(0.95 0.005 220);
+  --popover: oklch(0.16 0.02 220);
+  --popover-foreground: oklch(0.95 0.005 220);
+  --primary: oklch(0.72 0.18 170);
+  --primary-foreground: oklch(0.12 0.02 220);
+  --secondary: oklch(0.20 0.02 220);
+  --secondary-foreground: oklch(0.85 0.01 220);
+  --muted: oklch(0.22 0.02 220);
+  --muted-foreground: oklch(0.60 0.01 220);
+  --accent: oklch(0.22 0.02 220);
+  --accent-foreground: oklch(0.95 0.005 220);
+  --destructive: oklch(0.60 0.22 25);
+  --destructive-foreground: oklch(0.95 0.005 220);
+  --border: oklch(0.24 0.02 220);
+  --input: oklch(0.20 0.02 220);
+  --ring: oklch(0.72 0.18 170);
+  --sidebar: oklch(0.14 0.02 220);
+  --sidebar-foreground: oklch(0.95 0.005 220);
+  --sidebar-accent: oklch(0.20 0.02 220);
+  --sidebar-accent-foreground: oklch(0.72 0.18 170);
+  --sidebar-border: oklch(0.22 0.02 220);
+  --sidebar-ring: oklch(0.72 0.18 170);
+  --success: oklch(0.72 0.18 145);
+  --warning: oklch(0.78 0.16 75);
+  color-scheme: dark;
 }
 
 @layer base {
@@ -161,6 +173,19 @@
     }
   }
 
+  /* Dashboard glass card */
+  .glass-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    backdrop-filter: blur(12px);
+  }
+
+  /* Brand border glow (active nav item) */
+  .brand-border-glow {
+    box-shadow: inset 2px 0 0 var(--primary);
+  }
+
   /* Vida Card Custom Components */
   .vida-card {
     @apply bg-white rounded-lg shadow-md border border-gray-100 p-6 transition-all duration-300 hover:shadow-lg;
@@ -193,4 +218,101 @@
   .vida-text-orange {
     @apply text-[#FF8C42];
   }
+
+  /* Dashboard scrollbar */
+  .dashboard-dark * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(31, 189, 143, 0.25) transparent;
+  }
+
+  .dashboard-dark ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .dashboard-dark ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dashboard-dark ::-webkit-scrollbar-thumb {
+    background: rgba(31, 189, 143, 0.2);
+    border-radius: 9999px;
+  }
+
+  .dashboard-dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(31, 189, 143, 0.45);
+  }
+}
+
+/* Ambient background animation */
+@keyframes ambientPulse {
+  0%, 100% {
+    transform: scale(0.9) translate3d(0, 0, 0);
+    opacity: 0.18;
+  }
+  50% {
+    transform: scale(1.12) translate3d(1.25rem, -1rem, 0);
+    opacity: 0.46;
+  }
+}
+
+.ambient-glow {
+  animation: ambientPulse 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-glow {
+    animation: none;
+  }
+}
+
+/* Rich content rendering */
+.rich-content {
+  color: var(--color-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  word-wrap: break-word;
+}
+.rich-content h1 { font-size: 1.75rem; font-weight: 700; margin: 1.25rem 0 0.75rem; }
+.rich-content h2 { font-size: 1.375rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+.rich-content h3 { font-size: 1.125rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+.rich-content p { margin: 0.5rem 0; }
+.rich-content a { color: var(--color-primary); text-decoration: underline; text-underline-offset: 2px; }
+.rich-content ul, .rich-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.rich-content ul { list-style: disc; }
+.rich-content ol { list-style: decimal; }
+.rich-content li { margin: 0.2rem 0; }
+.rich-content blockquote {
+  border-left: 3px solid var(--color-primary);
+  background: rgba(31, 189, 143, 0.06);
+  padding: 0.5rem 0.9rem;
+  margin: 0.75rem 0;
+  color: var(--color-muted-foreground);
+  border-radius: 0 0.4rem 0.4rem 0;
+}
+.rich-content code {
+  background: rgba(148, 163, 184, 0.14);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  font-size: 0.85em;
+}
+.rich-content pre {
+  background: rgba(8, 18, 33, 0.75);
+  border: 1px solid var(--color-border);
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.rich-content pre code { background: transparent; padding: 0; }
+.rich-content table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+.rich-content th, .rich-content td { border: 1px solid var(--color-border); padding: 0.5rem 0.7rem; }
+.rich-content th { background: rgba(148, 163, 184, 0.08); font-weight: 600; }
+
+/* Payment table cell utilities */
+.td-cell {
+  @apply px-3 py-2 text-xs overflow-hidden text-ellipsis;
+}
+.th-cell {
+  @apply px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70;
 }

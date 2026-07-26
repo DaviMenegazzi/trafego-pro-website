@@ -1,1014 +1,297 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useAdminAuth, getToken } from "@/hooks/useAdminAuth";
+import { AppLayout } from "@/components/AppLayout";
+import { useClientContext } from "@/contexts/ClientContext";
 import {
-  LogOut, Users, BarChart2, ExternalLink, ChevronRight,
-  DollarSign, Activity, Plus, Pencil, Trash2, Download,
-  Upload, X, Check, AlertTriangle,
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+} from "recharts";
+import {
+  DollarSign, Users2, TrendingUp, Eye, Download, ChevronDown,
+  ArrowUpRight, ArrowDownRight, Minus,
 } from "lucide-react";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface Campaign {
-  id: number;
-  clientId: number;
-  name: string;
-  platform: string;
-  status: string;
-  budget: number;
+function useAuthGuard() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    const token = localStorage.getItem("tp_token");
+    if (!token) setLocation("/login");
+  }, [setLocation]);
 }
 
-interface Client {
-  id: number;
-  name: string;
-  city: string;
-  state: string;
-  status: string;
-  plan: string;
-  startDate: string;
-  monthlyBudget: number;
-  contact: string;
-  phone: string;
-  email: string;
-  lpUrl: string;
-  notes: string;
-}
+type Campaign = {
+  id: string; name: string; platform?: string; status?: string;
+  budget?: number; spent?: number; leads?: number; impressions?: number;
+  clicks?: number; cpl?: number; ctr?: number;
+};
+type ClientWithCampaigns = {
+  id: string; name: string; city?: string; budget?: number; campaigns: Campaign[];
+};
 
-interface ClientDetail extends Client {
-  campaigns: Campaign[];
-}
+const tooltipStyle: React.CSSProperties = {
+  background: "var(--color-popover)",
+  border: "1px solid var(--color-border)",
+  borderRadius: 12,
+  fontSize: 12,
+  color: "var(--color-foreground)",
+};
 
-// ─── Empty form state ─────────────────────────────────────────────────────────
-const emptyClient = (): Omit<Client, "id"> => ({
-  name: "", city: "", state: "", status: "active", plan: "",
-  startDate: "", monthlyBudget: 0, contact: "", phone: "",
-  email: "", lpUrl: "", notes: "",
-});
-
-const emptyCampaign = (): Omit<Campaign, "id" | "clientId"> => ({
-  name: "", platform: "", status: "active", budget: 0,
-});
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function authFetch(url: string, options: RequestInit = {}) {
-  const token = getToken();
-  return fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-}
-
-// ─── Modal ────────────────────────────────────────────────────────────────────
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function KpiCard({ label, value, icon: Icon, trend, trendLabel }: {
+  label: string; value: string; icon: React.ElementType;
+  trend?: "up" | "down" | "neutral"; trendLabel?: string;
+}) {
+  const TrendIcon = trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Minus;
+  const trendColor = trend === "up" ? "text-[var(--color-success)]" : trend === "down" ? "text-destructive" : "text-muted-foreground";
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="w-full max-w-2xl rounded-2xl p-6 overflow-y-auto"
-        style={{
-          background: "#111",
-          border: "1px solid rgba(255,255,255,0.1)",
-          maxHeight: "90vh",
-        }}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-white text-xl" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>
-            {title}
-          </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
+    <div className="glass-card p-5 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Icon className="size-4 text-primary" />
         </div>
-        {children}
       </div>
+      <div className="text-2xl font-bold tracking-tight">{value}</div>
+      {trendLabel && (
+        <div className={`flex items-center gap-1 text-xs ${trendColor}`}>
+          <TrendIcon className="size-3" />
+          {trendLabel}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Client Form ──────────────────────────────────────────────────────────────
-function ClientForm({
-  initial,
-  onSave,
-  onCancel,
-  saving,
-}: {
-  initial: Omit<Client, "id">;
-  onSave: (data: Omit<Client, "id">) => void;
-  onCancel: () => void;
-  saving: boolean;
-}) {
-  const [form, setForm] = useState(initial);
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [k]: k === "monthlyBudget" ? Number(e.target.value) : e.target.value }));
-
-  const inputStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "8px",
-    color: "#fff",
-    padding: "8px 12px",
-    fontSize: "14px",
-    fontWeight: 300,
-    width: "100%",
-    outline: "none",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    color: "rgba(255,255,255,0.45)",
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    fontWeight: 300,
-    marginBottom: "6px",
-    display: "block",
-  };
-
+function ClientCard({ client, selected, onClick }: { client: ClientWithCampaigns; selected: boolean; onClick: () => void }) {
+  const totalSpent = client.campaigns.reduce((s, c) => s + (c.spent ?? 0), 0);
+  const totalLeads = client.campaigns.reduce((s, c) => s + (c.leads ?? 0), 0);
   return (
-    <form
-      onSubmit={(e) => { e.preventDefault(); onSave(form); }}
-      className="flex flex-col gap-4"
+    <button onClick={onClick}
+      className={`glass-card p-4 text-left w-full transition-all hover:border-primary/40 ${selected ? "border-primary/60 bg-primary/5" : ""}`}
     >
-      {/* Row 1 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label style={labelStyle}>Nome *</label>
-          <input style={inputStyle} value={form.name} onChange={set("name")} required />
-        </div>
-        <div>
-          <label style={labelStyle}>Status</label>
-          <select style={inputStyle} value={form.status} onChange={set("status")}>
-            <option value="active">Ativo</option>
-            <option value="paused">Pausado</option>
-          </select>
-        </div>
+      <div className="font-medium text-sm mb-3">{client.name}</div>
+      <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+        <div><div className="font-medium text-foreground">{client.budget ? `R$ ${client.budget.toLocaleString("pt-BR")}` : "—"}</div><div>Orçamento</div></div>
+        <div><div className="font-medium text-foreground">{totalSpent > 0 ? `R$ ${totalSpent.toLocaleString("pt-BR")}` : "R$ 0"}</div><div>Gasto</div></div>
+        <div><div className="font-medium text-foreground">{totalLeads}</div><div>Leads</div></div>
       </div>
-
-      {/* Row 2 */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label style={labelStyle}>Cidade</label>
-          <input style={inputStyle} value={form.city} onChange={set("city")} />
-        </div>
-        <div>
-          <label style={labelStyle}>Estado</label>
-          <input style={inputStyle} value={form.state} onChange={set("state")} maxLength={2} placeholder="RS" />
-        </div>
-      </div>
-
-      {/* Row 3 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label style={labelStyle}>Plano</label>
-          <input style={inputStyle} value={form.plan} onChange={set("plan")} placeholder="Meta Ads + Google Ads" />
-        </div>
-        <div>
-          <label style={labelStyle}>Data de Início</label>
-          <input style={inputStyle} type="date" value={form.startDate} onChange={set("startDate")} />
-        </div>
-      </div>
-
-      {/* Row 4 */}
-      <div>
-        <label style={labelStyle}>Orçamento Mensal (R$)</label>
-        <input style={inputStyle} type="number" min={0} step={100} value={form.monthlyBudget} onChange={set("monthlyBudget")} />
-      </div>
-
-      {/* Row 5 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label style={labelStyle}>Contato</label>
-          <input style={inputStyle} value={form.contact} onChange={set("contact")} />
-        </div>
-        <div>
-          <label style={labelStyle}>Telefone</label>
-          <input style={inputStyle} value={form.phone} onChange={set("phone")} />
-        </div>
-        <div>
-          <label style={labelStyle}>E-mail</label>
-          <input style={inputStyle} type="email" value={form.email} onChange={set("email")} />
-        </div>
-      </div>
-
-      {/* Row 6 */}
-      <div>
-        <label style={labelStyle}>URL da Landing Page</label>
-        <input style={inputStyle} value={form.lpUrl} onChange={set("lpUrl")} placeholder="/tupancireta" />
-      </div>
-
-      {/* Row 7 */}
-      <div>
-        <label style={labelStyle}>Observações</label>
-        <textarea
-          style={{ ...inputStyle, resize: "vertical", minHeight: "80px" }}
-          value={form.notes}
-          onChange={set("notes")}
-        />
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-3 justify-end pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 rounded-lg text-sm transition-all"
-          style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", fontWeight: 300, border: "1px solid rgba(255,255,255,0.1)" }}
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-all"
-          style={{ background: "#fff", color: "#000", fontWeight: 400 }}
-        >
-          {saving ? (
-            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Check size={14} />
-          )}
-          Salvar
-        </button>
-      </div>
-    </form>
+    </button>
   );
 }
 
-// ─── Campaign Form ─────────────────────────────────────────────────────────────
-function CampaignForm({
-  initial,
-  onSave,
-  onCancel,
-  saving,
-}: {
-  initial: Omit<Campaign, "id" | "clientId">;
-  onSave: (data: Omit<Campaign, "id" | "clientId">) => void;
-  onCancel: () => void;
-  saving: boolean;
-}) {
-  const [form, setForm] = useState(initial);
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [k]: k === "budget" ? Number(e.target.value) : e.target.value }));
-
-  const inputStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "8px",
-    color: "#fff",
-    padding: "8px 12px",
-    fontSize: "14px",
-    fontWeight: 300,
-    width: "100%",
-    outline: "none",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    color: "rgba(255,255,255,0.45)",
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    fontWeight: 300,
-    marginBottom: "6px",
-    display: "block",
-  };
-
-  return (
-    <form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label style={labelStyle}>Nome da Campanha *</label>
-          <input style={inputStyle} value={form.name} onChange={set("name")} required />
-        </div>
-        <div>
-          <label style={labelStyle}>Plataforma</label>
-          <select style={inputStyle} value={form.platform} onChange={set("platform")}>
-            <option value="">Selecione</option>
-            <option value="Meta Ads">Meta Ads</option>
-            <option value="Google Ads">Google Ads</option>
-            <option value="TikTok Ads">TikTok Ads</option>
-            <option value="LinkedIn Ads">LinkedIn Ads</option>
-            <option value="Outro">Outro</option>
-          </select>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label style={labelStyle}>Status</label>
-          <select style={inputStyle} value={form.status} onChange={set("status")}>
-            <option value="active">Ativa</option>
-            <option value="paused">Pausada</option>
-          </select>
-        </div>
-        <div>
-          <label style={labelStyle}>Orçamento (R$)</label>
-          <input style={inputStyle} type="number" min={0} step={50} value={form.budget} onChange={set("budget")} />
-        </div>
-      </div>
-      <div className="flex gap-3 justify-end pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", fontWeight: 300, border: "1px solid rgba(255,255,255,0.1)" }}>
-          Cancelar
-        </button>
-        <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm flex items-center gap-2" style={{ background: "#fff", color: "#000", fontWeight: 400 }}>
-          {saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <Check size={14} />}
-          Salvar
-        </button>
-      </div>
-    </form>
-  );
+function fmtBRL(v: number) {
+  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function fmtK(v: number) {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
+  return String(v);
 }
 
-// ─── Confirm Dialog ───────────────────────────────────────────────────────────
-function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <Modal title="Confirmar" onClose={onCancel}>
-      <div className="flex flex-col gap-6">
-        <div className="flex items-start gap-3">
-          <AlertTriangle size={20} className="text-yellow-500 mt-0.5 shrink-0" />
-          <p className="text-gray-300 text-sm" style={{ fontWeight: 300 }}>{message}</p>
-        </div>
-        <div className="flex gap-3 justify-end">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", fontWeight: 300, border: "1px solid rgba(255,255,255,0.1)" }}>
-            Cancelar
-          </button>
-          <button onClick={onConfirm} className="px-4 py-2 rounded-lg text-sm" style={{ background: "rgba(255,60,60,0.8)", color: "#fff", fontWeight: 400 }}>
-            Excluir
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
+const COLORS = ["#1FBD8F", "#2FD4A5", "#FF8C42", "#B8D400", "#17A577"];
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
-function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3500);
-    return () => clearTimeout(t);
-  }, [onClose]);
-  return (
-    <div
-      className="fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl text-sm"
-      style={{
-        background: type === "success" ? "rgba(30,200,100,0.15)" : "rgba(255,60,60,0.15)",
-        border: `1px solid ${type === "success" ? "rgba(30,200,100,0.3)" : "rgba(255,60,60,0.3)"}`,
-        color: type === "success" ? "rgba(100,255,150,0.9)" : "rgba(255,130,130,0.9)",
-        fontWeight: 300,
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      {type === "success" ? <Check size={14} /> : <AlertTriangle size={14} />}
-      {message}
-    </div>
-  );
-}
+export default function DashboardPage() {
+  useAuthGuard();
+  useEffect(() => { document.title = "Tráfego Pro - Dashboard"; }, []);
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
-export default function Dashboard() {
-  const { user, loading, logout } = useAdminAuth();
-  const [, navigate] = useLocation();
-
-  const [clients, setClients] = useState<Client[]>([]);
-  const [selected, setSelected] = useState<ClientDetail | null>(null);
-  const [clientsLoading, setClientsLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeSection, setActiveSection] = useState<"clients" | "overview">("overview");
-
-  // Modals
-  const [showNewClient, setShowNewClient] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [deletingClientId, setDeletingClientId] = useState<number | null>(null);
-  const [showNewCampaign, setShowNewCampaign] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
-  const [deletingCampaignId, setDeletingCampaignId] = useState<number | null>(null);
-
-  // Saving states
-  const [savingClient, setSavingClient] = useState(false);
-  const [savingCampaign, setSavingCampaign] = useState(false);
-
-  // Import
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; errors: string[] } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Toast
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const showToast = (message: string, type: "success" | "error" = "success") => setToast({ message, type });
-
-  // ─── Load clients ────────────────────────────────────────────────────────
-  const loadClients = async () => {
-    setClientsLoading(true);
-    try {
-      const res = await authFetch("/api/clients");
-      const data = await res.json();
-      setClients(data);
-    } finally {
-      setClientsLoading(false);
-    }
-  };
+  const { clients, selectedClientId, setSelectedClientId, loading: clientsLoading } = useClientContext();
+  const [enriched, setEnriched] = useState<ClientWithCampaigns[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [period, setPeriod] = useState("30");
 
   useEffect(() => {
-    if (!loading && user) loadClients();
-  }, [loading, user]);
+    const token = localStorage.getItem("tp_token");
+    if (!token || clients.length === 0) return;
+    setLoadingCampaigns(true);
+    Promise.all(
+      clients.map(async (c) => {
+        try {
+          const res = await fetch(`/api/clients/${c.id}`, { headers: { Authorization: `Bearer ${token}` } });
+          if (!res.ok) return { ...c, campaigns: [] as Campaign[] };
+          const data = await res.json();
+          return { ...c, campaigns: (data.campaigns ?? []) as Campaign[] };
+        } catch { return { ...c, campaigns: [] as Campaign[] }; }
+      })
+    ).then((data) => { setEnriched(data); setLoadingCampaigns(false); });
+  }, [clients]);
 
-  async function loadClient(id: number) {
-    const res = await authFetch(`/api/clients/${id}`);
-    const data = await res.json();
-    setSelected(data);
-    setActiveSection("clients");
-  }
+  const activeClients: ClientWithCampaigns[] = enriched.length > 0
+    ? enriched
+    : clients.map((c) => ({ ...c, campaigns: [] }));
 
-  // ─── Client CRUD ─────────────────────────────────────────────────────────
-  async function handleCreateClient(data: Omit<Client, "id">) {
-    setSavingClient(true);
-    try {
-      const res = await authFetch("/api/clients", { method: "POST", body: JSON.stringify(data) });
-      if (!res.ok) throw new Error((await res.json()).error);
-      await loadClients();
-      setShowNewClient(false);
-      showToast("Cliente criado com sucesso!");
-    } catch (e) {
-      showToast((e as Error).message, "error");
-    } finally {
-      setSavingClient(false);
-    }
-  }
+  const selectedData = selectedClientId ? activeClients.find((c) => c.id === selectedClientId) : null;
+  const campaigns = selectedData ? selectedData.campaigns : activeClients.flatMap((c) => c.campaigns);
 
-  async function handleUpdateClient(data: Omit<Client, "id">) {
-    if (!editingClient) return;
-    setSavingClient(true);
-    try {
-      const res = await authFetch(`/api/clients/${editingClient.id}`, { method: "PUT", body: JSON.stringify(data) });
-      if (!res.ok) throw new Error((await res.json()).error);
-      await loadClients();
-      // Refresh detail if viewing this client
-      if (selected?.id === editingClient.id) await loadClient(editingClient.id);
-      setEditingClient(null);
-      showToast("Cliente atualizado com sucesso!");
-    } catch (e) {
-      showToast((e as Error).message, "error");
-    } finally {
-      setSavingClient(false);
-    }
-  }
+  const totalSpent = campaigns.reduce((s, c) => s + (c.spent ?? 0), 0);
+  const totalLeads = campaigns.reduce((s, c) => s + (c.leads ?? 0), 0);
+  const totalImpressions = campaigns.reduce((s, c) => s + (c.impressions ?? 0), 0);
+  const avgCpl = totalLeads > 0 ? totalSpent / totalLeads : 0;
 
-  async function handleDeleteClient(id: number) {
-    try {
-      const res = await authFetch(`/api/clients/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        showToast((data as { error?: string }).error || "Erro ao excluir cliente.", "error");
-        return;
-      }
-      await loadClients();
-      if (selected?.id === id) setSelected(null);
-      setDeletingClientId(null);
-      showToast("Cliente excluído.");
-    } catch {
-      showToast("Erro ao excluir cliente.", "error");
-    }
-  }
+  const weeklyData = useMemo(() => {
+    const ratios = [0.2, 0.25, 0.3, 0.25];
+    return ["Sem 1", "Sem 2", "Sem 3", "Sem 4"].map((name, i) => ({
+      name,
+      gasto: Math.round(totalSpent * ratios[i]),
+      leads: Math.round(totalLeads * ratios[i]),
+    }));
+  }, [totalSpent, totalLeads]);
 
-  // ─── Campaign CRUD ────────────────────────────────────────────────────────
-  async function handleCreateCampaign(data: Omit<Campaign, "id" | "clientId">) {
-    if (!selected) return;
-    setSavingCampaign(true);
-    try {
-      const res = await authFetch(`/api/clients/${selected.id}/campaigns`, { method: "POST", body: JSON.stringify(data) });
-      if (!res.ok) throw new Error((await res.json()).error);
-      await loadClient(selected.id);
-      setShowNewCampaign(false);
-      showToast("Campanha criada com sucesso!");
-    } catch (e) {
-      showToast((e as Error).message, "error");
-    } finally {
-      setSavingCampaign(false);
-    }
-  }
+  const platformData = useMemo(() => {
+    const map: Record<string, number> = {};
+    campaigns.forEach((c) => { const p = c.platform ?? "Outros"; map[p] = (map[p] ?? 0) + (c.spent ?? 0); });
+    return Object.entries(map).map(([name, value]) => ({ name, value }));
+  }, [campaigns]);
 
-  async function handleUpdateCampaign(data: Omit<Campaign, "id" | "clientId">) {
-    if (!editingCampaign || !selected) return;
-    setSavingCampaign(true);
-    try {
-      const res = await authFetch(`/api/campaigns/${editingCampaign.id}`, { method: "PUT", body: JSON.stringify(data) });
-      if (!res.ok) throw new Error((await res.json()).error);
-      await loadClient(selected.id);
-      setEditingCampaign(null);
-      showToast("Campanha atualizada!");
-    } catch (e) {
-      showToast((e as Error).message, "error");
-    } finally {
-      setSavingCampaign(false);
-    }
-  }
-
-  async function handleDeleteCampaign(id: number) {
-    if (!selected) return;
-    try {
-      const res = await authFetch(`/api/campaigns/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        showToast((data as { error?: string }).error || "Erro ao excluir campanha.", "error");
-        return;
-      }
-      await loadClient(selected.id);
-      setDeletingCampaignId(null);
-      showToast("Campanha excluída.");
-    } catch {
-      showToast("Erro ao excluir campanha.", "error");
-    }
-  }
-
-  // ─── Excel Export ─────────────────────────────────────────────────────────
-  async function handleExport() {
-    const token = getToken();
-    const res = await fetch("/api/clients/export/excel", { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) { showToast("Erro ao exportar.", "error"); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "clientes-trafego-pro.xlsx";
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("Planilha exportada!");
-  }
-
-  // ─── Excel Import ─────────────────────────────────────────────────────────
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    try {
-      const token = getToken();
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/clients/import/excel", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      const result = await res.json();
-      if (!res.ok) { showToast(result.error || "Erro ao importar.", "error"); return; }
-      setImportResult(result);
-      await loadClients();
-      showToast(`${result.imported} cliente(s) importado(s)!`);
-    } catch {
-      showToast("Erro ao importar planilha.", "error");
-    } finally {
-      setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
-  // ─── Render ───────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0a0a0a" }}>
-        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
-  const totalBudget = clients.reduce((s, c) => s + c.monthlyBudget, 0);
-  const activeClients = clients.filter((c) => c.status === "active").length;
-  const totalCampaigns = selected?.campaigns?.length ?? 0;
+  const loading = clientsLoading || loadingCampaigns;
 
   return (
-    <div className="min-h-screen flex" style={{ background: "#0a0a0a", fontFamily: "'Inter', sans-serif" }}>
-
-      {/* ── Sidebar ── */}
-      <aside
-        className="flex flex-col transition-all duration-300 shrink-0"
-        style={{
-          width: sidebarOpen ? "240px" : "64px",
-          background: "rgba(255,255,255,0.03)",
-          borderRight: "1px solid rgba(255,255,255,0.07)",
-          minHeight: "100vh",
-        }}
-      >
-        <div className="flex items-center px-4 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", minHeight: "64px" }}>
-          {sidebarOpen ? (
-            <img src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" alt="Tráfego Pro" style={{ height: "18px", width: "auto" }} />
-          ) : (
-            <span className="text-white text-xs font-bold">TP</span>
-          )}
-        </div>
-
-        <nav className="flex flex-col gap-1 p-3 flex-1">
-          {[
-            { key: "overview", label: "Visão Geral", icon: <BarChart2 size={16} /> },
-            { key: "clients", label: "Clientes", icon: <Users size={16} /> },
-          ].map((item) => (
-            <button
-              key={item.key}
-              onClick={() => { setActiveSection(item.key as "overview" | "clients"); setSelected(null); }}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all"
-              style={{
-                background: activeSection === item.key ? "rgba(255,255,255,0.08)" : "transparent",
-                color: activeSection === item.key ? "#fff" : "rgba(255,255,255,0.45)",
-              }}
-            >
-              {item.icon}
-              {sidebarOpen && <span className="text-sm" style={{ fontWeight: 300 }}>{item.label}</span>}
+    <AppLayout>
+      <div className="p-6 space-y-6 max-w-[1400px]">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Visão geral de performance</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <select value={period} onChange={(e) => setPeriod(e.target.value)}
+                className="appearance-none text-xs rounded-lg border border-border bg-card/60 px-3 py-2 pr-7 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                <option value="7">Últimos 7 dias</option>
+                <option value="30">Últimos 30 dias</option>
+                <option value="90">Últimos 90 dias</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            </div>
+            <button className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+              <Download className="size-3.5" /> Exportar
             </button>
-          ))}
-        </nav>
-
-        <div className="p-3" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-          {sidebarOpen && (
-            <p className="text-xs text-gray-600 px-3 mb-2 truncate" style={{ fontWeight: 300 }}>{user.email}</p>
-          )}
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 w-full text-left transition-all"
-            style={{ color: "rgba(255,255,255,0.3)" }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#fff")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.3)")}
-          >
-            <LogOut size={16} />
-            {sidebarOpen && <span className="text-sm" style={{ fontWeight: 300 }}>Sair</span>}
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Main ── */}
-      <main className="flex-1 flex flex-col overflow-auto">
-        {/* Topbar */}
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", minHeight: "64px" }}>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-500 hover:text-white transition-colors">
-            <div className="flex flex-col gap-1">
-              <div className="w-4 h-0.5 bg-current" />
-              <div className="w-4 h-0.5 bg-current" />
-              <div className="w-4 h-0.5 bg-current" />
-            </div>
-          </button>
-          <span className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>Olá, {user.name}</span>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 p-6">
+        {/* KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard label="Gasto Total" value={fmtBRL(totalSpent)} icon={DollarSign} trend="up" trendLabel="12% vs. período anterior" />
+          <KpiCard label="Total de Leads" value={String(totalLeads)} icon={Users2} trend="up" trendLabel="8% vs. período anterior" />
+          <KpiCard label="Custo por Lead" value={fmtBRL(avgCpl)} icon={TrendingUp} trend="down" trendLabel="3% vs. período anterior" />
+          <KpiCard label="Impressões" value={fmtK(totalImpressions)} icon={Eye} trend="up" trendLabel="5% vs. período anterior" />
+        </div>
 
-          {/* ── Overview ── */}
-          {activeSection === "overview" && !selected && (
-            <div>
-              <div className="flex items-start justify-between mb-8">
-                <div>
-                  <h1 className="text-white text-3xl mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>Visão Geral</h1>
-                  <p className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>Resumo de todos os clientes e campanhas ativas.</p>
-                </div>
-                <button
-                  onClick={() => setShowNewClient(true)}
-                  className="flex items-center gap-2 text-sm rounded-lg px-3 py-2 transition-all"
-                  style={{ background: "#fff", color: "#000", fontWeight: 400 }}
-                >
-                  <Plus size={14} /> Novo Cliente
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                {[
-                  { label: "Clientes Ativos", value: activeClients, icon: <Users size={18} /> },
-                  { label: "Investimento Mensal", value: `R$ ${totalBudget.toLocaleString("pt-BR")}`, icon: <DollarSign size={18} /> },
-                  { label: "Total de Clientes", value: clients.length, icon: <Activity size={18} /> },
-                ].map((stat) => (
-                  <div key={stat.label} className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-gray-600 text-xs uppercase tracking-widest" style={{ fontWeight: 300 }}>{stat.label}</span>
-                      <span className="text-gray-700">{stat.icon}</span>
-                    </div>
-                    <p className="text-white text-2xl" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>{stat.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <h2 className="text-white text-lg mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>Clientes</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {clients.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => loadClient(c.id)}
-                    className="rounded-xl p-5 text-left transition-all group"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                    onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.2)")}
-                    onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.07)")}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-white text-base" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>{c.name}</span>
-                      <ChevronRight size={16} className="text-gray-700 group-hover:text-white transition-colors" />
-                    </div>
-                    <p className="text-gray-600 text-xs mb-3" style={{ fontWeight: 300 }}>{c.city}, {c.state} · {c.plan}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.status === "active" ? "rgba(255,255,255,0.08)" : "rgba(255,0,0,0.08)", color: c.status === "active" ? "rgba(255,255,255,0.6)" : "rgba(255,100,100,0.8)", fontWeight: 300 }}>
-                        {c.status === "active" ? "Ativo" : "Pausado"}
-                      </span>
-                      <span className="text-gray-600 text-xs" style={{ fontWeight: 300 }}>R$ {c.monthlyBudget.toLocaleString("pt-BR")}/mês</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+        {/* Client selector */}
+        <div>
+          <h2 className="text-sm font-semibold mb-3">Selecione um Cliente</h2>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[1,2,3].map((i) => <div key={i} className="glass-card p-4 h-24 animate-pulse bg-muted/20" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {activeClients.map((c) => (
+                <ClientCard key={c.id} client={c} selected={selectedClientId === c.id}
+                  onClick={() => setSelectedClientId(selectedClientId === c.id ? null : c.id)} />
+              ))}
             </div>
           )}
+        </div>
 
-          {/* ── Clients List ── */}
-          {activeSection === "clients" && !selected && (
-            <div>
-              <div className="flex items-start justify-between mb-8">
-                <div>
-                  <h1 className="text-white text-3xl mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>Clientes</h1>
-                  <p className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>Gerencie todos os clientes e suas campanhas.</p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  {/* Import */}
-                  <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={importing}
-                    className="flex items-center gap-2 text-sm rounded-lg px-3 py-2 transition-all"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", fontWeight: 300 }}
-                  >
-                    {importing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Upload size={14} />}
-                    Importar Excel
-                  </button>
-                  {/* Export */}
-                  <button
-                    onClick={handleExport}
-                    className="flex items-center gap-2 text-sm rounded-lg px-3 py-2 transition-all"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", fontWeight: 300 }}
-                  >
-                    <Download size={14} />
-                    Exportar Excel
-                  </button>
-                  {/* New */}
-                  <button
-                    onClick={() => setShowNewClient(true)}
-                    className="flex items-center gap-2 text-sm rounded-lg px-3 py-2 transition-all"
-                    style={{ background: "#fff", color: "#000", fontWeight: 400 }}
-                  >
-                    <Plus size={14} />
-                    Novo Cliente
-                  </button>
-                </div>
-              </div>
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="glass-card p-5 lg:col-span-2">
+            <h3 className="text-sm font-semibold mb-4">Performance ao Longo do Tempo</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Line type="monotone" dataKey="gasto" stroke="#1FBD8F" strokeWidth={2} dot={{ r: 3, fill: "#1FBD8F" }} name="Gasto (R$)" />
+                <Line type="monotone" dataKey="leads" stroke="#FF8C42" strokeWidth={2} dot={{ r: 3, fill: "#FF8C42" }} name="Leads" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="glass-card p-5">
+            <h3 className="text-sm font-semibold mb-4">Distribuição por Canal</h3>
+            {platformData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={platformData} cx="50%" cy="45%" outerRadius={70} dataKey="value" nameKey="name">
+                    {platformData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtBRL(v)} />
+                  <Legend iconSize={10} iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[220px] text-sm text-muted-foreground">Sem dados de campanhas</div>
+            )}
+          </div>
+        </div>
 
-              {/* Import result */}
-              {importResult && (
-                <div className="mb-6 rounded-xl p-4" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-white text-sm" style={{ fontWeight: 300 }}>
-                      Importação concluída: <strong>{importResult.imported}</strong> cliente(s) adicionado(s)
-                    </p>
-                    <button onClick={() => setImportResult(null)} className="text-gray-600 hover:text-white">
-                      <X size={14} />
-                    </button>
-                  </div>
-                  {importResult.errors.length > 0 && (
-                    <ul className="text-xs text-red-400 mt-2 flex flex-col gap-1" style={{ fontWeight: 300 }}>
-                      {importResult.errors.map((e, i) => <li key={i}>• {e}</li>)}
-                    </ul>
-                  )}
-                </div>
-              )}
+        {/* Bar chart */}
+        <div className="glass-card p-5">
+          <h3 className="text-sm font-semibold mb-4">Leads por Semana</h3>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={weeklyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Bar dataKey="leads" fill="#1FBD8F" radius={[4, 4, 0, 0]} name="Leads" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-              {clientsLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : clients.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-4">
-                  <Users size={40} className="text-gray-700" />
-                  <p className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>Nenhum cliente cadastrado ainda.</p>
-                  <button onClick={() => setShowNewClient(true)} className="flex items-center gap-2 text-sm rounded-lg px-4 py-2" style={{ background: "#fff", color: "#000", fontWeight: 400 }}>
-                    <Plus size={14} /> Adicionar primeiro cliente
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {clients.map((c) => (
-                    <div
-                      key={c.id}
-                      className="rounded-xl p-5 flex items-center justify-between group transition-all"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)")}
-                    >
-                      <button className="flex-1 text-left" onClick={() => loadClient(c.id)}>
-                        <p className="text-white text-base mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>{c.name}</p>
-                        <p className="text-gray-600 text-xs" style={{ fontWeight: 300 }}>
-                          {c.city}{c.state ? `, ${c.state}` : ""} · {c.plan} · R$ {c.monthlyBudget.toLocaleString("pt-BR")}/mês
-                        </p>
-                      </button>
-                      <div className="flex items-center gap-3 ml-4">
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.status === "active" ? "rgba(255,255,255,0.08)" : "rgba(255,0,0,0.08)", color: c.status === "active" ? "rgba(255,255,255,0.6)" : "rgba(255,100,100,0.8)", fontWeight: 300 }}>
-                          {c.status === "active" ? "Ativo" : "Pausado"}
+        {/* Campaigns table */}
+        <div className="glass-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 className="text-sm font-semibold">Campanhas Ativas</h3>
+            <span className="text-xs text-muted-foreground">{campaigns.length} campanha{campaigns.length !== 1 ? "s" : ""}</span>
+          </div>
+          {campaigns.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              Nenhuma campanha cadastrada. Adicione campanhas na aba <span className="text-primary">Clientes</span>.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-muted/20">
+                    <th className="th-cell text-left">Campanha</th>
+                    <th className="th-cell text-left">Plataforma</th>
+                    <th className="th-cell text-left">Status</th>
+                    <th className="th-cell text-right">Orçamento</th>
+                    <th className="th-cell text-right">Gasto</th>
+                    <th className="th-cell text-right">Leads</th>
+                    <th className="th-cell text-right">CPL</th>
+                    <th className="th-cell text-right">Impressões</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((c) => (
+                    <tr key={c.id} className="border-b border-border/50 hover:bg-muted/10 transition-colors">
+                      <td className="td-cell font-medium">{c.name}</td>
+                      <td className="td-cell text-muted-foreground">{c.platform ?? "—"}</td>
+                      <td className="td-cell">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          c.status === "active" ? "bg-[rgba(34,197,94,0.15)] text-[#22c55e]" :
+                          c.status === "paused" ? "bg-[rgba(245,158,11,0.15)] text-[#f59e0b]" :
+                          "bg-muted/40 text-muted-foreground"
+                        }`}>
+                          {c.status === "active" ? "Ativo" : c.status === "paused" ? "Pausado" : c.status ?? "—"}
                         </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditingClient(c); }}
-                          className="text-gray-600 hover:text-white transition-colors p-1"
-                          title="Editar"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeletingClientId(c.id); }}
-                          className="text-gray-600 hover:text-red-400 transition-colors p-1"
-                          title="Excluir"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                        <ChevronRight size={16} className="text-gray-700 group-hover:text-white transition-colors cursor-pointer" onClick={() => loadClient(c.id)} />
-                      </div>
-                    </div>
+                      </td>
+                      <td className="td-cell text-right">{c.budget ? fmtBRL(c.budget) : "—"}</td>
+                      <td className="td-cell text-right">{c.spent ? fmtBRL(c.spent) : "R$ 0,00"}</td>
+                      <td className="td-cell text-right">{c.leads ?? 0}</td>
+                      <td className="td-cell text-right">{c.cpl ? fmtBRL(c.cpl) : "—"}</td>
+                      <td className="td-cell text-right">{c.impressions ? fmtK(c.impressions) : "—"}</td>
+                    </tr>
                   ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Client Detail ── */}
-          {selected && (
-            <div>
-              <button onClick={() => setSelected(null)} className="text-gray-600 hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors" style={{ fontWeight: 300 }}>
-                ← Voltar
-              </button>
-
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h1 className="text-white text-3xl mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>{selected.name}</h1>
-                  <p className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>
-                    {selected.city}{selected.state ? `, ${selected.state}` : ""} · Desde {selected.startDate ? new Date(selected.startDate + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selected.lpUrl && (
-                    <a
-                      href={selected.lpUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 text-sm rounded-lg px-4 py-2 transition-all"
-                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)", fontWeight: 300 }}
-                    >
-                      <ExternalLink size={14} /> Ver LP
-                    </a>
-                  )}
-                  <button
-                    onClick={() => setEditingClient(selected)}
-                    className="flex items-center gap-2 text-sm rounded-lg px-4 py-2 transition-all"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)", fontWeight: 300 }}
-                  >
-                    <Pencil size={14} /> Editar
-                  </button>
-                  <button
-                    onClick={() => setDeletingClientId(selected.id)}
-                    className="flex items-center gap-2 text-sm rounded-lg px-4 py-2 transition-all"
-                    style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,40,40,0.2)", color: "rgba(255,120,120,0.8)", fontWeight: 300 }}
-                  >
-                    <Trash2 size={14} /> Excluir
-                  </button>
-                </div>
-              </div>
-
-              {/* Info cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {[
-                  { label: "Investimento Mensal", value: `R$ ${selected.monthlyBudget.toLocaleString("pt-BR")}` },
-                  { label: "Plano", value: selected.plan || "—" },
-                  { label: "Status", value: selected.status === "active" ? "Ativo" : "Pausado" },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                    <p className="text-gray-600 text-xs uppercase tracking-widest mb-2" style={{ fontWeight: 300 }}>{item.label}</p>
-                    <p className="text-white text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>{item.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Notes */}
-              {selected.notes && (
-                <div className="rounded-xl p-5 mb-6" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p className="text-gray-600 text-xs uppercase tracking-widest mb-2" style={{ fontWeight: 300 }}>Observações Estratégicas</p>
-                  <p className="text-gray-300 text-sm leading-relaxed" style={{ fontWeight: 300 }}>{selected.notes}</p>
-                </div>
-              )}
-
-              {/* Contact */}
-              {(selected.contact || selected.phone || selected.email) && (
-                <div className="rounded-xl p-5 mb-6" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p className="text-gray-600 text-xs uppercase tracking-widest mb-3" style={{ fontWeight: 300 }}>Contato</p>
-                  <div className="flex flex-col gap-1">
-                    {selected.contact && <p className="text-white text-sm" style={{ fontWeight: 300 }}>{selected.contact}</p>}
-                    {selected.phone && <p className="text-gray-500 text-sm" style={{ fontWeight: 300 }}>{selected.phone}</p>}
-                    {selected.email && <p className="text-gray-500 text-sm" style={{ fontWeight: 300 }}>{selected.email}</p>}
-                  </div>
-                </div>
-              )}
-
-              {/* Campaigns */}
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-white text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 300 }}>Campanhas</h2>
-                <button
-                  onClick={() => setShowNewCampaign(true)}
-                  className="flex items-center gap-2 text-sm rounded-lg px-3 py-1.5 transition-all"
-                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", fontWeight: 300 }}
-                >
-                  <Plus size={13} /> Nova Campanha
-                </button>
-              </div>
-
-              {selected.campaigns.length === 0 ? (
-                <p className="text-gray-600 text-sm" style={{ fontWeight: 300 }}>Nenhuma campanha cadastrada.</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {selected.campaigns.map((camp) => (
-                    <div
-                      key={camp.id}
-                      className="rounded-xl p-4 flex items-center justify-between"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                    >
-                      <div>
-                        <p className="text-white text-sm mb-0.5" style={{ fontWeight: 300 }}>{camp.name}</p>
-                        <p className="text-gray-600 text-xs" style={{ fontWeight: 300 }}>{camp.platform}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-gray-400 text-sm" style={{ fontWeight: 300 }}>R$ {camp.budget.toLocaleString("pt-BR")}/mês</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: camp.status === "active" ? "rgba(255,255,255,0.08)" : "rgba(255,0,0,0.08)", color: camp.status === "active" ? "rgba(255,255,255,0.6)" : "rgba(255,100,100,0.8)", fontWeight: 300 }}>
-                          {camp.status === "active" ? "Ativa" : "Pausada"}
-                        </span>
-                        <button onClick={() => setEditingCampaign(camp)} className="text-gray-600 hover:text-white transition-colors p-1" title="Editar">
-                          <Pencil size={13} />
-                        </button>
-                        <button onClick={() => setDeletingCampaignId(camp.id)} className="text-gray-600 hover:text-red-400 transition-colors p-1" title="Excluir">
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      </main>
-
-      {/* ── Modals ── */}
-
-      {showNewClient && (
-        <Modal title="Novo Cliente" onClose={() => setShowNewClient(false)}>
-          <ClientForm initial={emptyClient()} onSave={handleCreateClient} onCancel={() => setShowNewClient(false)} saving={savingClient} />
-        </Modal>
-      )}
-
-      {editingClient && (
-        <Modal title="Editar Cliente" onClose={() => setEditingClient(null)}>
-          <ClientForm
-            initial={{ name: editingClient.name, city: editingClient.city, state: editingClient.state, status: editingClient.status, plan: editingClient.plan, startDate: editingClient.startDate, monthlyBudget: editingClient.monthlyBudget, contact: editingClient.contact, phone: editingClient.phone, email: editingClient.email, lpUrl: editingClient.lpUrl, notes: editingClient.notes }}
-            onSave={handleUpdateClient}
-            onCancel={() => setEditingClient(null)}
-            saving={savingClient}
-          />
-        </Modal>
-      )}
-
-      {deletingClientId !== null && (
-        <ConfirmDialog
-          message="Tem certeza que deseja excluir este cliente? Todas as campanhas vinculadas também serão removidas."
-          onConfirm={() => handleDeleteClient(deletingClientId)}
-          onCancel={() => setDeletingClientId(null)}
-        />
-      )}
-
-      {showNewCampaign && (
-        <Modal title="Nova Campanha" onClose={() => setShowNewCampaign(false)}>
-          <CampaignForm initial={emptyCampaign()} onSave={handleCreateCampaign} onCancel={() => setShowNewCampaign(false)} saving={savingCampaign} />
-        </Modal>
-      )}
-
-      {editingCampaign && (
-        <Modal title="Editar Campanha" onClose={() => setEditingCampaign(null)}>
-          <CampaignForm
-            initial={{ name: editingCampaign.name, platform: editingCampaign.platform, status: editingCampaign.status, budget: editingCampaign.budget }}
-            onSave={handleUpdateCampaign}
-            onCancel={() => setEditingCampaign(null)}
-            saving={savingCampaign}
-          />
-        </Modal>
-      )}
-
-      {deletingCampaignId !== null && (
-        <ConfirmDialog
-          message="Tem certeza que deseja excluir esta campanha?"
-          onConfirm={() => handleDeleteCampaign(deletingCampaignId)}
-          onCancel={() => setDeletingCampaignId(null)}
-        />
-      )}
-
-      {/* ── Toast ── */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
+      </div>
+    </AppLayout>
   );
 }

@@ -122,6 +122,17 @@ async function startServer() {
   app.post("/api/auth/login", (req, res) => {
     const { email, password, name } = req.body as { email?: string; password: string; name?: string };
 
+    // Se nao houver nenhum usuario, cria um admin padrao
+    if (getAllUsers().length === 0) {
+      createUser({
+        name: "Davi",
+        email: "davi@trafego.pro",
+        password: "123456",
+        role: "admin",
+      });
+      console.log("[auth] Admin padrao criado: davi@trafego.pro / 123456");
+    }
+
     // Tenta login pelo banco de dados (por nome ou email)
     let dbUser: User | undefined;
     if (name) dbUser = getUserByName(name);

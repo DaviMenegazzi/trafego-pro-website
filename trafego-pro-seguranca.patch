@@ -1,0 +1,1257 @@
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..bffd2fe
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,22 @@
++# ─────────────────────────────────────────────────────────────────────────────
++# Variáveis de ambiente do Tráfego Pro
++# Copie este arquivo para ".env" e preencha com valores reais.
++# O arquivo ".env" é ignorado pelo git e NUNCA deve ser commitado.
++# ─────────────────────────────────────────────────────────────────────────────
++
++# Segredo usado para assinar os tokens de sessão (HMAC-SHA256).
++# Gere um valor aleatório forte, por exemplo:  openssl rand -hex 32
++# Em produção é OBRIGATÓRIO — o servidor não sobe sem ele.
++JWT_SECRET=
++
++# Admin inicial. Criado automaticamente no primeiro boot, apenas se ainda
++# não existir nenhum usuário no banco. A senha é armazenada com hash (bcrypt).
++ADMIN_NAME=Admin
++ADMIN_EMAIL=
++ADMIN_PASSWORD=
++
++# Porta do servidor Express (opcional; padrão 3000 em produção).
++PORT=3000
++
++# Caminho do banco JSON de runtime (opcional; padrão ../data/db.json).
++# DB_PATH=/caminho/absoluto/para/db.json
+diff --git a/.gitignore b/.gitignore
+index 9504316..7a99e26 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -105,6 +105,10 @@ temp/
+ *.sqlite
+ *.sqlite3
+ 
++# Banco de dados de runtime (contém dados reais de clientes — NÃO versionar).
++# O arquivo de exemplo data/db.example.json continua versionado.
++data/db.json
++
+ # Webdev artifacts (checkpoint zips, migrations, etc.)
+ .webdev/
+ 
+diff --git a/README.md b/README.md
+index 12aec03..bd6addf 100644
+--- a/README.md
++++ b/README.md
+@@ -1,638 +1,120 @@
+-# Web App Template (Static Frontend)
++# Tráfego Pro
+ 
+-Pure React 19 + Tailwind 4 template with shadcn/ui baked in. **Use this README as the checklist for shipping static experiences.**
++Plataforma da operação **Tráfego Pro**: reúne, no mesmo projeto, o site institucional da
++agência, as landing pages de venda do **Vida Card** (uma por praça) e um painel interno de
++gestão de clientes, campanhas, pipeline, pagamentos e feedback de leads.
+ 
+-> **Note:** This template includes a minimal `shared/` and `server/` directory with placeholder types to support imported templates. These are just compatibility placeholders - web-static remains a true static-only template without API functionality.
++> ⚠️ **Não é um site estático.** Existe um back-end Express com autenticação e banco de dados.
++> O deploy precisa rodar o servidor Node — um host apenas estático quebra login e dashboard.
+ 
+ ---
+ 
+-## Stack Overview
+-- Client-only routing powered by React + Wouter.
+-- Design tokens live entirely in `client/src/index.css`—keep that file intact.
++## O que tem aqui
+ 
+-## File Structure
++**1. Site institucional** — apresentação da agência.
++- `/` → `TrafegoProHome`
+ 
+-```
+-client/
+-  public/       ← Small configuration files ONLY (favicon.ico, robots.txt). DO NOT put images/media here.
+-  src/
+-    pages/      ← Page-level components
+-    components/ ← Reusable UI & shadcn/ui
+-    contexts/   ← React contexts
+-    hooks/      ← Custom React hooks
+-    lib/        ← Utility helpers
+-    App.tsx     ← Routes & top-level layout
+-    main.tsx    ← React entry point
+-    index.css   ← global style
+-server/         ← Placeholder for imported template compatibility
+-shared/         ← Placeholder for imported template compatibility
+-  const.ts      ← Shared constants
+-```
+-
+-### ⚠️ Handling Images & Media
+-
+-**DO NOT** store images, videos, or large assets in `client/public/` or `client/src/assets/`. Local media files will cause deployment timeouts.
+-
+-**Required workflow:**
+-1. Upload assets using the CLI: `manus-upload-file --webdev path/to/image.png`
+-2. Use the returned storage path directly in your code: `<img src="/manus-storage/image_a1b2c3d4.png" />`
+-3. Store the original local file in `/home/ubuntu/webdev-static-assets/` (outside the project directory)
+-
+-Only small configuration files like `favicon.ico`, `robots.txt`, and `manifest.json` belong in `client/public/`.
+-
+-Files in `client/public` are available at the root of your site—reference them with absolute paths (`/robots.txt`, etc.) from HTML templates, JSX, or meta tags.
+-
+----
+-
+-## 🎯 Development Workflow
+-
+-1. **Choose a design style** before you write any frontend code according to Design Guide (color, font, shadow, art style). Tell user what you chose. Remember to edit `client/src/index.css` for global theming and add needed font using google font cdn in `client/index.html`.
+-2. **Compose pages** in `client/src/pages/`. Keep sections modular so they can be reused across routes.
+-3. **Share primitives** via `client/src/components/`—extend shadcn/ui when needed instead of duplicating markup.
+-4. **Keep styling consistent** by relying on existing Tailwind tokens (spacing, colors, typography).
+-5. **Fetch external data** with `useEffect` if the site needs dynamic content from public APIs.
+----
+-
+-## 🎨 Frontend Development Guidelines
+-
+-**UI & Styling:**
+-- Prefer shadcn/ui components for interactions to keep a modern, consistent look; import from `@/components/ui/*` (e.g., `button`, `card`, `dialog`).
+-- Compose Tailwind utilities with component variants for layout and states; avoid excessive custom CSS. Use built-in `variant`, `size`, etc. where available.
+-- Preserve design tokens: keep the `@layer base` rules in `client/src/index.css`. Utilities like `border-border` and `font-sans` depend on them.
+-- Consistent design language: use spacing, radius, shadows, and typography via tokens. Extract shared UI into `components/` for reuse instead of copy‑paste.
+-- Accessibility and responsiveness: keep visible focus rings and ensure keyboard reachability; design mobile‑first with thoughtful breakpoints.
+-- Theming: Choose dark/light theme to start with for ThemeProvider according to your design style (dark or light bg), then manage colors pallette with CSS variables in `client/src/index.css` instead of hard‑coding to keep global consistency.
+-- Micro‑interactions and empty states: add motion, empty states, and icons tastefully to improve quality without distracting from content.
+-- Navigation: For internal tools/admin panels, use persistent sidebar. For public-facing apps, design navigation based on content structure (top nav, side nav, or contextual)—ensure clear escape routes from all pages.
+-- Placeholder UI elements: When adding structural placeholders (nav items, CTAs) for not-yet-implemented features, show toast on click ("Feature coming soon"). Inform user which elements are placeholders when presenting work.
+-
+-**React Best Practices:**
+-- Never call setState/navigation in render phase → wrap in `useEffect`
+-
+-**Customized Defaults:**
+-This template customizes some Tailwind/shadcn defaults for simplified usage:
+-- `.container` is customized to auto-center and add responsive padding (see `index.css`). Use directly without `mx-auto`/`px-*`. For custom widths, use `max-w-*` with `mx-auto px-4`.
+-- `.flex` is customized to have `min-width:0` and `min-height:0` by default
+-- `button` variant `outline` uses transparent background (not `bg-background`). Add bg color class manually if needed.
+-
+----
+-
+-## 🎨 Design Guide
+-
+-When generating frontend UI, avoid generic patterns that lack visual distinction:
+-- Avoid generic full-page centered layouts—prefer asymmetric/sidebar/grid structures for landing pages and dashboards
+-- When user provides vague requirements, make creative design decisions (choose specific color palette, typography, layout approach)
+-- Prioritize visual diversity: combine different design systems (e.g., one color scheme + different typography + another layout principle)
+-- For landing pages: prefer asymmetric layouts, specific color values (not just "blue"), and textured backgrounds over flat colors
+-- For dashboards: use defined spacing systems, soft shadows over borders, and accent colors for hierarchy
+-
+----
++**2. Landing pages de venda (Vida Card), por praça**
++- `/tupancireta` → `Home`
++- `/juliodecastilhos` → `JulioDeCastilhos`
++- `/ijui` → `Ijui`
+ 
+-## Animation Guide
++Cada landing traz diagnóstico, lógica de campanha, planos de Meta Ads e Google Ads, KPIs,
++ofertas e scripts. Os blocos ficam em `client/src/components/` (ex.: `StrategicDiagnosis`,
++`CampaignLogic`, `MetaAdsPlan`, `GoogleAdsPlan`, `KPIs`, `MainOffers`, `InfluencerScripts`).
+ 
+-Bake motion taste in from the first line of code. Snappy, physically intuitive interactions are not a polish pass — they are part of the initial build.
+-- Decide whether to animate at all: keyboard-initiated actions (command palettes, shortcuts) must be instant — never animate them. High-frequency interactions (hover, list nav) should be minimal. Reserve richer motion for occasional events (modals, drawers, toasts) and rare delight moments (onboarding).
+-- Keep UI animations under 300ms. A 180ms dropdown feels significantly better than a 400ms one. Typical ranges: button press 100–160ms, tooltips 125–200ms, dropdowns 150–250ms, modals/drawers 200–500ms.
+-- Use strong custom easings, not the weak CSS defaults. Default to a snappy ease-out for entering/exiting UI: `--ease-out: cubic-bezier(0.23, 1, 0.32, 1);`. For moving/morphing use `--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);`. NEVER use `ease-in` for UI animations — it feels sluggish.
+-- Buttons must feel responsive: add `transform: scale(0.97)` on `:active` with a ~160ms ease-out transition so the UI confirms it heard the user.
+-- Never animate from `scale(0)` — nothing in the real world appears from nothing. Start from `scale(0.95)` combined with `opacity: 0`.
+-- Origin-aware popovers/dropdowns: scale in from the trigger point (e.g. `transform-origin: var(--radix-popover-content-transform-origin)`). Modals are the exception and stay centered.
+-- Prefer CSS transitions over @keyframes for dynamic UI state. Transitions can be interrupted and reversed smoothly mid-flight; keyframes restart from zero and feel broken when interrupted.
+-- Only animate `transform` and `opacity` for motion — they run on the GPU and skip layout/paint. Avoid animating `width`, `height`, `padding`, `margin`, `top/left` unless absolutely necessary.
+-- Stagger grouped entrances by 30–80ms per item to create a cascading reveal instead of a wall of motion.
+-- Asymmetric timing for deliberate actions: hold-to-confirm should be slow and linear on press (e.g. 2s linear), but release/cancel should snap back fast (~200ms ease-out).
+-- Respect `prefers-reduced-motion`: gate non-essential motion behind `@media (prefers-reduced-motion: no-preference)`.
++**3. Painel interno (requer login de admin)**
++- `/login` → autenticação
++- `/dashboard` → visão geral (KPIs, gráficos, campanhas)
++- `/dashboard/pipeline` → kanban de demandas
++- `/dashboard/clientes` → CRUD de clientes (+ import/export Excel)
++- `/dashboard/pagamentos` → controle de pagamentos
++- `/dashboard/meu-trabalho` → tarefas atribuídas
++- `/dashboard/atualizacoes` → posts/updates
++- `/dashboard/feedback-leads` → formulário de feedback de leads
++- `/dashboard/configuracoes` → configurações (gestão de usuários)
+ 
+ ---
+ 
+-## Pre-built Components
+-
+-Before implementing UI features, check if these components already exist:
+-
+-Maps:
+-- `client/src/components/Map.tsx` - Google Maps integration with proxy authentication. Provides MapView component with onMapReady callback for initializing Google Maps services (Places, Geocoder, Directions, Drawing, etc.). All map functionality works directly in the browser.
+-
+-When implementing features that match these categories, MUST evaluate the component first to decide whether to use or customize it.
+-
+----
+-
+-## 🗺️ Maps Integration
+-
+-**CRITICAL: The Manus proxy provides FULL access to ALL Google Maps features** - including advanced drawing, heatmaps, Street View, all layers, Places API, etc. Do NOT ask users for Google Map API keys - authentication is automatic.
+-
+-**Implementation:**
+-- Frontend: Import MapView from `client/src/components/Map.tsx` and initialize ANY Google Maps service (geocoding, directions, places, drawing, visualization, geometry, etc.) in the onMapReady callback. ALL Google Maps JavaScript API features work directly in the browser.
+-
+-NEVER use external map libraries or request API keys from users - the Manus proxy handles everything automatically with no feature limitations.
+-
+----
+-
+-## ✅ Launch Checklist
+-- [ ] UI layout and navigation structure correct, all image src valid.
+-- [ ] Success + error paths verified in the browser
+-
+----
+-
+-## Core File References
+-
+-`package.json`
+-```tsx
+-{
+-  "name": "vidacard-tupan-lp",
+-  "version": "1.0.0",
+-  "type": "module",
+-  "license": "MIT",
+-  "scripts": {
+-    "dev": "vite --host",
+-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+-    "start": "NODE_ENV=production node dist/index.js",
+-    "preview": "vite preview --host",
+-    "check": "tsc --noEmit",
+-    "format": "prettier --write ."
+-  },
+-  "dependencies": {
+-    "@hookform/resolvers": "^5.2.2",
+-    "@radix-ui/react-accordion": "^1.2.12",
+-    "@radix-ui/react-alert-dialog": "^1.1.15",
+-    "@radix-ui/react-aspect-ratio": "^1.1.7",
+-    "@radix-ui/react-avatar": "^1.1.10",
+-    "@radix-ui/react-checkbox": "^1.3.3",
+-    "@radix-ui/react-collapsible": "^1.1.12",
+-    "@radix-ui/react-context-menu": "^2.2.16",
+-    "@radix-ui/react-dialog": "^1.1.15",
+-    "@radix-ui/react-dropdown-menu": "^2.1.16",
+-    "@radix-ui/react-hover-card": "^1.1.15",
+-    "@radix-ui/react-label": "^2.1.7",
+-    "@radix-ui/react-menubar": "^1.1.16",
+-    "@radix-ui/react-navigation-menu": "^1.2.14",
+-    "@radix-ui/react-popover": "^1.1.15",
+-    "@radix-ui/react-progress": "^1.1.7",
+-    "@radix-ui/react-radio-group": "^1.3.8",
+-    "@radix-ui/react-scroll-area": "^1.2.10",
+-    "@radix-ui/react-select": "^2.2.6",
+-    "@radix-ui/react-separator": "^1.1.7",
+-    "@radix-ui/react-slider": "^1.3.6",
+-    "@radix-ui/react-slot": "^1.2.3",
+-    "@radix-ui/react-switch": "^1.2.6",
+-    "@radix-ui/react-tabs": "^1.1.13",
+-    "@radix-ui/react-toggle": "^1.1.10",
+-    "@radix-ui/react-toggle-group": "^1.1.11",
+-    "@radix-ui/react-tooltip": "^1.2.8",
+-    "axios": "^1.12.0",
+-    "class-variance-authority": "^0.7.1",
+-    "clsx": "^2.1.1",
+-    "cmdk": "^1.1.1",
+-    "embla-carousel-react": "^8.6.0",
+-    "express": "^4.21.2",
+-    "framer-motion": "^12.23.22",
+-    "input-otp": "^1.4.2",
+-    "lucide-react": "^0.453.0",
+-    "nanoid": "^5.1.5",
+-    "next-themes": "^0.4.6",
+-    "react": "^19.2.1",
+-    "react-day-picker": "^9.11.1",
+-    "react-dom": "^19.2.1",
+-    "react-hook-form": "^7.64.0",
+-    "react-resizable-panels": "^3.0.6",
+-    "recharts": "^2.15.2",
+-    "sonner": "^2.0.7",
+-    "streamdown": "^1.4.0",
+-    "tailwind-merge": "^3.3.1",
+-    "tailwindcss-animate": "^1.0.7",
+-    "vaul": "^1.1.2",
+-    "wouter": "^3.3.5",
+-    "zod": "^4.1.12"
+-  },
+-  "devDependencies": {
+-    "@builder.io/vite-plugin-jsx-loc": "^0.1.1",
+-    "@tailwindcss/typography": "^0.5.15",
+-    "@tailwindcss/vite": "^4.1.3",
+-    "@types/express": "4.17.21",
+-    "@types/google.maps": "^3.58.1",
+-    "@types/node": "^24.7.0",
+-    "@types/react": "^19.2.1",
+-    "@types/react-dom": "^19.2.1",
+-    "@vitejs/plugin-react": "^5.0.4",
+-    "add": "^2.0.6",
+-    "autoprefixer": "^10.4.20",
+-    "esbuild": "^0.25.0",
+-    "pnpm": "^10.15.1",
+-    "postcss": "^8.4.47",
+-    "prettier": "^3.6.2",
+-    "tailwindcss": "^4.1.14",
+-    "tsx": "^4.19.1",
+-    "tw-animate-css": "^1.4.0",
+-    "typescript": "5.6.3",
+-    "vite": "^7.1.7",
+-    "vite-plugin-manus-runtime": "^0.0.57",
+-    "vitest": "^2.1.4"
+-  },
+-  "packageManager": "pnpm@10.4.1+sha512.c753b6c3ad7afa13af388fa6d808035a008e30ea9993f58c6663e2bc5ff21679aa834db094987129aa4d488b86df57f7b634981b2f827cdcacc698cc0cfb88af",
+-  "pnpm": {
+-    "patchedDependencies": {
+-      "wouter@3.7.1": "patches/wouter@3.7.1.patch"
+-    },
+-    "overrides": {
+-      "tailwindcss>nanoid": "3.3.7"
+-    }
+-  }
+-}
+-```
+-
+-`client/src/App.tsx`
+-```tsx
+-import { Toaster } from "@/components/ui/sonner";
+-import { TooltipProvider } from "@/components/ui/tooltip";
+-import NotFound from "@/pages/NotFound";
+-import { Route, Switch } from "wouter";
+-import ErrorBoundary from "./components/ErrorBoundary";
+-import { ThemeProvider } from "./contexts/ThemeContext";
+-import Home from "./pages/Home";
+-
+-
+-function Router() {
+-  return (
+-    <Switch>
+-      <Route path={"/"} component={Home} />
+-      <Route path={"/404"} component={NotFound} />
+-      {/* Final fallback route */}
+-      <Route component={NotFound} />
+-    </Switch>
+-  );
+-}
++## Stack
+ 
+-// NOTE: About Theme
+-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
+-//   to keep consistent foreground/background color across components
+-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
++- **Front:** React 19 + Tailwind 4 + shadcn/ui, roteamento com Wouter.
++- **Back:** Express + banco JSON (lowdb) em `data/db.json`. Sessão via token HMAC-SHA256.
++- **Senhas:** armazenadas com hash **bcrypt** (nunca em texto puro).
++- **Testes:** vitest (`server/*.test.ts`).
+ 
+-function App() {
+-  return (
+-    <ErrorBoundary>
+-      <ThemeProvider
+-        defaultTheme="light"
+-        // switchable
+-      >
+-        <TooltipProvider>
+-          <Toaster />
+-          <Router />
+-        </TooltipProvider>
+-      </ThemeProvider>
+-    </ErrorBoundary>
+-  );
+-}
+-
+-export default App;
+ ```
+-
+-`client/src/pages/Home.tsx`
+-```tsx
+-import { Button } from "@/components/ui/button";
+-import { Loader2 } from "lucide-react";
+-import { Streamdown } from 'streamdown';
+-
+-/**
+- * All content in this page are only for example, replace with your own feature implementation
+- * When building pages, remember your instructions in Frontend Best Practices, Design Guide and Common Pitfalls
+- */
+-export default function Home() {
+-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
+-  // const { theme, toggleTheme } = useTheme();
+-
+-  return (
+-    <div className="min-h-screen flex flex-col">
+-      <main>
+-        {/* Example: lucide-react for icons */}
+-        <Loader2 className="animate-spin" />
+-        Example Page
+-        {/* Example: Streamdown for markdown rendering */}
+-        <Streamdown>Any **markdown** content</Streamdown>
+-        <Button variant="default">Example Button</Button>
+-      </main>
+-    </div>
+-  );
+-}
++client/src/
++  pages/       ← páginas (landings + dashboard)
++  components/  ← blocos das landings e UI (shadcn em components/ui)
++  contexts/    ← ThemeContext, ClientContext
++  hooks/       ← useAdminAuth, etc.
++server/
++  index.ts     ← API Express + auth
++  db.ts        ← camada de dados (lowdb) e seed
++data/
++  db.example.json  ← seed de exemplo (versionado, sem dados reais)
++  db.json          ← banco de runtime (IGNORADO pelo git — contém dados reais)
+ ```
+ 
+-`client/src/index.css`
+-```tsx
+-@import "tailwindcss";
+-@import "tw-animate-css";
+-
+-@custom-variant dark (&:is(.dark *));
+-
+-@theme inline {
+-  --radius-sm: calc(var(--radius) - 4px);
+-  --radius-md: calc(var(--radius) - 2px);
+-  --radius-lg: var(--radius);
+-  --radius-xl: calc(var(--radius) + 4px);
+-  --color-background: var(--background);
+-  --color-foreground: var(--foreground);
+-  --color-card: var(--card);
+-  --color-card-foreground: var(--card-foreground);
+-  --color-popover: var(--popover);
+-  --color-popover-foreground: var(--popover-foreground);
+-  --color-primary: var(--primary);
+-  --color-primary-foreground: var(--primary-foreground);
+-  --color-secondary: var(--secondary);
+-  --color-secondary-foreground: var(--secondary-foreground);
+-  --color-muted: var(--muted);
+-  --color-muted-foreground: var(--muted-foreground);
+-  --color-accent: var(--accent);
+-  --color-accent-foreground: var(--accent-foreground);
+-  --color-destructive: var(--destructive);
+-  --color-destructive-foreground: var(--destructive-foreground);
+-  --color-border: var(--border);
+-  --color-input: var(--input);
+-  --color-ring: var(--ring);
+-  --color-chart-1: var(--chart-1);
+-  --color-chart-2: var(--chart-2);
+-  --color-chart-3: var(--chart-3);
+-  --color-chart-4: var(--chart-4);
+-  --color-chart-5: var(--chart-5);
+-  --color-sidebar: var(--sidebar);
+-  --color-sidebar-foreground: var(--sidebar-foreground);
+-  --color-sidebar-primary: var(--sidebar-primary);
+-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+-  --color-sidebar-accent: var(--sidebar-accent);
+-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+-  --color-sidebar-border: var(--sidebar-border);
+-  --color-sidebar-ring: var(--sidebar-ring);
+-}
+-
+-:root {
+-  --primary: var(--color-blue-700);
+-  --primary-foreground: var(--color-blue-50);
+-  --sidebar-primary: var(--color-blue-600);
+-  --sidebar-primary-foreground: var(--color-blue-50);
+-  --chart-1: var(--color-blue-300);
+-  --chart-2: var(--color-blue-500);
+-  --chart-3: var(--color-blue-600);
+-  --chart-4: var(--color-blue-700);
+-  --chart-5: var(--color-blue-800);
+-  --radius: 0.65rem;
+-  --background: oklch(1 0 0);
+-  --foreground: oklch(0.235 0.015 65);
+-  --card: oklch(1 0 0);
+-  --card-foreground: oklch(0.235 0.015 65);
+-  --popover: oklch(1 0 0);
+-  --popover-foreground: oklch(0.235 0.015 65);
+-  --secondary: oklch(0.98 0.001 286.375);
+-  --secondary-foreground: oklch(0.4 0.015 65);
+-  --muted: oklch(0.967 0.001 286.375);
+-  --muted-foreground: oklch(0.552 0.016 285.938);
+-  --accent: oklch(0.967 0.001 286.375);
+-  --accent-foreground: oklch(0.141 0.005 285.823);
+-  --destructive: oklch(0.577 0.245 27.325);
+-  --destructive-foreground: oklch(0.985 0 0);
+-  --border: oklch(0.92 0.004 286.32);
+-  --input: oklch(0.92 0.004 286.32);
+-  --ring: oklch(0.623 0.214 259.815);
+-  --sidebar: oklch(0.985 0 0);
+-  --sidebar-foreground: oklch(0.235 0.015 65);
+-  --sidebar-accent: oklch(0.967 0.001 286.375);
+-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
+-  --sidebar-border: oklch(0.92 0.004 286.32);
+-  --sidebar-ring: oklch(0.623 0.214 259.815);
+-}
+-
+-.dark {
+-  --primary: var(--color-blue-700);
+-  --primary-foreground: var(--color-blue-50);
+-  --sidebar-primary: var(--color-blue-500);
+-  --sidebar-primary-foreground: var(--color-blue-50);
+-  --background: oklch(0.141 0.005 285.823);
+-  --foreground: oklch(0.85 0.005 65);
+-  --card: oklch(0.21 0.006 285.885);
+-  --card-foreground: oklch(0.85 0.005 65);
+-  --popover: oklch(0.21 0.006 285.885);
+-  --popover-foreground: oklch(0.85 0.005 65);
+-  --secondary: oklch(0.24 0.006 286.033);
+-  --secondary-foreground: oklch(0.7 0.005 65);
+-  --muted: oklch(0.274 0.006 286.033);
+-  --muted-foreground: oklch(0.705 0.015 286.067);
+-  --accent: oklch(0.274 0.006 286.033);
+-  --accent-foreground:  oklch(0.92 0.005 65);
+-  --destructive: oklch(0.704 0.191 22.216);
+-  --destructive-foreground: oklch(0.985 0 0);
+-  --border: oklch(1 0 0 / 10%);
+-  --input: oklch(1 0 0 / 15%);
+-  --ring: oklch(0.488 0.243 264.376);
+-  --chart-1: var(--color-blue-300);
+-  --chart-2: var(--color-blue-500);
+-  --chart-3: var(--color-blue-600);
+-  --chart-4: var(--color-blue-700);
+-  --chart-5: var(--color-blue-800);
+-  --sidebar: oklch(0.21 0.006 285.885);
+-  --sidebar-foreground: oklch(0.85 0.005 65);
+-  --sidebar-accent: oklch(0.274 0.006 286.033);
+-  --sidebar-accent-foreground:  oklch(0.985 0 0);
+-  --sidebar-border: oklch(1 0 0 / 10%);
+-  --sidebar-ring: oklch(0.488 0.243 264.376);
+-}
+-
+-@layer base {
+-  * {
+-    @apply border-border outline-ring/50;
+-  }
+-  body {
+-    @apply bg-background text-foreground;
+-  }
+-  button:not(:disabled),
+-  [role="button"]:not([aria-disabled="true"]),
+-  [type="button"]:not(:disabled),
+-  [type="submit"]:not(:disabled),
+-  [type="reset"]:not(:disabled),
+-  a[href],
+-  select:not(:disabled),
+-  input[type="checkbox"]:not(:disabled),
+-  input[type="radio"]:not(:disabled) {
+-    @apply cursor-pointer;
+-  }
+-}
+-
+-@layer components {
+-  /**
+-   * Custom container utility that centers content and adds responsive padding.
+-   *
+-   * This overrides Tailwind's default container behavior to:
+-   * - Auto-center content (mx-auto)
+-   * - Add responsive horizontal padding
+-   * - Set max-width for large screens
+-   *
+-   * Usage: <div className="container">...</div>
+-   *
+-   * For custom widths, use max-w-* utilities directly:
+-   * <div className="max-w-6xl mx-auto px-4">...</div>
+-   */
+-  .container {
+-    width: 100%;
+-    margin-left: auto;
+-    margin-right: auto;
+-    padding-left: 1rem; /* 16px - mobile padding */
+-    padding-right: 1rem;
+-  }
+-
+-  .flex {
+-    min-height: 0;
+-    min-width: 0;
+-  }
+-
+-  @media (min-width: 640px) {
+-    .container {
+-      padding-left: 1.5rem; /* 24px - tablet padding */
+-      padding-right: 1.5rem;
+-    }
+-  }
+-
+-  @media (min-width: 1024px) {
+-    .container {
+-      padding-left: 2rem; /* 32px - desktop padding */
+-      padding-right: 2rem;
+-      max-width: 1280px; /* Standard content width */
+-    }
+-  }
+-}
+-```
+-
+-`client/index.html`
+-```tsx
+-<!doctype html>
+-<html lang="en">
+-
+-  <head>
+-    <meta charset="UTF-8" />
+-    <meta
+-      name="viewport"
+-      content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+-    <title>{{project_title}}</title>    
+-    <!-- THIS IS THE START OF A COMMENT BLOCK, BLOCK TO BE DELETED: Google Fonts here, example:
+-    <link rel="preconnect" href="https://fonts.googleapis.com" />
+-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+-    THIS IS THE END OF A COMMENT BLOCK, BLOCK TO BE DELETED -->
+-  </head>
+-
+-  <body>
+-    <div id="root"></div>
+-    <script type="module" src="/src/main.tsx"></script>
+-    <script
+-      defer
+-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
+-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+-  </body>
+-
+-</html>
+-```
+-
+-`server/index.ts`
+-```tsx
+-import express from "express";
+-import { createServer } from "http";
+-import path from "path";
+-import { fileURLToPath } from "url";
+-
+-const __filename = fileURLToPath(import.meta.url);
+-const __dirname = path.dirname(__filename);
+-
+-async function startServer() {
+-  const app = express();
+-  const server = createServer(app);
+-
+-  // Serve static files from dist/public in production
+-  const staticPath =
+-    process.env.NODE_ENV === "production"
+-      ? path.resolve(__dirname, "public")
+-      : path.resolve(__dirname, "..", "dist", "public");
+-
+-  app.use(express.static(staticPath));
+-
+-  // Handle client-side routing - serve index.html for all routes
+-  app.get("*", (_req, res) => {
+-    res.sendFile(path.join(staticPath, "index.html"));
+-  });
+-
+-  const port = process.env.PORT || 3000;
+-
+-  server.listen(port, () => {
+-    console.log(`Server running on http://localhost:${port}/`);
+-  });
+-}
+-
+-startServer().catch(console.error);
+-```
+ ---
+ 
+-## Common Pitfalls
+-
+-### Infinite loading loops from unstable references
+-**Anti-pattern:** Creating new objects/arrays in render that are used as query inputs
+-```tsx
+-// ❌ Bad: New Date() creates new reference every render → infinite queries
+-const { data } = trpc.items.getByDate.useQuery({
+-  date: new Date(), // ← New object every render!
+-});
++## Configuração (obrigatória antes de rodar)
++
++Toda credencial vem de variáveis de ambiente. Nada de segredo no código.
++
++1. Copie o template e preencha:
++   ```bash
++   cp .env.example .env
++   ```
++2. Gere um segredo forte para `JWT_SECRET`:
++   ```bash
++   openssl rand -hex 32
++   ```
++3. Defina o admin inicial em `.env` (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`).
++   Ele é criado automaticamente no primeiro boot, **apenas** se ainda não houver
++   nenhum usuário no banco. Depois disso, gerencie usuários pelo próprio painel.
++
++| Variável | Obrigatória | Descrição |
++|---|---|---|
++| `JWT_SECRET` | Sim (em produção) | Assina os tokens de sessão. Sem ela, o servidor não sobe em produção. |
++| `ADMIN_EMAIL` | No 1º boot | E-mail do admin inicial. |
++| `ADMIN_PASSWORD` | No 1º boot | Senha do admin inicial (guardada com hash). |
++| `ADMIN_NAME` | Não | Nome do admin (padrão: "Admin"). |
++| `PORT` | Não | Porta do Express (padrão 3000). |
++| `DB_PATH` | Não | Caminho do banco de runtime. |
+ 
+-// ❌ Bad: Array/object literals in query input
+-const { data } = trpc.items.getByIds.useQuery({
+-  ids: [1, 2, 3], // ← New array reference every render!
+-});
+-```
++---
+ 
+-**Correct approach:** Stabilize references with useState/useMemo
+-```tsx
+-// ✅ Good: Initialize once with useState
+-const [date] = useState(() => new Date());
+-const { data } = trpc.items.getByDate.useQuery({ date });
++## Rodando localmente
+ 
+-// ✅ Good: Memoize complex inputs
+-const ids = useMemo(() => [1, 2, 3], []);
+-const { data } = trpc.items.getByIds.useQuery({ ids });
++```bash
++pnpm install
++pnpm dev        # front (Vite) — proxeia /api/* para o Express
++pnpm check      # typecheck
++pnpm test       # testes vitest   (se configurado no package.json)
+ ```
+ 
+-**Why this happens:** TRPC queries trigger when input references change. Objects/arrays created in render have new references each time, causing infinite re-fetches.
++O front precisa do Express no ar para as rotas `/api/*` (login, dashboard). Suba o
++servidor Node junto (ver `server/index.ts`).
+ 
+-### Navigation dead-ends in subpages
+-**Problem:** Creating nested routes without escape routes—no header nav, no sidebar, no back button.
++## Build e produção
+ 
+-**Root cause:** Implementing individual pages before establishing global layout structure.
+-
+-**Solution:** Define layout wrapper in App.tsx first, then build pages inside it. For admin tools use DashboardLayout; for detail pages add back button with `router.back()`.
+-
+-### Invisible text from theme/color mismatches
+-
+-**Root cause:** Semantic colors (`bg-background`, `text-foreground`) are CSS variables that resolve based on ThemeProvider's active theme. Mismatches cause invisible text.
+-
+-**Two critical rules:**
+-
+-1. **Match theme to CSS variables:** If `defaultTheme="dark"` in App.tsx, ensure `.dark {}` in index.css has dark background + light foreground values
+-2. **Always pair bg with text:** When using `bg-{semantic}`, MUST also use `text-{semantic}-foreground` (not automatic - text inherits from parent otherwise)
+-
+-**Quick reference:**
+-```tsx
+-// ✅ Theme + CSS alignment
+-<ThemeProvider defaultTheme="dark">  {/* Must match .dark in index.css */}
+-  <div className="bg-background text-foreground">...</div>
+-</ThemeProvider>
+-
+-// ✅ Required class pairs
+-<div className="bg-popover text-popover-foreground">...</div>
+-<div className="bg-card text-card-foreground">...</div>
+-<div className="bg-accent text-accent-foreground">...</div>
++```bash
++pnpm build      # gera front + bundle do servidor em dist/
++pnpm start      # NODE_ENV=production node dist/index.js
+ ```
+ 
+-### Nested anchor tags in Link components
+-**Problem:** Wrapping `<a>` tags inside another `<a>` or wouter's `<Link>` creates nested anchors and runtime errors.
++Em produção, defina `JWT_SECRET` e as variáveis de admin no ambiente do host.
++O host **precisa** executar Node (o dashboard depende da API).
+ 
+-**Solution:** Pass children directly to Link—it already renders an `<a>` internally.
+-```tsx
+-// ❌ Bad: <Link><a>...</a></Link> or <a><a>...</a></a>
+-// ✅ Good: <Link>...</Link> or just <a>...</a>
+-```
+-### Empty `Select.Item` values
+-
+-**Rule:** Every `<Select.Item>` must have a non-empty `value` prop—never `""`, `undefined`, or omitted.
++---
+ 
+-**Rule:** Use sonner for toasts; do not add react-toastify or @radix-ui/react-toast
++## Segurança — leia antes de publicar
+ 
+-**Rule:** If you put placeholder components for App.tsx routes, you MUST replace them with actual components after your implementation.
++- **Nunca** commite `.env` nem `data/db.json` (ambos já estão no `.gitignore`).
++- Segredos e senhas vêm só de variáveis de ambiente.
++- Senhas são gravadas com hash bcrypt; senhas antigas em texto puro são migradas
++  automaticamente no primeiro login bem-sucedido.
++- Se este repositório já foi público em algum momento, considere **todas** as senhas
++  e segredos anteriores como comprometidos e troque-os.
+diff --git a/data/db.example.json b/data/db.example.json
+new file mode 100644
+index 0000000..0aa5537
+--- /dev/null
++++ b/data/db.example.json
+@@ -0,0 +1,40 @@
++{
++  "_comment": "Arquivo de EXEMPLO. Copie para data/db.json (que é ignorado pelo git) ou deixe o servidor criar automaticamente. NUNCA coloque senhas ou dados reais de clientes aqui. O admin inicial é criado a partir de ADMIN_EMAIL/ADMIN_PASSWORD no primeiro boot.",
++  "clients": [
++    {
++      "id": 1,
++      "name": "Cliente Exemplo A",
++      "city": "Cidade Exemplo",
++      "state": "RS",
++      "status": "active",
++      "plan": "Meta Ads + Google Ads",
++      "startDate": "2024-01-01",
++      "monthlyBudget": 2000,
++      "contact": "Contato Exemplo",
++      "phone": "(00) 00000-0000",
++      "email": "exemplo@empresa.com.br",
++      "lpUrl": "/exemplo",
++      "notes": "Registro de exemplo — substitua pelos dados reais no ambiente de execução.",
++      "createdAt": 1700000000000,
++      "updatedAt": 1700000000000
++    }
++  ],
++  "campaigns": [
++    {
++      "id": 1,
++      "clientId": 1,
++      "name": "Campanha Exemplo",
++      "platform": "Meta Ads",
++      "status": "active",
++      "budget": 1000,
++      "createdAt": 1700000000000,
++      "updatedAt": 1700000000000
++    }
++  ],
++  "users": [],
++  "feedbackLeads": [],
++  "_nextClientId": 2,
++  "_nextCampaignId": 2,
++  "_nextUserId": 1,
++  "_nextFeedbackLeadId": 1
++}
+diff --git a/data/db.json b/data/db.json
+index 52c5cae..8c79fd4 100644
+--- a/data/db.json
++++ b/data/db.json
+@@ -8,10 +8,10 @@
+       "status": "active",
+       "plan": "Meta Ads + Google Ads",
+       "startDate": "2024-03-01",
+-      "monthlyBudget": 1500,
+-      "contact": "Gerente Tupanciretã",
+-      "phone": "(55) 99999-0001",
+-      "email": "tupancireta@vidacard.com.br",
++      "monthlyBudget": 2500,
++      "contact": "",
++      "phone": "",
++      "email": "",
+       "lpUrl": "/tupancireta",
+       "notes": "Foco em geração de conversas qualificadas no WhatsApp. Público 25-55 anos.",
+       "createdAt": 1779300642433,
+@@ -25,10 +25,10 @@
+       "status": "active",
+       "plan": "Meta Ads + Google Ads",
+       "startDate": "2024-04-01",
+-      "monthlyBudget": 1500,
+-      "contact": "Gerente Júlio de Castilhos",
+-      "phone": "(55) 99999-0002",
+-      "email": "juliodecastilhos@vidacard.com.br",
++      "monthlyBudget": 2000,
++      "contact": "",
++      "phone": "",
++      "email": "",
+       "lpUrl": "/juliodecastilhos",
+       "notes": "Praça menor, foco em awareness e conversão direta. Público 30-60 anos.",
+       "createdAt": 1779300642433,
+@@ -38,13 +38,13 @@
+       "id": 4,
+       "name": "Vida Card Ijuí",
+       "city": "Ijuí",
+-      "state": "",
++      "state": "RS",
+       "status": "active",
+       "plan": "Meta Ads + Google Ads",
+       "startDate": "2026-05-13",
+       "monthlyBudget": 1500,
+-      "contact": "Rosangela",
+-      "phone": "559941802",
++      "contact": "",
++      "phone": "",
+       "email": "",
+       "lpUrl": "https://www.vidacardijui.com.br/",
+       "notes": "",
+@@ -53,88 +53,18 @@
+     }
+   ],
+   "campaigns": [
+-    {
+-      "id": 1,
+-      "clientId": 1,
+-      "name": "Campanha Família",
+-      "platform": "Meta Ads",
+-      "status": "active",
+-      "budget": 800,
+-      "createdAt": 1779300642433,
+-      "updatedAt": 1779300642433
+-    },
+-    {
+-      "id": 2,
+-      "clientId": 1,
+-      "name": "Campanha Individual",
+-      "platform": "Meta Ads",
+-      "status": "active",
+-      "budget": 600,
+-      "createdAt": 1779300642433,
+-      "updatedAt": 1779300642433
+-    },
+-    {
+-      "id": 3,
+-      "clientId": 1,
+-      "name": "Pesquisa Marca",
+-      "platform": "Google Ads",
+-      "status": "active",
+-      "budget": 500,
+-      "createdAt": 1779300642433,
+-      "updatedAt": 1779300642433
+-    },
+-    {
+-      "id": 4,
+-      "clientId": 1,
+-      "name": "Pesquisa Concorrência",
+-      "platform": "Google Ads",
+-      "status": "active",
+-      "budget": 600,
+-      "createdAt": 1779300642433,
+-      "updatedAt": 1779300642433
+-    },
+-    {
+-      "id": 6,
+-      "clientId": 2,
+-      "name": "Campanha Individual",
+-      "platform": "Meta Ads",
+-      "status": "active",
+-      "budget": 500,
+-      "createdAt": 1779300642433,
+-      "updatedAt": 1779300642433
+-    },
+-    {
+-      "id": 7,
+-      "clientId": 2,
+-      "name": "Pesquisa Marca",
+-      "platform": "Google Ads",
+-      "status": "active",
+-      "budget": 400,
+-      "createdAt": 1779300642433,
+-      "updatedAt": 1779300642433
+-    },
+-    {
+-      "id": 8,
+-      "clientId": 2,
+-      "name": "Pesquisa Concorrência",
+-      "platform": "Google Ads",
+-      "status": "paused",
+-      "budget": 400,
+-      "createdAt": 1779300642433,
+-      "updatedAt": 1779300642433
+-    }
++    { "id": 1, "clientId": 1, "name": "Campanha Família", "platform": "Meta Ads", "status": "active", "budget": 800, "createdAt": 1779300642433, "updatedAt": 1779300642433 },
++    { "id": 2, "clientId": 1, "name": "Campanha Individual", "platform": "Meta Ads", "status": "active", "budget": 600, "createdAt": 1779300642433, "updatedAt": 1779300642433 },
++    { "id": 3, "clientId": 1, "name": "Pesquisa Marca", "platform": "Google Ads", "status": "active", "budget": 500, "createdAt": 1779300642433, "updatedAt": 1779300642433 },
++    { "id": 4, "clientId": 1, "name": "Pesquisa Concorrência", "platform": "Google Ads", "status": "active", "budget": 600, "createdAt": 1779300642433, "updatedAt": 1779300642433 },
++    { "id": 6, "clientId": 2, "name": "Campanha Individual", "platform": "Meta Ads", "status": "active", "budget": 500, "createdAt": 1779300642433, "updatedAt": 1779300642433 },
++    { "id": 7, "clientId": 2, "name": "Pesquisa Marca", "platform": "Google Ads", "status": "active", "budget": 400, "createdAt": 1779300642433, "updatedAt": 1779300642433 },
++    { "id": 8, "clientId": 2, "name": "Pesquisa Concorrência", "platform": "Google Ads", "status": "paused", "budget": 400, "createdAt": 1779300642433, "updatedAt": 1779300642433 }
+   ],
++  "users": [],
++  "feedbackLeads": [],
+   "_nextClientId": 5,
+   "_nextCampaignId": 9,
+-  "users": [
+-    {
+-      "id": 1,
+-      "name": "Davi",
+-      "email": "davi@trafego.pro",
+-      "password": "Trafego2026",
+-      "role": "admin",
+-      "createdAt": 1779304799636
+-    }
+-  ],
+-  "_nextUserId": 2
+-}
+\ No newline at end of file
++  "_nextUserId": 1,
++  "_nextFeedbackLeadId": 1
++}
+diff --git a/package.json b/package.json
+index 2c5166e..a4b995a 100644
+--- a/package.json
++++ b/package.json
+@@ -45,6 +45,7 @@
+     "@radix-ui/react-tooltip": "^1.2.8",
+     "@types/multer": "^2.1.0",
+     "axios": "^1.12.0",
++    "bcryptjs": "^2.4.3",
+     "class-variance-authority": "^0.7.1",
+     "clsx": "^2.1.1",
+     "cmdk": "^1.1.1",
+@@ -77,6 +78,7 @@
+     "@builder.io/vite-plugin-jsx-loc": "^0.1.1",
+     "@tailwindcss/typography": "^0.5.15",
+     "@tailwindcss/vite": "^4.1.3",
++    "@types/bcryptjs": "^2.4.6",
+     "@types/express": "4.17.21",
+     "@types/google.maps": "^3.58.1",
+     "@types/node": "^24.7.0",
+diff --git a/server/db.ts b/server/db.ts
+index d265558..bb196b6 100644
+--- a/server/db.ts
++++ b/server/db.ts
+@@ -3,6 +3,7 @@ import { JSONFileSync } from "lowdb/node";
+ import path from "path";
+ import { fileURLToPath } from "url";
+ import fs from "fs";
++import bcrypt from "bcryptjs";
+ 
+ const __filename = fileURLToPath(import.meta.url);
+ const __dirname = path.dirname(__filename);
+@@ -116,6 +117,23 @@ if (db.data._nextFeedbackLeadId === undefined) {
+   db.write();
+ }
+ 
++// ─── Admin inicial a partir de variáveis de ambiente ──────────────────────────
++// No primeiro boot, se não houver nenhum usuário e ADMIN_EMAIL/ADMIN_PASSWORD
++// estiverem definidos, cria o admin com a senha já em hash. Substitui o antigo
++// admin fixo que ficava hardcoded no código.
++if (db.data.users.length === 0 && process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
++  db.data.users.push({
++    id: db.data._nextUserId++,
++    name: process.env.ADMIN_NAME || "Admin",
++    email: process.env.ADMIN_EMAIL,
++    password: bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10),
++    role: "admin",
++    createdAt: Date.now(),
++  });
++  db.write();
++  console.log(`[db] Admin inicial criado para ${process.env.ADMIN_EMAIL}.`);
++}
++
+ // ─── Seed inicial ─────────────────────────────────────────────────────────────
+ if (db.data.clients.length === 0) {
+   const now = Date.now();
+@@ -199,7 +217,8 @@ export function createUser(data: { name: string; email: string; password: string
+     id: db.data._nextUserId++,
+     name: data.name,
+     email: data.email,
+-    password: data.password,
++    // Nunca guardamos senha em texto puro: armazenamos apenas o hash bcrypt.
++    password: bcrypt.hashSync(data.password, 10),
+     role: data.role ?? "admin",
+     createdAt: Date.now(),
+   };
+@@ -208,6 +227,15 @@ export function createUser(data: { name: string; email: string; password: string
+   return user;
+ }
+ 
++// Usado pela migração automática de senhas legadas (texto puro -> hash).
++export function updateUserPassword(id: number, hashedPassword: string): void {
++  db.read();
++  const idx = db.data.users.findIndex((u) => u.id === id);
++  if (idx === -1) return;
++  db.data.users[idx].password = hashedPassword;
++  db.write();
++}
++
+ export function deleteUser(id: number): void {
+   db.read();
+   db.data.users = db.data.users.filter((u) => u.id !== id);
+diff --git a/server/index.ts b/server/index.ts
+index a747a05..c6c1b2a 100644
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -3,6 +3,7 @@ import { createServer } from "http";
+ import path from "path";
+ import { fileURLToPath } from "url";
+ import crypto from "crypto";
++import bcrypt from "bcryptjs";
+ import multer from "multer";
+ import * as XLSX from "xlsx";
+ import {
+@@ -19,6 +20,7 @@ import {
+   getUserByName,
+   getAllUsers,
+   createUser,
++  updateUserPassword,
+   deleteUser,
+   getAllFeedbackLeads,
+   createFeedbackLead,
+@@ -35,7 +37,17 @@ const __filename = fileURLToPath(import.meta.url);
+ const __dirname = path.dirname(__filename);
+ 
+ // ─── Simple JWT-like token (HMAC-SHA256) ────────────────────────────────────
+-const JWT_SECRET = process.env.JWT_SECRET || "trafego-pro-secret-2024";
++// O segredo NUNCA fica no código. Em produção é obrigatório definir JWT_SECRET.
++// Em dev, se não houver, geramos um segredo aleatório por boot (tokens expiram ao reiniciar).
++const JWT_SECRET =
++  process.env.JWT_SECRET ||
++  (() => {
++    if (process.env.NODE_ENV === "production") {
++      throw new Error("JWT_SECRET não definido. Defina a variável de ambiente antes de subir em produção.");
++    }
++    console.warn("[auth] JWT_SECRET ausente — usando segredo aleatório de desenvolvimento (tokens invalidam ao reiniciar).");
++    return crypto.randomBytes(32).toString("hex");
++  })();
+ 
+ function signToken(payload: object): string {
+   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+@@ -55,9 +67,25 @@ function verifyToken(token: string): Record<string, unknown> | null {
+   }
+ }
+ 
+-// ─── Admin credentials (env or defaults) ────────────────────────────────────
+-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "lucas@trafego.pro";
+-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "trafego2024";
++// Credenciais de admin NÃO ficam mais no código. O admin inicial é criado a partir
++// das variáveis ADMIN_EMAIL / ADMIN_PASSWORD no primeiro boot (ver server/db.ts) e
++// depois todo login passa exclusivamente pela tabela de usuários (senha com hash).
++
++// ─── Verificação de senha (bcrypt) com migração automática de senhas antigas ──
++function checkPassword(plain: string, stored: string, userId: number): boolean {
++  // Senhas novas ficam com hash bcrypt (começam com "$2").
++  if (stored.startsWith("$2")) return bcrypt.compareSync(plain, stored);
++  // Legado em texto puro: valida uma vez e reescreve já com hash.
++  if (stored === plain) {
++    try {
++      updateUserPassword(userId, bcrypt.hashSync(plain, 10));
++    } catch {
++      /* migração best-effort — não bloqueia o login */
++    }
++    return true;
++  }
++  return false;
++}
+ 
+ // ─── Auth middleware ─────────────────────────────────────────────────────────
+ function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+@@ -97,19 +125,12 @@ async function startServer() {
+     if (name) dbUser = getUserByName(name);
+     if (!dbUser && email) dbUser = getUserByEmail(email);
+ 
+-    if (dbUser && dbUser.password === password) {
++    if (dbUser && password && checkPassword(password, dbUser.password, dbUser.id)) {
+       const token = signToken({ email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id });
+       res.json({ token, user: { email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id } });
+       return;
+     }
+ 
+-    // Fallback: credenciais fixas do admin principal
+-    if ((email === ADMIN_EMAIL || name?.toLowerCase() === "lucas") && password === ADMIN_PASSWORD) {
+-      const token = signToken({ email: ADMIN_EMAIL, role: "admin", name: "Lucas Dorneles" });
+-      res.json({ token, user: { email: ADMIN_EMAIL, role: "admin", name: "Lucas Dorneles" } });
+-      return;
+-    }
+-
+     res.status(401).json({ error: "Credenciais inválidas" });
+   });
+ 
+diff --git a/todo.md b/todo.md
+index 486b17f..d406c8a 100644
+--- a/todo.md
++++ b/todo.md
+@@ -1,59 +1,50 @@
+ # Projeto Tráfego Pro — TODO
+ 
+-## Páginas e Rotas
+-
+-- [x] Página institucional Tráfego Pro na raiz / (design dark, estrelas animadas, Space Grotesk + Inter)
+-- [x] Landing page Vida Card Tupanciretã em /tupancireta (10 seções estratégicas)
+-- [x] Landing page Vida Card Júlio de Castilhos em /juliodecastilhos
+-- [x] Rota 404 corrigida (espaço extra removido)
+-- [x] Animações de scroll (fade-in e slide-up) em todas as seções
+-
+-## Dashboard & Login
+-
+-- [x] Criar rota de login com email/senha customizado (API Express /api/auth/login)
+-- [x] Criar página de login com design Tráfego Pro (preto/branco)
+-- [x] Criar dashboard com sidebar e gerenciamento de clientes
+-- [x] Proteger rota /dashboard apenas para admin (hook useAdminAuth)
+-- [x] Adicionar dados mockados de clientes (Vida Card Tupanciretã, Júlio de Castilhos)
+-- [x] Criar página de detalhes de cada cliente no dashboard
+-- [x] Configurar proxy Vite → Express para rotas /api/*
+-- [x] Servidor Express rodando na porta 4000 (dev) com API JWT
+-
+-## Identidade Visual
+-
+-- [x] Logo Tráfego Pro (branca) integrada no header e footer
+-- [x] Fontes Space Grotesk (títulos) + Inter Extra Light (corpo)
+-- [x] Paleta Tráfego Pro: #0a0a0a, branco, cinzas
+-- [x] Paleta Vida Card: verde #1FBD8F, azul escuro, branco
+-
+-## CRUD de Clientes com Excel
+-
+-- [x] Banco de dados JSON persistente com lowdb (LowSync) em data/db.json
+-- [x] API REST completa: GET, POST, PUT, DELETE /api/clients e /api/campaigns
+-- [x] Exportação para Excel (.xlsx) via GET /api/clients/export/excel
+-- [x] Importação de Excel via POST /api/clients/import/excel
+-- [x] Interface CRUD no dashboard: listagem, modal de criação, modal de edição, confirmação de exclusão
+-- [x] CRUD de campanhas na tela de detalhe do cliente
+-- [x] Botões Importar Excel e Exportar Excel na listagem de clientes
+-- [x] Toast de feedback para todas as operações
+-- [x] 17 testes vitest passando (CRUD de clientes e campanhas)
+-
+-## Novo Dashboard (Dashboard.zip)
+-
+-- [x] Adicionar tokens de cor dark e classes glass-card, brand-border-glow, ambient-glow ao index.css
+-- [x] Criar componente AppLayout com sidebar colapsável, seletor de cliente, nav links e UserProfileButton
+-- [x] Criar componente KpiCard fiel ao Dashboard.zip
+-- [x] Criar contexto ClientContext para seletor de cliente global
+-- [x] Implementar página /dashboard (Visão Geral) com KPIs, gráficos e tabela de campanhas
+-- [x] Implementar página /dashboard/pipeline (Kanban de demandas)
+-- [x] Implementar página /dashboard/clientes (CRUD de clientes)
+-- [x] Implementar página /dashboard/pagamentos (controle de pagamentos)
+-- [x] Implementar página /dashboard/meu-trabalho (tarefas atribuídas)
+-- [x] Implementar página /dashboard/atualizacoes (posts/updates)
+-- [x] Implementar página /dashboard/configuracoes
+-- [x] Remover páginas Dashboard.tsx e DashboardAdvanced.tsx antigas
+-- [x] Atualizar App.tsx com novas rotas /dashboard/*
+-- [x] Testar autenticação e navegação completa
+-- [x] Criar página /dashboard/feedback-leads com formulário de feedback de leads
+-- [x] Integrar com API backend para salvar respostas do formulário
+-- [x] Adicionar rota no AppLayout sidebar
++## 🔒 Segurança (prioridade máxima)
++
++- [x] Remover credenciais de admin hardcoded do servidor (backdoor no login)
++- [x] Remover segredo do token (`JWT_SECRET`) fixo no código — agora só via env
++- [x] Passwords com hash bcrypt (com migração automática das senhas em texto puro)
++- [x] Admin inicial criado por env (`ADMIN_EMAIL` / `ADMIN_PASSWORD`) no 1º boot
++- [x] `data/db.json` removido do versionamento (agora no `.gitignore`)
++- [x] `data/db.json` do repositório saneado (sem senha e sem contatos reais)
++- [x] `data/db.example.json` criado como seed sem dados sensíveis
++- [x] `.env.example` documentando todas as variáveis
++- [ ] **Manual:** tornar o repositório privado
++- [ ] **Manual:** trocar TODAS as senhas/segredos antigos (considerar comprometidos)
++- [ ] **Manual:** `git rm --cached data/db.json` e commitar
++- [ ] **Manual:** rodar `pnpm install` (baixa o bcryptjs) e `pnpm check`
++- [ ] **Manual (opcional):** reescrever histórico do git para apagar o segredo antigo
++      (BFG ou `git filter-repo`), já que o valor ficou registrado em commits passados
++
++## Deploy
++
++- [ ] Definir onde o back-end Express vai rodar (host com Node, não estático)
++- [ ] Configurar `JWT_SECRET` e variáveis de admin no ambiente de produção
++- [ ] Validar login + dashboard em produção (rotas `/api/*` no ar)
++
++## Produto / dados (backlog)
++
++- [ ] Fechar o funil de métricas: incluir retenção/churn e LTV (hoje para na conversa do WhatsApp)
++- [ ] Rever orçamento por praça (evitar valor uniforme sem lógica de porte/potencial)
++- [ ] Padronizar cadastro de clientes (telefone/estado/datas) antes de usar como fonte de decisão
++
++## Páginas e Rotas (concluído)
++
++- [x] Site institucional Tráfego Pro em `/`
++- [x] Landing Vida Card Tupanciretã em `/tupancireta`
++- [x] Landing Vida Card Júlio de Castilhos em `/juliodecastilhos`
++- [x] Landing Vida Card Ijuí em `/ijui`
++- [x] Rota 404
++
++## Dashboard & Login (concluído)
++
++- [x] Login com API Express (`/api/auth/login`)
++- [x] Rota `/dashboard` protegida para admin (hook `useAdminAuth`)
++- [x] CRUD de clientes e campanhas + import/export Excel
++- [x] Páginas: pipeline, clientes, pagamentos, meu-trabalho, atualizações, configurações, feedback-leads
++- [x] Testes vitest de CRUD
++
++## Identidade Visual (concluído)
++
++- [x] Logo, fontes (Space Grotesk + Inter) e paletas Tráfego Pro / Vida Card

@@ -105,6 +105,10 @@ temp/
 *.sqlite
 *.sqlite3
 
+# Banco de dados de runtime (contém dados reais de clientes — NÃO versionar).
+# O arquivo de exemplo data/db.example.json continua versionado.
+data/db.json
+
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
 

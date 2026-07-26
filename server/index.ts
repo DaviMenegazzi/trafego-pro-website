@@ -3,6 +3,7 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import {
@@ -19,6 +20,7 @@ import {
   getUserByName,
   getAllUsers,
   createUser,
+  updateUserPassword,
   deleteUser,
   getAllFeedbackLeads,
   createFeedbackLead,
@@ -35,7 +37,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ─── Simple JWT-like token (HMAC-SHA256) ────────────────────────────────────
-const JWT_SECRET = process.env.JWT_SECRET || "trafego-pro-secret-2024";
+// O segredo NUNCA fica no código. Em produção é obrigatório definir JWT_SECRET.
+// Em dev, se não houver, geramos um segredo aleatório por boot (tokens expiram ao reiniciar).
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  (() => {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET não definido. Defina a variável de ambiente antes de subir em produção.");
+    }
+    console.warn("[auth] JWT_SECRET ausente — usando segredo aleatório de desenvolvimento (tokens invalidam ao reiniciar).");
+    return crypto.randomBytes(32).toString("hex");
+  })();
 
 function signToken(payload: object): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
@@ -55,9 +67,25 @@ function verifyToken(token: string): Record<string, unknown> | null {
   }
 }
 
-// ─── Admin credentials (env or defaults) ────────────────────────────────────
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "lucas@trafego.pro";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "trafego2024";
+// Credenciais de admin NÃO ficam mais no código. O admin inicial é criado a partir
+// das variáveis ADMIN_EMAIL / ADMIN_PASSWORD no primeiro boot (ver server/db.ts) e
+// depois todo login passa exclusivamente pela tabela de usuários (senha com hash).
+
+// ─── Verificação de senha (bcrypt) com migração automática de senhas antigas ──
+function checkPassword(plain: string, stored: string, userId: number): boolean {
+  // Senhas novas ficam com hash bcrypt (começam com "$2").
+  if (stored.startsWith("$2")) return bcrypt.compareSync(plain, stored);
+  // Legado em texto puro: valida uma vez e reescreve já com hash.
+  if (stored === plain) {
+    try {
+      updateUserPassword(userId, bcrypt.hashSync(plain, 10));
+    } catch {
+      /* migração best-effort — não bloqueia o login */
+    }
+    return true;
+  }
+  return false;
+}
 
 // ─── Auth middleware ─────────────────────────────────────────────────────────
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -97,16 +125,9 @@ async function startServer() {
     if (name) dbUser = getUserByName(name);
     if (!dbUser && email) dbUser = getUserByEmail(email);
 
-    if (dbUser && dbUser.password === password) {
+    if (dbUser && password && checkPassword(password, dbUser.password, dbUser.id)) {
       const token = signToken({ email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id });
       res.json({ token, user: { email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id } });
-      return;
-    }
-
-    // Fallback: credenciais fixas do admin principal
-    if ((email === ADMIN_EMAIL || name?.toLowerCase() === "lucas") && password === ADMIN_PASSWORD) {
-      const token = signToken({ email: ADMIN_EMAIL, role: "admin", name: "Lucas Dorneles" });
-      res.json({ token, user: { email: ADMIN_EMAIL, role: "admin", name: "Lucas Dorneles" } });
       return;
     }
 

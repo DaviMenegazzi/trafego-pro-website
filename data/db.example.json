@@ -1,0 +1,40 @@
+{
+  "_comment": "Arquivo de EXEMPLO. Copie para data/db.json (que é ignorado pelo git) ou deixe o servidor criar automaticamente. NUNCA coloque senhas ou dados reais de clientes aqui. O admin inicial é criado a partir de ADMIN_EMAIL/ADMIN_PASSWORD no primeiro boot.",
+  "clients": [
+    {
+      "id": 1,
+      "name": "Cliente Exemplo A",
+      "city": "Cidade Exemplo",
+      "state": "RS",
+      "status": "active",
+      "plan": "Meta Ads + Google Ads",
+      "startDate": "2024-01-01",
+      "monthlyBudget": 2000,
+      "contact": "Contato Exemplo",
+      "phone": "(00) 00000-0000",
+      "email": "exemplo@empresa.com.br",
+      "lpUrl": "/exemplo",
+      "notes": "Registro de exemplo — substitua pelos dados reais no ambiente de execução.",
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000
+    }
+  ],
+  "campaigns": [
+    {
+      "id": 1,
+      "clientId": 1,
+      "name": "Campanha Exemplo",
+      "platform": "Meta Ads",
+      "status": "active",
+      "budget": 1000,
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000
+    }
+  ],
+  "users": [],
+  "feedbackLeads": [],
+  "_nextClientId": 2,
+  "_nextCampaignId": 2,
+  "_nextUserId": 1,
+  "_nextFeedbackLeadId": 1
+}

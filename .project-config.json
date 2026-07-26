@@ -8,15 +8,16 @@
   "dev_command": "pnpm run dev",
   "env_vars": {
     "DATABASE_URL": "mysql://2GrmLjqk6jqj6xH.root:kzLM2DL97sNK71J3uxry@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/HCdtznE9dNy8ZoAnjMwrWj?ssl={\"rejectUnauthorized\":true}",
-    "DRIZZLE_DATABASE_URL": "mysql://2GrmLjqk6jqj6xH.root:kzLM2DL97sNK71J3uxry@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/HCdtznE9dNy8ZoAnjMwrWj?ssl={\"rejectUnauthorized\":true}"
+    "DRIZZLE_DATABASE_URL": "mysql://2GrmLjqk6jqj6xH.root:kzLM2DL97sNK71J3uxry@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/HCdtznE9dNy8ZoAnjMwrWj?ssl={\"rejectUnauthorized\":true}",
+    "MANUS_WEBDEV_PROJECT_ID": "HCdtznE9dNy8ZoAnjMwrWj"
   },
   "experiments": null,
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663655133524/HCdtznE9dNy8ZoAnjMwrWj",
-    "access_key_id": "ASIAZV3A2ECZLQT3SWD2",
-    "secret_access_key": "WrvV67+apWimG/fiyP+qbvoF+54VCVLi+25+zS6x",
-    "session_token": "IQoJb3JpZ2luX2VjEG8aCXVzLWVhc3QtMSJIMEYCIQCnnNKJ9IlwQk1drTU18K0nrfWkFXC9zv9LwKzA0wDm5wIhAIc08NNF/lHkXQdGxdoZcNregKQ2iHMvDKJCYnQgQsejKvYDCDcQBBoMNjY1Mzg2MDk4ODY2IgxTougtdguJ9y5JN/8q0wOfcJhZLb+LVd1pV6yzGssyJ71c6KNHKwvyHjFKk5xnyJfGdI6/kJv/3v8ssD5aUlrgDBNJbcd8a8K0l6Tt+DiNAbFnzm2O35MRtr/joSEAO4cJdyUWRlJuhfjYSPuCTPH69AYaWJQkIBEH47AOFlt3JjBV5upa3s4QpfHrc5prHGagKHOFQBV3aICaFYzGNXwIC6DQaba9raBZuyie+b3RI+2mRtePug0mUly0epgWtISoAt+digNCOI0G2Ic/TPA9vDEUsKfJT24S4PgTMPxLNwfBo/2EXzncOthNWEs7Cm5M7xIStEYeh5yKFn6X747OkIPQ0EQfAe4rVqctVbVHQv+PO328v2YlSOWwZBIbbhc0sGlhS2FKvTL+SVV96gPatxypgvXeVSQzxblPznQK6Jn6zRQ9u3knDU4nj9dOck5S6PFnbOqeBgiKqzU2YTMlx92sH4ve/mxSr7ZAbKQcn8upDEnmU3nm7u4/bCFO1yq43YeKmYr9pH6NhOLa0I7BSjufc+jyk0/XBnMTULBTEzqw3zyMksCPQrFwR9wKl+rQrnQ3crztfC8c7fqLXrxCx6g2xF/daO+tDCeOehvz597YBYB+/Lw78c+aDTx0jh3NfjDZrZjTBjqcAWB25qF1cqaYtCoKfNrj4rOMULC8TTRuYRSeZq6S49+cum0/VTx5b9vy+Ym3/9YbSLLpknBVfgCbLBYqpvxd91S8A+kJsLkE8NYyDg/SvLB+2nPIz8pGBv9y/Gg0T0XVQihjFg9SV/7h2FeRE25argBkOhMfk/sboebDIsW3xnmQBVlJmXLCcIvfKOSiN+YCc0uDbO1HvL6iZ6ADDw==",
-    "expiration": "2026-07-27T02:16:57.000Z",
+    "access_key_id": "ASIAZV3A2ECZEMAM23XC",
+    "secret_access_key": "nSgQLO7LTYG3ElOziv4W+cf2x46HVWn4Ad2ozJLj",
+    "session_token": "IQoJb3JpZ2luX2VjEG8aCXVzLWVhc3QtMSJIMEYCIQCCIku+jUKttJs64xJIOT02OR+5CN1Y4g/G5xgmKHUDngIhAJRA4grLOPVv0ts/2AyKU9UDy5VGKNx5DStDTbyRpG/nKvYDCDgQBBoMNjY1Mzg2MDk4ODY2IgyAqVp2mlMva7Q+WAEq0wNijPFKpM0V29pNAAD++72y5IZIisQz8VupsTKdlB9D8XphhQ0kzIAw1ZBdwg9ou2w1q+woZZqa1Pr7Ixbt1MQnQbOhTkr4J1dR1UObKfGkxpvTi4xZGUrCZKe0k5J04IAG1mGlXVVtbbk37Pu2jWe9AoQb6psCbP7WNjJq71s5TE7c63QAZm9+mHv9UqmaSJ6Fsm6z+jk8c2hrgSx3h18VRnX9hH/vgyCVQ7Hsvopq37GtyeNhjKAuU/pg+niQfGKef7rDUOTEISAXIX9qFmvtp90LNqe0Nfjf9btZeDZrbURwvw8iDryZYgYvtuQAKX7pGhE7gF0y9qWg+LAare3I6XkmMkYY/utRfySuzsnmeD5fWr0lftkp760lBAMhpFw8AdTkZciDbSjR46L6wkhPZWnYVknp/PSD4MnUqsEc/qzVG/YrvXbGhq+B98TQHltvmKcDIEZUQCHMqL0HA3Tr9Wv/YF4LrNqlDNLrOVp0f9M65s4Lvfq2gK7XnTGN5cL+p8LfRq894vGdI2u+Rq1tJwCW++pGAJwhDsfLp0MoYdkm2QXiFBwDO7Gm85JLTvUE6v1lP3j8OCq6GZZX99Mkdz9/VUUv4z4lF8Yq5suSxZBKKTDqs5jTBjqcAZSF74nMRjDyJMqLrFddbINC9q6hHO0SnIxZ74lsokjw4cxRLEl18a2r0wdjiOT3sAEai1bXsiGkTt2WcO9S1aBZEnanQj4VZwP8JnumKS+Neb9TpDjuIh218GhCzM16fhfsg7y0dIk69ncaiAGix2QSeaE1Ho8LK/E34rgXx7Y1Xns7zwekpitdKu/NqsWtxcYmZ8Y5Zj9Vkpgdfg==",
+    "expiration": "2026-07-27T02:30:02.000Z",
     "backend": "GIT_BACKEND_S3"
   },
   "name": "vidacard-tupan-lp",
@@ -29,11 +30,13 @@
     "OAUTH_SERVER_URL": "https://api.manus.im",
     "OWNER_NAME": "Davi",
     "OWNER_OPEN_ID": "aedygS7YmRoTGS3ZjtZzMr",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_4xypWjUcSIw1rJbnyDSfvA_txE5Sivo",
+    "SUPABASE_URL": "https://kphhbpsfwklwddmgpsrm.supabase.co",
     "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
     "VITE_ANALYTICS_WEBSITE_ID": "202f67cb-1a4a-4c78-954a-fabaa81b1d12",
     "VITE_APP_ID": "HCdtznE9dNy8ZoAnjMwrWj",
-    "VITE_APP_LOGO": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310519663655133524/IClziiAaYHNQNKWs.webp",
-    "VITE_APP_TITLE": "Tráfego Pro - Impulsionando suas vendas",
+    "VITE_APP_LOGO": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310519663655133524/OJruLtBSIGgeJttz.png",
+    "VITE_APP_TITLE": "Tráfego Pro",
     "VITE_FRONTEND_FORGE_API_KEY": "V6mqDi9rVbLKiHaEXdbMWp",
     "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",
     "VITE_OAUTH_PORTAL_URL": "https://manus.im"

@@ -139,7 +139,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               transition: `max-width ${DURATION} ${EASE}, opacity ${DURATION} ${EASE}`,
             }}
           >
-            <div className="text-sm font-semibold tracking-tight whitespace-nowrap">Tráfego Pro</div>
+            <div className="font-display text-sm font-semibold tracking-[0.14em] whitespace-nowrap">TRÁFEGO<span className="text-muted-foreground"> PRO</span></div>
           </div>
         </div>
         <button

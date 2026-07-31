@@ -45,6 +45,9 @@ pids
 *.seed
 *.pid.lock
 
+# patches
+*.patch
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

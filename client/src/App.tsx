@@ -10,8 +10,6 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import DashboardAnuncios from "./pages/DashboardAnuncios";
 import DashboardClientes from "./pages/DashboardClientes";
-import DashboardPagamentos from "./pages/DashboardPagamentos";
-import DashboardMeuTrabalho from "./pages/DashboardMeuTrabalho";
 import DashboardConfiguracoes from "./pages/DashboardConfiguracoes";
 import DashboardFeedbackLeads from "./pages/DashboardFeedbackLeads";
 
@@ -26,10 +24,6 @@ function Router() {
       <Route path={"/dashboard/anuncios/"} component={DashboardAnuncios} />
       <Route path={"/dashboard/clientes"} component={DashboardClientes} />
       <Route path={"/dashboard/clientes/"} component={DashboardClientes} />
-      <Route path={"/dashboard/pagamentos"} component={DashboardPagamentos} />
-      <Route path={"/dashboard/pagamentos/"} component={DashboardPagamentos} />
-      <Route path={"/dashboard/meu-trabalho"} component={DashboardMeuTrabalho} />
-      <Route path={"/dashboard/meu-trabalho/"} component={DashboardMeuTrabalho} />
       <Route path={"/dashboard/configuracoes"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/configuracoes/"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/feedback-leads"} component={DashboardFeedbackLeads} />

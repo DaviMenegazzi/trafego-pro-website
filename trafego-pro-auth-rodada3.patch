@@ -1,0 +1,230 @@
+diff --git a/server/index.ts b/server/index.ts
+index 1679ddf..d854817 100644
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -90,6 +90,10 @@ function checkPassword(plain: string, stored: string, userId: number): boolean {
+ }
+ 
+ // ─── Auth middleware ─────────────────────────────────────────────────────────
++// requireAuth: exige apenas um token válido (qualquer usuário autenticado).
++// requireAdmin: exige token válido E cargo "admin".
++// O token só é emitido após a autenticação passar pelo Supabase (ver /api/auth/login),
++// portanto a verificação de identidade acontece sempre no Supabase.
+ function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+   const authHeader = req.headers.authorization;
+   if (!authHeader?.startsWith("Bearer ")) {
+@@ -102,13 +106,21 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
+     res.status(401).json({ error: "Invalid token" });
+     return;
+   }
+-  if (payload.role !== "admin") {
+-    res.status(403).json({ error: "Forbidden: admin only" });
+-    return;
+-  }
++  (req as express.Request & { user?: Record<string, unknown> }).user = payload;
+   next();
+ }
+ 
++function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
++  requireAuth(req, res, () => {
++    const payload = (req as express.Request & { user?: { role?: string } }).user;
++    if (payload?.role !== "admin") {
++      res.status(403).json({ error: "Acesso restrito a administradores" });
++      return;
++    }
++    next();
++  });
++}
++
+ // ─── Multer (in-memory for Excel upload) ────────────────────────────────────
+ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+ 
+@@ -119,6 +131,10 @@ async function startServer() {
+   app.use(express.json());
+ 
+   // ─── Auth ─────────────────────────────────────────────────────────────────
++  // A autenticação (verificação de credenciais) acontece SEMPRE no Supabase.
++  // O banco local guarda apenas o cargo (autorização), nunca valida senha em
++  // produção. O caminho local só existe para desenvolvimento e precisa ser
++  // habilitado explicitamente com ALLOW_LOCAL_AUTH=true.
+   app.post("/api/auth/login", async (req, res) => {
+     const { email, password } = req.body as { email: string; password: string };
+ 
+@@ -127,29 +143,30 @@ async function startServer() {
+       return;
+     }
+ 
+-    // Tenta autenticar contra o Supabase Auth
+     const supabase = getSupabase();
++
+     if (supabase) {
+       try {
+         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+         if (error || !data.user) {
+-          res.status(401).json({ error: "Credenciais inválidas (Supabase)" });
++          res.status(401).json({ error: "Credenciais inválidas" });
+           return;
+         }
+ 
+-        // Usuário autenticado no Supabase. Cria/atualiza no banco local
++        // Identidade confirmada pelo Supabase. O cargo vem do banco local
++        // (fonte de autorização). Usuário novo entra como "user" — a promoção
++        // a admin é feita de propósito, nunca automática.
+         let dbUser = getUserByEmail(email);
+         if (!dbUser) {
+           dbUser = createUser({
+             name: data.user.user_metadata?.name || email.split("@")[0],
+             email,
+-            password: "[supabase-auth]", // Senha não é usada quando autenticado via Supabase
+-            role: "admin", // Novo usuário começa como admin
++            password: "[supabase-auth]", // senha não é usada: quem valida é o Supabase
++            role: "user",
+           });
+-          console.log(`[auth] Novo usuário criado via Supabase: ${email}`);
++          console.log(`[auth] Novo usuário provisionado via Supabase como "user": ${email}`);
+         }
+ 
+-        // Gera token JWT local
+         const token = signToken({ email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id });
+         res.json({ token, user: { email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id } });
+         return;
+@@ -160,35 +177,35 @@ async function startServer() {
+       }
+     }
+ 
+-    // Fallback: se Supabase não estiver configurado, usa banco local
+-    console.warn("[auth] Supabase não configurado, usando autenticação local");
++    // Supabase não configurado. Em produção isso é um erro de configuração —
++    // não há autenticação local silenciosa. Só libera se ALLOW_LOCAL_AUTH=true.
++    if (process.env.ALLOW_LOCAL_AUTH !== "true") {
++      console.error("[auth] Supabase não configurado e ALLOW_LOCAL_AUTH!=true — login recusado.");
++      res.status(503).json({ error: "Autenticação indisponível: Supabase não configurado." });
++      return;
++    }
++
++    console.warn("[auth] MODO DEV: autenticação local habilitada (ALLOW_LOCAL_AUTH=true).");
+     let dbUser = getUserByEmail(email);
+     if (!dbUser) {
+-      dbUser = createUser({
+-        name: email.split("@")[0],
+-        email,
+-        password,
+-        role: "admin",
+-      });
+-      console.log(`[auth] Novo usuário criado localmente: ${email}`);
++      dbUser = createUser({ name: email.split("@")[0], email, password, role: "user" });
++      console.log(`[auth] (dev) Novo usuário local criado como "user": ${email}`);
+     }
+-
+     if (dbUser && checkPassword(password, dbUser.password, dbUser.id)) {
+       const token = signToken({ email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id });
+       res.json({ token, user: { email: dbUser.email, name: dbUser.name, role: dbUser.role, id: dbUser.id } });
+       return;
+     }
+-
+     res.status(401).json({ error: "Credenciais inválidas" });
+   });
+ 
+   // ─── Users (admin only) ──────────────────────────────────────────────────────
+-  app.get("/api/users", requireAuth, (_req, res) => {
++  app.get("/api/users", requireAdmin, (_req, res) => {
+     const users = getAllUsers().map(({ password: _p, ...u }) => u);
+     res.json(users);
+   });
+ 
+-  app.post("/api/users", requireAuth, (req, res) => {
++  app.post("/api/users", requireAdmin, (req, res) => {
+     const { name, email, password, role } = req.body as { name: string; email: string; password: string; role?: "admin" | "user" };
+     if (!name?.trim() || !password?.trim()) {
+       res.status(400).json({ error: "Nome e senha são obrigatórios" });
+@@ -203,7 +220,7 @@ async function startServer() {
+     res.status(201).json(safeUser);
+   });
+ 
+-  app.delete("/api/users/:id", requireAuth, (req, res) => {
++  app.delete("/api/users/:id", requireAdmin, (req, res) => {
+     const id = parseInt(req.params.id);
+     deleteUser(id);
+     res.json({ success: true });
+@@ -216,12 +233,12 @@ async function startServer() {
+   });
+ 
+   // ─── Clients — List & Create ──────────────────────────────────────────────
+-  app.get("/api/clients", requireAuth, (_req, res) => {
++  app.get("/api/clients", requireAdmin, (_req, res) => {
+     const clients = getAllClients();
+     res.json(clients);
+   });
+ 
+-  app.post("/api/clients", requireAuth, (req, res) => {
++  app.post("/api/clients", requireAdmin, (req, res) => {
+     const body = req.body as Partial<ClientInput> & { name: string };
+     if (!body.name?.trim()) {
+       res.status(400).json({ error: "Nome é obrigatório" });
+@@ -232,21 +249,21 @@ async function startServer() {
+   });
+ 
+   // ─── Clients — Single ────────────────────────────────────────────────────
+-  app.get("/api/clients/:id", requireAuth, (req, res) => {
++  app.get("/api/clients/:id", requireAdmin, (req, res) => {
+     const client = getClientById(Number(req.params.id));
+     if (!client) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
+     const campaigns = getCampaignsByClientId(client.id);
+     res.json({ ...client, campaigns });
+   });
+ 
+-  app.put("/api/clients/:id", requireAuth, (req, res) => {
++  app.put("/api/clients/:id", requireAdmin, (req, res) => {
+     const id = Number(req.params.id);
+     if (!getClientById(id)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
+     const updated = updateClient(id, req.body as Partial<ClientInput>);
+     res.json(updated);
+   });
+ 
+-  app.delete("/api/clients/:id", requireAuth, (req, res) => {
++  app.delete("/api/clients/:id", requireAdmin, (req, res) => {
+     const id = Number(req.params.id);
+     if (!getClientById(id)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
+     deleteClient(id);
+@@ -254,7 +271,7 @@ async function startServer() {
+   });
+ 
+   // ─── Campaigns ────────────────────────────────────────────────────────────
+-  app.post("/api/clients/:clientId/campaigns", requireAuth, (req, res) => {
++  app.post("/api/clients/:clientId/campaigns", requireAdmin, (req, res) => {
+     const clientId = Number(req.params.clientId);
+     if (!getClientById(clientId)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
+     const body = req.body as Partial<CampaignInput> & { name: string };
+@@ -263,20 +280,20 @@ async function startServer() {
+     res.status(201).json(campaign);
+   });
+ 
+-  app.put("/api/campaigns/:id", requireAuth, (req, res) => {
++  app.put("/api/campaigns/:id", requireAdmin, (req, res) => {
+     const id = Number(req.params.id);
+     const updated = updateCampaign(id, req.body as Partial<CampaignInput>);
+     if (!updated) { res.status(404).json({ error: "Campanha não encontrada" }); return; }
+     res.json(updated);
+   });
+ 
+-  app.delete("/api/campaigns/:id", requireAuth, (req, res) => {
++  app.delete("/api/campaigns/:id", requireAdmin, (req, res) => {
+     deleteCampaign(Number(req.params.id));
+     res.json({ ok: true });
+   });
+ 
+   // ─── Excel Export ─────────────────────────────────────────────────────────
+-  app.get("/api/clients/export/excel", requireAuth, (_req, res) => {
++  app.get("/api/clients/export/excel", requireAdmin, (_req, res) => {
+     const clients = getAllClients();
+ 
+     // Aba de clientes
+@@ -414,7 +431,7 @@ async function startServer() {
+   });
+ 
+   // ─── Excel Import ─────────────────────────────────────────────────────────
+-  app.post("/api/clients/import/excel", requireAuth, upload.single("file"), (req, res) => {
++  app.post("/api/clients/import/excel", requireAdmin, upload.single("file"), (req, res) => {
+     if (!req.file) { res.status(400).json({ error: "Nenhum arquivo enviado" }); return; }
+ 
+     try {

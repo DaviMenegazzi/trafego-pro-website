@@ -4,8 +4,6 @@ import {
   LayoutDashboard,
   Megaphone,
   Users2,
-  CreditCard,
-  ClipboardList,
   Settings,
   Menu,
   X,
@@ -20,15 +18,30 @@ import { useClientContext } from "@/contexts/ClientContext";
 const DURATION = "200ms";
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 
-const nav = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/dashboard/anuncios", label: "Anúncios", icon: Megaphone },
-  { to: "/dashboard/clientes", label: "Clientes", icon: Users2 },
-  { to: "/dashboard/pagamentos", label: "Pagamentos", icon: CreditCard },
-  { to: "/dashboard/meu-trabalho", label: "Meu Trabalho", icon: ClipboardList },
-  { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
-  { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
-];
+// Menu montado por cargo. "Clientes" só aparece para administradores
+// (role === "admin"). Mesma estrutura de spread condicional usada no painel
+// de referência (lá o gate era client_viewer; aqui o cargo é admin/user).
+function buildNav(isAdmin: boolean) {
+  return [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/dashboard/anuncios", label: "Anúncios", icon: Megaphone },
+    ...(isAdmin
+      ? [{ to: "/dashboard/clientes", label: "Clientes", icon: Users2 }]
+      : []),
+    { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
+    { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
+  ];
+}
+
+// Lê o cargo do usuário logado (gravado no login em localStorage.tp_user).
+function useIsAdmin(): boolean {
+  try {
+    const u = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+    return u?.role === "admin";
+  } catch {
+    return false;
+  }
+}
 
 function ClientSelector({ collapsed }: { collapsed: boolean }) {
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
@@ -118,6 +131,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pathname] = useLocation();
+  const nav = buildNav(useIsAdmin());
 
   const sidebarWidth = collapsed ? 64 : 256;
 

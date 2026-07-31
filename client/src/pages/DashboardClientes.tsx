@@ -7,7 +7,17 @@ import { toast } from "sonner";
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
-  useEffect(() => { if (!localStorage.getItem("tp_token")) setLocation("/login"); }, [setLocation]);
+  useEffect(() => {
+    if (!localStorage.getItem("tp_token")) { setLocation("/login"); return; }
+    // "Clientes" é restrito a administradores. Quem não for admin é
+    // redirecionado — impede acesso via URL direta, não só pelo menu.
+    try {
+      const u = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+      if (u?.role !== "admin") setLocation("/dashboard");
+    } catch {
+      setLocation("/dashboard");
+    }
+  }, [setLocation]);
 }
 
 type StatusTab = "all" | "active" | "paused" | "inactive";

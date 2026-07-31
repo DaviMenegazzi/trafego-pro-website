@@ -2,8 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+
+// ─── Paleta de destaque dos gráficos ─────────────────────────────────────────
+// Cores fixas (não usam --primary, que fica quase branco no tema escuro do
+// dashboard). Todas têm bom contraste sobre o fundo escuro.
+const CHART = {
+  green: "#22C55E",   // conversas / positivo
+  teal: "#2FD4A5",    // marca (Vida Card)
+  orange: "#F59E0B",  // investimento / atenção
+  red: "#EF4444",     // custo / alerta
+  blue: "#38BDF8",    // apoio
+};
 import { Download, RefreshCw, ChevronDown } from "lucide-react";
 
 function useAuthGuard() {
@@ -266,27 +277,37 @@ export default function DashboardPage() {
         {/* Gráficos linha 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Panel title="Conversas iniciadas por dia">
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
+                <defs>
+                  <linearGradient id="gConversas" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={CHART.green} stopOpacity={0.45} />
+                    <stop offset="100%" stopColor={CHART.green} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
                 <YAxis tick={axisTick} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="conversas" stroke="var(--color-foreground)" strokeWidth={2} dot={false} name="Conversas" />
-              </LineChart>
+                <Area type="monotone" dataKey="conversas" stroke={CHART.green} strokeWidth={3} fill="url(#gConversas)"
+                  dot={{ r: 3, fill: CHART.green, strokeWidth: 0 }} activeDot={{ r: 5 }} name="Conversas" />
+              </AreaChart>
             </ResponsiveContainer>
           </Panel>
 
           <Panel title="Investimento x Conversas">
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={260}>
               <LineChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
                 <YAxis yAxisId="l" tick={axisTick} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="r" orientation="right" tick={axisTick} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Line yAxisId="l" type="monotone" dataKey="investimento" stroke="var(--color-foreground)" strokeWidth={2} dot={false} name="Investimento (R$)" />
-                <Line yAxisId="r" type="monotone" dataKey="conversas" stroke="var(--color-muted-foreground)" strokeWidth={2} strokeDasharray="4 3" dot={false} name="Conversas" />
+                <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <Line yAxisId="l" type="monotone" dataKey="investimento" stroke={CHART.orange} strokeWidth={3}
+                  dot={{ r: 3, fill: CHART.orange, strokeWidth: 0 }} activeDot={{ r: 5 }} name="Investimento (R$)" />
+                <Line yAxisId="r" type="monotone" dataKey="conversas" stroke={CHART.green} strokeWidth={3}
+                  dot={{ r: 3, fill: CHART.green, strokeWidth: 0 }} activeDot={{ r: 5 }} name="Conversas" />
               </LineChart>
             </ResponsiveContainer>
           </Panel>
@@ -295,30 +316,42 @@ export default function DashboardPage() {
         {/* Gráficos linha 2 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Panel title="Custo por conversa" note="R$ por conversa iniciada">
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
+                <defs>
+                  <linearGradient id="gCusto" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={CHART.red} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={CHART.orange} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
                 <YAxis tick={axisTick} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(Number(v))} />
-                <Line type="monotone" dataKey="custo" stroke="var(--color-foreground)" strokeWidth={2} dot={false} name="Custo/conversa" />
-              </LineChart>
+                <Area type="monotone" dataKey="custo" stroke={CHART.red} strokeWidth={3} fill="url(#gCusto)"
+                  dot={{ r: 3, fill: CHART.red, strokeWidth: 0 }} activeDot={{ r: 5 }} name="Custo/conversa" />
+              </AreaChart>
             </ResponsiveContainer>
           </Panel>
 
           <Panel title="Funil de mensagens">
             <div className="space-y-5">
-              {FUNNEL.map((f) => (
-                <div key={f.label}>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-sm text-muted-foreground">{f.label}</span>
-                    <span className="font-display text-lg font-semibold tracking-[-0.01em]">{n(f.value)}</span>
+              {FUNNEL.map((f, i) => {
+                const funnelColors = [CHART.green, CHART.teal, CHART.blue, CHART.orange];
+                const c = funnelColors[i % funnelColors.length];
+                return (
+                  <div key={f.label}>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm text-muted-foreground">{f.label}</span>
+                      <span className="font-display text-lg font-semibold tracking-[-0.01em]" style={{ color: c }}>{n(f.value)}</span>
+                    </div>
+                    <div className="mt-2 h-3 rounded-full bg-surface-2 overflow-hidden">
+                      <div className="h-full rounded-full transition-all"
+                        style={{ width: `${Math.round((f.value / funnelMax) * 100)}%`, background: `linear-gradient(90deg, ${c}, ${c}bb)` }} />
+                    </div>
                   </div>
-                  <div className="mt-2 h-2.5 rounded-full bg-surface-2 overflow-hidden">
-                    <div className="h-full rounded-full bg-foreground/80" style={{ width: `${Math.round((f.value / funnelMax) * 100)}%` }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Panel>
         </div>

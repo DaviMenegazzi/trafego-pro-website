@@ -2,11 +2,10 @@ import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
-  GitBranch,
+  Megaphone,
   Users2,
   CreditCard,
   ClipboardList,
-  Newspaper,
   Settings,
   Menu,
   X,
@@ -23,11 +22,10 @@ const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch },
+  { to: "/dashboard/anuncios", label: "Anúncios", icon: Megaphone },
   { to: "/dashboard/clientes", label: "Clientes", icon: Users2 },
   { to: "/dashboard/pagamentos", label: "Pagamentos", icon: CreditCard },
   { to: "/dashboard/meu-trabalho", label: "Meu Trabalho", icon: ClipboardList },
-  { to: "/dashboard/atualizacoes", label: "Atualizações", icon: Newspaper },
   { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
   { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];

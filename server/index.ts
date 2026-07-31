@@ -369,6 +369,22 @@ async function startServer() {
     res.json({ configured: true, rows: data ?? [] });
   });
 
+  // Anúncios (nível de anúncio) — lê a view vw_meta_ads_offer_ads.
+  // Se a view ainda não existir no Supabase, devolve configured:false para o
+  // front exibir dados de exemplo (mesmo comportamento das demais métricas).
+  app.get("/api/metrics/ads", requireAuth, async (req, res) => {
+    const sb = getSupabase();
+    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+    let q = sb.from("vw_meta_ads_offer_ads").select("*");
+    if (clientId) q = q.eq("client_id", clientId);
+    if (start) q = q.gte("date_start", start);
+    if (end) q = q.lte("date_start", end);
+    const { data, error } = await q.order("total_spend", { ascending: false });
+    if (error) { res.json({ configured: false, rows: [], error: error.message }); return; }
+    res.json({ configured: true, rows: data ?? [] });
+  });
+
   app.post("/api/feedback-leads", requireAuth, (req, res) => {
     const body = req.body as Partial<FeedbackLeadInput> & { unit: string; responsible: string; weekStart: string };
     if (!body.unit?.trim() || !body.responsible?.trim() || !body.weekStart) {

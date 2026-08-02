@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -15,59 +15,84 @@ import {
   LogOut,
   User,
   MessageSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 
 const DURATION = "200ms";
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 
-const nav = [
+// ─── Helper: lê o user do localStorage ──────────────────────────────────────
+function getStoredUser(): {
+  name?: string;
+  email?: string;
+  role?: string;
+  allowedClientIds?: string[];
+} {
+  try {
+    return JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+function isAdminUser(): boolean {
+  const user = getStoredUser();
+  return (
+    user.role === "admin" ||
+    (Array.isArray(user.allowedClientIds) && user.allowedClientIds.includes("*"))
+  );
+}
+
+// ─── Nav items ──────────────────────────────────────────────────────────────
+const NAV_BASE = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch },
   { to: "/dashboard/clientes", label: "Clientes", icon: Users2 },
-  { to: "/dashboard/pagamentos", label: "Pagamentos", icon: CreditCard },
-  { to: "/dashboard/meu-trabalho", label: "Meu Trabalho", icon: ClipboardList },
-  { to: "/dashboard/atualizacoes", label: "Atualizações", icon: Newspaper },
   { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
   { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];
 
+const NAV_ADMIN_ONLY = [
+  { to: "/dashboard/usuarios", label: "Usuários", icon: ShieldCheck },
+];
+
 function ClientSelector({ collapsed }: { collapsed: boolean }) {
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
+  const user = getStoredUser();
 
-  if (clients.length === 0) return null;
+  // Filtra clients pelas permissões do usuário
+  const filteredClients = useMemo(() => {
+    if (!user.allowedClientIds || user.allowedClientIds.includes("*")) {
+      return clients;
+    }
+    return clients.filter((c) => user.allowedClientIds!.includes(String(c.id)));
+  }, [clients, user.allowedClientIds]);
 
-  return (
-    <div className="relative">
-      {collapsed ? (
-        <button
-          title="Selecionar cliente"
-          className="w-full flex items-center justify-center py-2 rounded-lg hover:bg-sidebar-accent/50 transition-colors"
-        >
-          <Users2 className="size-4 text-muted-foreground" />
-        </button>
-      ) : (
-        <select
-          value={selectedClientId ?? ""}
-          onChange={(e) => setSelectedClientId(e.target.value || null)}
-          className="w-full text-xs rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option value="">Todos os clientes</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      )}
-    </div>
-  );
+  if (filteredClients.length === 0) return null;
+
+  // Se só tem 1 unidade, não mostra selector — auto-seleciona
+  if (filteredClients.length === 1) {
+    // Auto-seleciona se não está selecionado
+    if (selectedClientId !== filteredClients[0].id) {
+      setTimeout(() => setSelectedClientId(filteredClients[0].id), 0);
+    }
+    if (collapsed) return null;
+    return (
+      <div className="px-1 py-2 text-xs text-muted-foreground truncate">
+        {filteredClients[0].name}
+      </div>
+    );
+  }
 }
 
 function UserProfileButton({ collapsed }: { collapsed: boolean }) {
-  const user = (() => {
-    try { return JSON.parse(localStorage.getItem("tp_user") ?? "{}"); } catch { return {}; }
-  })();
+  const user = getStoredUser();
+
+  const ROLE_LABELS: Record<string, string> = {
+    admin: "Admin",
+    socio: "Sócio",
+    gerente: "Gerente",
+  };
 
   function handleLogout() {
     localStorage.removeItem("tp_token");
@@ -94,6 +119,8 @@ function UserProfileButton({ collapsed }: { collapsed: boolean }) {
       >
         <div className="text-xs font-medium text-foreground truncate">{user?.name ?? "Usuário"}</div>
         <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+          <span>{ROLE_LABELS[user?.role ?? ""] ?? user?.role ?? ""}</span>
+          <span>·</span>
           <LogOut className="size-2.5" /> Sair
         </div>
       </div>
@@ -120,6 +147,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pathname] = useLocation();
+
+  const admin = isAdminUser();
+  const nav = admin ? [...NAV_BASE, ...NAV_ADMIN_ONLY] : NAV_BASE;
 
   const sidebarWidth = collapsed ? 64 : 256;
 

@@ -1,115 +1,103 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
+import { useClientContext } from "@/contexts/ClientContext";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import {
-  Megaphone, DollarSign, MessageCircle, Coins, Target, Search, ChevronDown, ImageOff,
+  Tag, DollarSign, MessageCircle, Coins, Target, Search, Filter, Check,
+  Sparkles, ImageOff, ArrowUpDown, Download, HelpCircle, LayoutGrid, LayoutList,
+  ChevronDown, RefreshCw,
 } from "lucide-react";
-
-// ─── Paleta de destaque (vívida no tema escuro) ──────────────────────────────
-const CHART = { green: "#22C55E", teal: "#2FD4A5", orange: "#F59E0B", red: "#EF4444", blue: "#38BDF8" };
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
   useEffect(() => {
-    const token = localStorage.getItem("tp_token");
-    if (!token) setLocation("/login");
+    if (!localStorage.getItem("tp_token")) setLocation("/login");
   }, [setLocation]);
 }
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type AdRow = {
-  id: number | string;
+  id: number;
+  account_id: string | null;
+  date_start: string | null;
+  date_stop: string | null;
+  synced_at: string | null;
+  campaign_id: string | null;
   campaign_name: string | null;
+  adset_id: string | null;
   adset_name: string | null;
+  ad_id: string | null;
   ad_name: string | null;
+  creative_id: string | null;
   creative_name: string | null;
   offer_name: string | null;
-  status_formatado: string | null;      // "Ativa" | "Pausada" | ...
-  performance_status: string | null;    // "Excelente" | "Positivo" | "Atenção" | "Crítico" | ...
+  offer_status: string | null;
+  status_formatado: string | null;
+  performance_status: string | null;
   performance_reason: string | null;
   ad_image_url: string | null;
   total_spend: number | null;
   total_conversas_iniciadas: number | null;
+  total_messaging_connections: number | null;
   total_leads_meta: number | null;
   alcance: number | null;
   total_impressions: number | null;
   total_clicks: number | null;
+  total_link_clicks: number | null;
   avg_ctr: number | null;
   avg_cpc: number | null;
   avg_cpm: number | null;
   custo_por_conversa: number | null;
+  cpl_meta: number | null;
+  frequency: number | null;
 };
 
-// ─── Formatação (pt-BR) ───────────────────────────────────────────────────────
-const n = (v: number) => v.toLocaleString("pt-BR");
-const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const pct = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-const num = (v: number | null | undefined) => Number(v ?? 0);
+type StatusFilter = "todas" | "ativas" | "pausadas";
+type PerfFilter = "todas" | "Excelente" | "Positivo" | "Atenção" | "Crítico" | "Sem conversas" | "Residual";
+type SortKey = "total_conversas_iniciadas" | "total_leads_meta" | "total_spend" | "custo_por_conversa" | "total_impressions" | "avg_ctr" | "avg_cpc" | "avg_cpm";
 
-// ─── Dados de exemplo (enquanto a view vw_meta_ads_offer_ads não existe) ───────
-const FALLBACK_ADS: AdRow[] = [
-  { id: 1, campaign_name: "[TP] - [ENG] - [WHATS] - [CARTÃO] - [MAIO/26]", adset_name: "Público frio 25-55", ad_name: "Cartão — depoimento", creative_name: "Vídeo depoimento", offer_name: "Vida Card", status_formatado: "Ativa", performance_status: "Excelente", performance_reason: "Custo por conversa abaixo de R$ 5,00.", ad_image_url: null, total_spend: 612.4, total_conversas_iniciadas: 148, total_leads_meta: 0, alcance: 42100, total_impressions: 98200, total_clicks: 990, avg_ctr: 1.01, avg_cpc: 0.62, avg_cpm: 6.24, custo_por_conversa: 4.14 },
-  { id: 2, campaign_name: "[TP] - [ENG] - [WHATS] - [CARTÃO] - [MAIO/26]", adset_name: "Remarketing 7d", ad_name: "Cartão — benefícios", creative_name: "Estático benefícios", offer_name: "Vida Card", status_formatado: "Ativa", performance_status: "Positivo", performance_reason: "Custo por conversa entre R$ 5,00 e R$ 9,00.", ad_image_url: null, total_spend: 505.37, total_conversas_iniciadas: 64, total_leads_meta: 0, alcance: 31600, total_impressions: 81500, total_clicks: 814, avg_ctr: 1.0, avg_cpc: 0.62, avg_cpm: 6.2, custo_por_conversa: 7.9 },
-  { id: 3, campaign_name: "[TP] - [ENG] - [WHATS] - [EMPRESARIAL] - [JUNHO/26]", adset_name: "Empresários 30-55", ad_name: "Empresarial — economia", creative_name: "Carrossel", offer_name: "Vida Card Empresarial", status_formatado: "Ativa", performance_status: "Atenção", performance_reason: "Custo por conversa entre R$ 9,00 e R$ 13,00.", ad_image_url: null, total_spend: 205.8, total_conversas_iniciadas: 18, total_leads_meta: 1, alcance: 14200, total_impressions: 22755, total_clicks: 280, avg_ctr: 1.23, avg_cpc: 0.73, avg_cpm: 9.04, custo_por_conversa: 11.43 },
-  { id: 4, campaign_name: "[TP] - [ENG] - [WHATS] - [EMPRESARIAL] - [JUNHO/26]", adset_name: "Lookalike 2%", ad_name: "Empresarial — chamada direta", creative_name: "Vídeo curto", offer_name: "Vida Card Empresarial", status_formatado: "Pausada", performance_status: "Crítico", performance_reason: "Custo por conversa acima de R$ 13,00.", ad_image_url: null, total_spend: 80.0, total_conversas_iniciadas: 4, total_leads_meta: 0, alcance: 5300, total_impressions: 9800, total_clicks: 96, avg_ctr: 0.98, avg_cpc: 0.83, avg_cpm: 8.16, custo_por_conversa: 20.0 },
-  { id: 5, campaign_name: "[TP] - [ENG] - [WHATS] - [CARTÃO] - [MAIO/26]", adset_name: "Interesses saúde", ad_name: "Cartão — oferta relâmpago", creative_name: "Estático oferta", offer_name: "Vida Card", status_formatado: "Ativa", performance_status: "Sem conversas", performance_reason: "Investimento registrado, mas nenhuma conversa iniciada.", ad_image_url: null, total_spend: 44.2, total_conversas_iniciadas: 0, total_leads_meta: 0, alcance: 3800, total_impressions: 7200, total_clicks: 61, avg_ctr: 0.85, avg_cpc: 0.72, avg_cpm: 6.14, custo_por_conversa: null },
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "total_conversas_iniciadas", label: "Conversas iniciadas" },
+  { value: "total_leads_meta", label: "Leads Meta" },
+  { value: "total_spend", label: "Valor usado" },
+  { value: "custo_por_conversa", label: "Custo por conversa" },
+  { value: "total_impressions", label: "Impressões" },
+  { value: "avg_ctr", label: "CTR" },
+  { value: "avg_cpc", label: "CPC" },
+  { value: "avg_cpm", label: "CPM" },
 ];
 
-const tooltipStyle: React.CSSProperties = {
-  background: "var(--color-popover)", border: "1px solid var(--color-border)",
-  borderRadius: 14, fontSize: 12, color: "var(--color-foreground)",
-};
-const axisTick = { fontSize: 11, fill: "var(--color-muted-foreground)" };
+const PERF_OPTIONS: PerfFilter[] = ["todas", "Excelente", "Positivo", "Atenção", "Crítico", "Sem conversas", "Residual"];
 
-// ─── Bandas de performance → cor ──────────────────────────────────────────────
-const PERF_COLOR: Record<string, string> = {
-  Excelente: CHART.green,
-  Positivo: CHART.teal,
-  Atenção: CHART.orange,
-  Crítico: CHART.red,
-  "Sem conversas": CHART.red,
-  Residual: CHART.blue,
-};
-function perfColor(v: string | null) { return (v && PERF_COLOR[v]) || "var(--color-muted-foreground)"; }
+const PERF_EXPLANATIONS: { label: string; tone: BadgeTone; description: string }[] = [
+  { label: "Excelente", tone: "success", description: "Custo por conversa abaixo de R$ 5,00." },
+  { label: "Positivo", tone: "info", description: "Custo por conversa entre R$ 5,00 e R$ 9,00, com bom resultado e espaço para otimização." },
+  { label: "Atenção", tone: "warning", description: "Custo por conversa entre R$ 9,00 e R$ 13,00. Precisa ser acompanhada." },
+  { label: "Crítico", tone: "danger", description: "Custo por conversa acima de R$ 13,00." },
+  { label: "Sem conversas", tone: "danger", description: "Houve investimento, mas nenhuma conversa foi iniciada." },
+  { label: "Residual", tone: "purple", description: "Oferta sem investimento atual, mas que ainda possui conversas registradas no período." },
+  { label: "Sem classificação", tone: "muted", description: "Dados insuficientes para classificar a performance." },
+];
 
-function Badge({ children, color }: { children: React.ReactNode; color?: string }) {
-  const style = color
-    ? { background: `${color}26`, color, border: `1px solid ${color}55` }
-    : undefined;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${color ? "" : "bg-muted/40 text-muted-foreground border border-border"}`}
-      style={style}
-    >
-      {children}
-    </span>
-  );
+// ─── Format helpers ───────────────────────────────────────────────────────────
+const n = (v: number | null | undefined) => Number(v ?? 0).toLocaleString("pt-BR");
+const brl = (v: number | null | undefined) => `R$ ${Number(v ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const pct = (v: number | null | undefined) => `${Number(v ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+const num = (v: number | null | undefined) => Number(v ?? 0);
+function dateBR(s: string | null | undefined) {
+  if (!s) return "—";
+  const parts = s.slice(0, 10).split("-");
+  if (parts.length !== 3) return s;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
-function StatusBadge({ value }: { value: string | null }) {
-  if (value === "Ativa") return <Badge color={CHART.green}>Ativa</Badge>;
-  if (value === "Pausada") return <Badge>Pausada</Badge>;
-  return <Badge>{value ?? "—"}</Badge>;
-}
-function PerfBadge({ value }: { value: string | null }) {
-  return <Badge color={perfColor(value)}>{value ?? "Sem classificação"}</Badge>;
-}
-
-function SafeImage({ src, alt }: { src: string | null; alt: string }) {
-  const [err, setErr] = useState(false);
-  if (!src || err) {
-    return (
-      <div className="w-full h-full flex items-center justify-center text-muted-foreground/50">
-        <ImageOff className="size-5" />
-      </div>
-    );
-  }
-  return <img src={src} alt={alt} onError={() => setErr(true)} className="w-full h-full object-cover" />;
-}
-
-function displayName(r: AdRow) {
-  return r.ad_name || r.offer_name || r.creative_name || r.campaign_name || "Anúncio sem nome";
+function dateTimeBR(s: string | null | undefined) {
+  if (!s) return "—";
+  try {
+    return new Date(s).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch { return s; }
 }
 
 function ymd(d: Date) { return d.toISOString().slice(0, 10); }
@@ -120,305 +108,598 @@ function rangeFor(period: string): { start: string; end: string } {
   return { start: ymd(start), end: ymd(end) };
 }
 
-function Panel({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function cleanDisplayName(r: AdRow): string {
+  const candidates = [r.ad_name, r.offer_name, r.creative_name];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    let s = raw;
+    s = s.replace(/\{\{[^}]+\}\}/g, "");
+    s = s.replace(/\b[0-9a-f]{16,}\b/gi, "");
+    s = s.replace(/\s{2,}/g, " ").trim();
+    s = s.replace(/^[-–—:|]+|[-–—:|]+$/g, "").trim();
+    if (s.length >= 3) return s;
+  }
+  return "Oferta sem nome";
+}
+
+type BadgeTone = "success" | "warning" | "danger" | "purple" | "muted" | "info";
+
+function Badge({ children, tone }: { children: React.ReactNode; tone: BadgeTone }) {
+  const styles: Record<string, string> = {
+    success: "bg-[color:var(--color-success)]/15 text-[color:var(--color-success)] border-[color:var(--color-success)]/30",
+    warning: "bg-[color:var(--color-warning)]/15 text-[color:var(--color-warning)] border-[color:var(--color-warning)]/30",
+    danger: "bg-[color:var(--color-destructive)]/15 text-[color:var(--color-destructive)] border-[color:var(--color-destructive)]/30",
+    purple: "bg-purple-500/15 text-purple-400 border-purple-500/30",
+    info: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+    muted: "bg-muted/40 text-muted-foreground border-border",
+  };
   return (
-    <section className="rounded-3xl border border-border bg-surface/40 overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-6 py-5 border-b border-border/70">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">{title}</h2>
-        {note && <span className="text-xs text-muted-foreground">{note}</span>}
-      </div>
-      <div className="p-6">{children}</div>
-    </section>
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${styles[tone]}`}>
+      {children}
+    </span>
   );
 }
 
-const STATUS_FILTERS = ["todas", "ativas", "pausadas"] as const;
-type StatusFilter = (typeof STATUS_FILTERS)[number];
-const PERF_FILTERS = ["todas", "Excelente", "Positivo", "Atenção", "Crítico", "Sem conversas"] as const;
-type PerfFilter = (typeof PERF_FILTERS)[number];
-const SORT_OPTIONS = [
-  { value: "total_spend", label: "Valor usado" },
-  { value: "total_conversas_iniciadas", label: "Conversas iniciadas" },
-  { value: "custo_por_conversa", label: "Custo por conversa" },
-  { value: "total_leads_meta", label: "Leads Meta" },
-  { value: "total_impressions", label: "Impressões" },
-  { value: "avg_ctr", label: "CTR" },
-] as const;
-type SortKey = (typeof SORT_OPTIONS)[number]["value"];
+function StatusBadge({ value }: { value: string | null }) {
+  if (!value) return <Badge tone="muted">—</Badge>;
+  if (value === "Ativa") return <Badge tone="success">Ativa</Badge>;
+  if (value === "Pausada") return <Badge tone="muted">Pausada</Badge>;
+  return <Badge tone="muted">{value}</Badge>;
+}
 
+function PerfBadge({ value }: { value: string | null }) {
+  switch (value) {
+    case "Excelente": return <Badge tone="success">Excelente</Badge>;
+    case "Positivo": return <Badge tone="info">Positivo</Badge>;
+    case "Atenção": return <Badge tone="warning">Atenção</Badge>;
+    case "Crítico": return <Badge tone="danger">Crítico</Badge>;
+    case "Sem conversas": return <Badge tone="danger">Sem conversas</Badge>;
+    case "Residual": return <Badge tone="purple">Residual</Badge>;
+    default: return <Badge tone="muted">Sem classificação</Badge>;
+  }
+}
+
+function SafeImage({ src, alt, className, fit = "cover" }: { src: string | null; alt: string; className?: string; fit?: "cover" | "contain" }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [src]);
+  if (!src || failed) {
+    return (
+      <div className={`grid place-items-center bg-card/60 border border-border text-muted-foreground text-[11px] ${className ?? ""}`}>
+        <div className="flex items-center gap-1.5"><ImageOff className="size-3.5" /> Sem imagem</div>
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} onError={() => setFailed(true)} className={`${fit === "cover" ? "object-cover" : "object-contain"} ${className ?? ""}`} loading="lazy" />;
+}
+
+function KpiCard({ title, value, icon: Icon, accent }: { title: string; value: string; icon: React.ElementType; accent?: "primary" | "success" | "warning" | "purple" }) {
+  const accentCls = accent === "success" ? "text-[color:var(--color-success)]" : accent === "warning" ? "text-[color:var(--color-warning)]" : accent === "purple" ? "text-purple-400" : "text-foreground";
+  return (
+    <div className="rounded-2xl border border-border bg-surface/40 p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Icon className={`size-4 ${accentCls}`} />
+        <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{title}</div>
+      </div>
+      <div className={`font-display text-2xl font-semibold tracking-[-0.02em] ${accentCls}`}>{value}</div>
+    </div>
+  );
+}
+
+function MetricTile({ label, value, accent }: { label: string; value: string; accent?: "primary" | "success" | "warning" | "purple" }) {
+  const tone = accent === "success" ? "text-[color:var(--color-success)]" : accent === "warning" ? "text-[color:var(--color-warning)]" : accent === "purple" ? "text-purple-400" : accent === "primary" ? "text-foreground" : "text-foreground";
+  return (
+    <div className="rounded-lg border border-border bg-card/40 p-3">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`text-sm font-semibold mt-1 ${tone}`}>{value}</div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="text-muted-foreground w-32 shrink-0">{label}</span>
+      <span className="text-foreground truncate" title={value}>{value}</span>
+    </div>
+  );
+}
+
+function FilterPopover({ trigger, children }: { trigger: React.ReactNode; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(!open)} className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-surface/60 hover:bg-surface text-xs font-medium text-muted-foreground hover:text-foreground transition">
+        {trigger}
+      </button>
+      {open && (
+        <>
+          <button type="button" className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-label="Fechar" />
+          <div className="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-border bg-card shadow-xl p-1" onClick={() => setOpen(false)}>
+            {children}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Chart tooltip ────────────────────────────────────────────────────────────
+const tooltipStyle: React.CSSProperties = {
+  background: "var(--color-card)", border: "1px solid var(--color-border)",
+  borderRadius: 8, fontSize: 12, color: "var(--color-foreground)",
+};
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function DashboardAnunciosPage() {
   useAuthGuard();
   useEffect(() => { document.title = "Tráfego Pro — Anúncios"; }, []);
 
-  const [period, setPeriod] = useState("30");
-  const [ads, setAds] = useState<AdRow[]>(FALLBACK_ADS);
-  const [configured, setConfigured] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("todas");
-  const [perf, setPerf] = useState<PerfFilter>("todas");
-  const [sortKey, setSortKey] = useState<SortKey>("total_spend");
-  const [selectedId, setSelectedId] = useState<AdRow["id"] | null>(null);
-
+  const { selectedClientId, selectedClient } = useClientContext();
   const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 
-  useEffect(() => {
-    if (!authHeaders) return;
-    const { start, end } = rangeFor(period);
-    const qs = new URLSearchParams({ start, end }).toString();
-    setLoading(true); setError(null);
-    fetch(`/api/metrics/ads?${qs}`, { headers: authHeaders })
-      .then((r) => r.json())
-      .then((d) => {
-        const ok = d.configured !== false;
-        setConfigured(ok);
-        if (ok && Array.isArray(d.rows) && d.rows.length > 0) setAds(d.rows);
-        else if (ok) setAds([]);
-        if (d.error) setError(d.error);
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  }, [token, period]);
+  // ─── State ────────────────────────────────────────────────────────────────
+  const [period, setPeriod] = useState("30");
+  const [rows, setRows] = useState<AdRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [configured, setConfigured] = useState<boolean | null>(null);
 
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("todas");
+  const [perfFilter, setPerfFilter] = useState<PerfFilter>("todas");
+  const [sortKey, setSortKey] = useState<SortKey>("total_conversas_iniciadas");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"default" | "creative-grid">("default");
+
+  // ─── Fetch offers ─────────────────────────────────────────────────────────
+  const fetchOffers = useCallback(async () => {
+    if (!authHeaders) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { start, end } = rangeFor(period);
+      const qs = new URLSearchParams({ start, end, ...(selectedClientId ? { clientId: String(selectedClientId) } : {}) }).toString();
+      // Tenta a RPC primeiro, depois fallback para a view
+      const res = await fetch(`/api/metrics/offers-rpc?${qs}`, { headers: authHeaders });
+      const data = await res.json();
+      setConfigured(data.configured !== false);
+      if (Array.isArray(data.rows)) setRows(data.rows);
+      if (data.error) setError(data.error);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [token, period, selectedClientId]);
+
+  useEffect(() => { fetchOffers(); }, [fetchOffers]);
+
+  // ─── Filtered & sorted ────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let r = ads;
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    let r = [...rows];
+    const q = search.trim().toLowerCase();
+    if (q) {
       r = r.filter((x) =>
         [x.ad_name, x.offer_name, x.creative_name, x.campaign_name, x.adset_name]
-          .filter(Boolean).some((s) => s!.toLowerCase().includes(q)));
+          .filter(Boolean).some((v) => v!.toLowerCase().includes(q)),
+      );
     }
-    if (status === "ativas") r = r.filter((x) => x.status_formatado === "Ativa");
-    if (status === "pausadas") r = r.filter((x) => x.status_formatado === "Pausada");
-    if (perf !== "todas") r = r.filter((x) => x.performance_status === perf);
-    return [...r].sort((a, b) => num(b[sortKey]) - num(a[sortKey]));
-  }, [ads, search, status, perf, sortKey]);
+    if (statusFilter === "ativas") r = r.filter((x) => x.status_formatado === "Ativa");
+    if (statusFilter === "pausadas") r = r.filter((x) => x.status_formatado === "Pausada");
+    if (perfFilter !== "todas") r = r.filter((x) => x.performance_status === perfFilter);
+    return [...r].sort((a, b) => {
+      const av = Number(a[sortKey] ?? 0);
+      const bv = Number(b[sortKey] ?? 0);
+      return sortDir === "desc" ? bv - av : av - bv;
+    });
+  }, [rows, search, statusFilter, perfFilter, sortKey, sortDir]);
+
+  const activeImages = useMemo(() => {
+    if (viewMode !== "creative-grid") return [];
+    return rows.filter((r) => r.status_formatado === "Ativa" && r.ad_image_url);
+  }, [rows, viewMode]);
+
+  // Keep valid selection
+  useEffect(() => {
+    if (filtered.length === 0) { setSelectedId(null); return; }
+    if (selectedId == null || !filtered.some((r) => r.id === selectedId)) {
+      setSelectedId(filtered[0].id);
+    }
+  }, [filtered, selectedId]);
 
   const selected = useMemo(() => filtered.find((r) => r.id === selectedId) ?? null, [filtered, selectedId]);
-  const activeImages = useMemo(() => filtered.filter((r) => r.status_formatado === "Ativa" && r.ad_image_url), [filtered]);
 
-  const totals = useMemo(() => {
-    const sum = (k: keyof AdRow) => filtered.reduce((a, r) => a + num(r[k] as number), 0);
-    const spend = sum("total_spend");
-    const conv = sum("total_conversas_iniciadas");
-    return { spend, conv, leads: sum("total_leads_meta"), custo: conv > 0 ? spend / conv : 0 };
-  }, [filtered]);
+  // ─── Aggregations ─────────────────────────────────────────────────────────
+  const sum = (k: keyof AdRow) => filtered.reduce((acc, r) => acc + Number((r[k] as number) ?? 0), 0);
+  const totalSpend = sum("total_spend");
+  const totalConversas = sum("total_conversas_iniciadas");
+  const totalLeads = sum("total_leads_meta");
+  const custoPorConversa = totalConversas > 0 ? totalSpend / totalConversas : 0;
 
-  const KPIS = [
-    { label: "Anúncios", value: n(filtered.length), icon: Megaphone, color: CHART.teal },
-    { label: "Investimento total", value: brl(totals.spend), icon: DollarSign, color: CHART.orange },
-    { label: "Conversas iniciadas", value: n(totals.conv), icon: MessageCircle, color: CHART.green },
-    { label: "Custo por conversa", value: brl(totals.custo), icon: Coins, color: CHART.red },
-    { label: "Leads Meta", value: n(totals.leads), icon: Target, color: CHART.blue },
-  ];
+  const conversasChart = useMemo(() =>
+    [...filtered].map((r) => ({ name: cleanDisplayName(r), value: num(r.total_conversas_iniciadas) }))
+      .sort((a, b) => b.value - a.value).slice(0, 15),
+    [filtered]);
 
-  const chartData = useMemo(
-    () => filtered.slice(0, 8).map((r) => ({
-      name: displayName(r).length > 22 ? displayName(r).slice(0, 22) + "…" : displayName(r),
-      conversas: num(r.total_conversas_iniciadas),
-      perf: r.performance_status,
-    })),
-    [filtered],
-  );
+  const spendChart = useMemo(() =>
+    [...filtered].map((r) => ({ name: cleanDisplayName(r), value: num(r.total_spend) }))
+      .sort((a, b) => b.value - a.value).slice(0, 15),
+    [filtered]);
 
+  const currentSortLabel = SORT_OPTIONS.find((s) => s.value === sortKey)?.label ?? "Ordenar";
   const notSynced = configured === false;
+
+  const gridToggleBtn = (
+    <button type="button" onClick={() => setViewMode((v) => (v === "default" ? "creative-grid" : "default"))}
+      className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-xs font-medium transition ${
+        viewMode === "creative-grid" ? "border-foreground/30 bg-foreground/10 text-foreground" : "border-border bg-surface/60 hover:bg-surface text-muted-foreground hover:text-foreground"
+      }`}>
+      {viewMode === "creative-grid" ? <LayoutList className="size-3.5" /> : <LayoutGrid className="size-3.5" />}
+      {viewMode === "creative-grid" ? "Modo normal" : "Grid de criativos"}
+    </button>
+  );
 
   return (
     <AppLayout>
-      <div className="p-6 md:p-10 space-y-8 max-w-[1400px]">
+      <div className="p-6 md:p-10 space-y-6 max-w-[1600px]">
         {/* Header */}
         <div className="flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Meta Ads</p>
-          <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-[-0.02em]">Anúncios</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Performance por anúncio, com classificação por custo de conversa.</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+            {selectedClient?.name ?? "Todos os clientes"}
+          </p>
+          <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-[-0.02em] flex items-center gap-3">
+            <Tag className="size-7 text-muted-foreground" /> Anúncios
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">Performance dos anúncios e criativos.</p>
         </div>
 
-        {/* Filtros */}
+        {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
+            <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar oferta ou anúncio"
+              className="h-9 pl-9 pr-3 rounded-full border border-border bg-surface/60 text-xs w-56 focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+
+          <div className="relative">
             <select value={period} onChange={(e) => setPeriod(e.target.value)}
-              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
               <option value="7">Últimos 7 dias</option>
               <option value="30">Últimos 30 dias</option>
               <option value="90">Últimos 90 dias</option>
+              <option value="365">Todo o período</option>
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           </div>
 
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar anúncio…"
-              className="w-full text-sm rounded-full border border-border bg-surface/60 pl-9 pr-4 py-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
-          </div>
+          <FilterPopover trigger={<><Filter className="size-3.5" /> Status: {statusFilter === "todas" ? "Todas" : statusFilter === "ativas" ? "Ativas" : "Pausadas"}</>}>
+            {(["todas", "ativas", "pausadas"] as StatusFilter[]).map((s) => (
+              <button key={s} onClick={() => setStatusFilter(s)}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded text-xs hover:bg-surface text-left capitalize">
+                <span>{s === "todas" ? "Todas" : s === "ativas" ? "Ativas" : "Pausadas"}</span>
+                {statusFilter === s && <Check className="size-3.5 text-foreground" />}
+              </button>
+            ))}
+          </FilterPopover>
 
-          <div className="relative">
-            <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}
-              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              <option value="todas">Todos os status</option>
-              <option value="ativas">Ativas</option>
-              <option value="pausadas">Pausadas</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          </div>
+          <FilterPopover trigger={<><Sparkles className="size-3.5" /> Performance: {perfFilter === "todas" ? "Todas" : perfFilter}</>}>
+            {PERF_OPTIONS.map((p) => (
+              <button key={p} onClick={() => setPerfFilter(p)}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded text-xs hover:bg-surface text-left">
+                <span>{p === "todas" ? "Todas" : p}</span>
+                {perfFilter === p && <Check className="size-3.5 text-foreground" />}
+              </button>
+            ))}
+          </FilterPopover>
 
-          <div className="relative">
-            <select value={perf} onChange={(e) => setPerf(e.target.value as PerfFilter)}
-              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              {PERF_FILTERS.map((p) => <option key={p} value={p}>{p === "todas" ? "Toda performance" : p}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          </div>
+          <FilterPopover trigger={<><ArrowUpDown className="size-3.5" /> {currentSortLabel}</>}>
+            {SORT_OPTIONS.map((opt) => (
+              <button key={opt.value} onClick={() => setSortKey(opt.value)}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded text-xs hover:bg-surface text-left">
+                <span>{opt.label}</span>
+                {sortKey === opt.value && <Check className="size-3.5 text-foreground" />}
+              </button>
+            ))}
+            <div className="border-t border-border my-1" />
+            <button onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+              className="w-full flex items-center justify-between px-2 py-1.5 rounded text-xs hover:bg-surface text-left">
+              <span>Direção</span>
+              <span className="text-muted-foreground">{sortDir === "desc" ? "↓ Desc" : "↑ Asc"}</span>
+            </button>
+          </FilterPopover>
 
-          <div className="relative">
-            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>Ordenar: {o.label}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          </div>
+          <button type="button" onClick={() => setHelpOpen(true)}
+            className="inline-flex items-center gap-2 h-9 px-3 rounded-full border border-border bg-surface/60 hover:bg-surface text-xs font-medium text-muted-foreground hover:text-foreground transition">
+            <HelpCircle className="size-3.5" /> Status
+          </button>
+
+          <button type="button" onClick={fetchOffers} disabled={loading}
+            className="inline-flex items-center gap-2 rounded-full bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Atualizar
+          </button>
 
           <span className="text-xs text-muted-foreground">
-            {loading ? "Carregando…" : notSynced ? "Supabase/view não configurados — exibindo dados de exemplo" : "Dados sincronizados do Supabase"}
+            {loading ? "Carregando…" : notSynced ? "Supabase não configurado" : `${rows.length} anúncio(s) encontrado(s)`}
           </span>
         </div>
 
         {error && (
-          <div className="rounded-2xl border border-[color:var(--color-warning)]/30 bg-[color:var(--color-warning)]/10 px-4 py-3 text-sm text-[color:var(--color-warning)]">
-            Não foi possível carregar a view de anúncios ({error}). Rode <code>db/vw_meta_ads_offer_ads.sql</code> no Supabase.
+          <div className="rounded-2xl border border-[color:var(--color-destructive)]/30 bg-[color:var(--color-destructive)]/10 px-4 py-3 text-sm text-[color:var(--color-destructive)]">
+            Não foi possível carregar os anúncios: {error}
           </div>
         )}
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-          {KPIS.map((k) => {
-            const Icon = k.icon;
-            return (
-              <div key={k.label} className="rounded-3xl border border-border bg-background p-5">
-                <div className="flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-xl" style={{ background: `${k.color}1f`, color: k.color }}>
-                    <Icon className="size-4" />
-                  </span>
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{k.label}</div>
-                </div>
-                <div className="mt-3 font-display text-2xl font-semibold tracking-[-0.02em]">{k.value}</div>
+        {/* ─── Creative Grid mode ─────────────────────────────────────────────── */}
+        {viewMode === "creative-grid" && (
+          <section className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">{activeImages.length} criativos ativos</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Somente imagens de anúncios com status Ativa.</p>
               </div>
-            );
-          })}
-        </div>
+              {gridToggleBtn}
+            </div>
+            {loading && <div className="rounded-2xl border border-border bg-surface/40 p-8 text-center text-sm text-muted-foreground">Carregando criativos...</div>}
+            {!loading && activeImages.length === 0 && <div className="rounded-2xl border border-border bg-surface/40 p-8 text-center text-sm text-muted-foreground">Nenhum criativo ativo encontrado.</div>}
+            {!loading && activeImages.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+                {activeImages.map((r) => (
+                  <div key={r.id} className="aspect-[4/5] rounded-xl overflow-hidden border border-border bg-card/60">
+                    <SafeImage src={r.ad_image_url} alt={cleanDisplayName(r)} fit="contain" className="w-full h-full" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
-        {/* Galeria de criativos ativos */}
-        {activeImages.length > 0 && (
-          <Panel title="Criativos ativos" note={`${activeImages.length} com imagem`}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
-              {activeImages.map((r) => (
-                <div key={r.id} className="aspect-square rounded-xl overflow-hidden border border-border bg-card/60">
-                  <SafeImage src={r.ad_image_url} alt={displayName(r)} />
+        {/* ─── Default mode ───────────────────────────────────────────────────── */}
+        {viewMode === "default" && (
+          <>
+            {/* KPIs */}
+            <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+              <KpiCard title="Ofertas" value={n(filtered.length)} icon={Tag} accent="primary" />
+              <KpiCard title="Investimento total" value={brl(totalSpend)} icon={DollarSign} accent="purple" />
+              <KpiCard title="Conversas iniciadas" value={n(totalConversas)} icon={MessageCircle} accent="success" />
+              <KpiCard title="Custo por conversa" value={totalConversas > 0 ? brl(custoPorConversa) : "—"} icon={Coins} accent="warning" />
+              <KpiCard title="Leads Meta" value={n(totalLeads)} icon={Target} accent="primary" />
+            </section>
+
+            {loading && <div className="rounded-2xl border border-border bg-surface/40 p-6 text-center text-sm text-muted-foreground">Carregando anúncios...</div>}
+
+            {/* Split view */}
+            {!loading && !error && (
+              <section className="grid grid-cols-1 lg:grid-cols-[42%_58%] gap-4">
+                {/* Left: list */}
+                <div className="rounded-2xl border border-border bg-surface/40 overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 border-b border-border/70 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h2 className="text-sm font-semibold">Lista de anúncios</h2>
+                      <span className="text-[11px] text-muted-foreground">{filtered.length} resultado(s)</span>
+                    </div>
+                    {gridToggleBtn}
+                  </div>
+                  {filtered.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      {rows.length === 0 ? "Nenhum anúncio encontrado." : "Nenhum anúncio encontrado para esse filtro."}
+                    </div>
+                  ) : (
+                    <div className="max-h-[720px] overflow-y-auto divide-y divide-border/50">
+                      {filtered.map((r) => {
+                        const isSel = r.id === selectedId;
+                        return (
+                          <button key={r.id} onClick={() => setSelectedId(r.id)}
+                            className={`w-full text-left px-3 py-3 flex gap-3 transition group ${
+                              isSel ? "bg-foreground/5 border-l-2 border-foreground" : "hover:bg-surface/60 border-l-2 border-transparent"
+                            }`}>
+                            <div className="shrink-0 w-16 h-16 rounded-md overflow-hidden border border-border bg-card/60">
+                              <SafeImage src={r.ad_image_url} alt={cleanDisplayName(r)} fit="cover" className="w-full h-full" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium truncate" title={cleanDisplayName(r)}>{cleanDisplayName(r)}</div>
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                <StatusBadge value={r.status_formatado} />
+                                <PerfBadge value={r.performance_status} />
+                              </div>
+                              <div className="mt-1.5 text-[11px] text-muted-foreground grid grid-cols-2 gap-x-2">
+                                <span>Conv.: <span className="text-foreground">{n(r.total_conversas_iniciadas)}</span></span>
+                                <span>Valor: <span className="text-foreground">{brl(r.total_spend)}</span></span>
+                                <span>Custo/conv.: <span className="text-foreground">{r.custo_por_conversa != null ? brl(r.custo_por_conversa) : "—"}</span></span>
+                                <span>Leads: <span className="text-foreground">{n(r.total_leads_meta)}</span></span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: preview */}
+                <div className="rounded-2xl border border-border bg-surface/40 overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 border-b border-border/70">
+                    <h2 className="text-sm font-semibold">Prévia do anúncio</h2>
+                  </div>
+                  {!selected ? (
+                    <div className="p-10 text-center text-sm text-muted-foreground">Selecione um anúncio para visualizar.</div>
+                  ) : (
+                    <div className="p-4 space-y-4 overflow-y-auto max-h-[800px]">
+                      {/* Big creative */}
+                      <div className="rounded-xl bg-background border border-border overflow-hidden">
+                        <div className="w-full max-h-[420px] aspect-square sm:aspect-video flex items-center justify-center">
+                          <SafeImage src={selected.ad_image_url} alt={cleanDisplayName(selected)} fit="contain" className="w-full h-full max-h-[420px]" />
+                        </div>
+                      </div>
+
+                      {/* Info */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                        <InfoRow label="Nome do anúncio" value={cleanDisplayName(selected)} />
+                        <InfoRow label="Oferta" value={selected.offer_name ?? "—"} />
+                        <InfoRow label="Criativo" value={selected.creative_name ?? "—"} />
+                        <InfoRow label="Campanha" value={selected.campaign_name ?? "—"} />
+                        <InfoRow label="Conjunto" value={selected.adset_name ?? "—"} />
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-32 shrink-0">Status</span>
+                          <StatusBadge value={selected.status_formatado} />
+                        </div>
+                        <div className="flex items-start gap-2 sm:col-span-2">
+                          <span className="text-muted-foreground w-32 shrink-0 pt-0.5">Performance</span>
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <PerfBadge value={selected.performance_status} />
+                            {selected.performance_reason && (
+                              <span className="text-[11px] text-muted-foreground leading-snug">{selected.performance_reason}</span>
+                            )}
+                          </div>
+                        </div>
+                        <InfoRow label="Período" value={`${dateBR(selected.date_start)} → ${dateBR(selected.date_stop)}`} />
+                        <InfoRow label="Última atualização" value={dateTimeBR(selected.synced_at)} />
+                      </div>
+
+                      {/* Metrics */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <MetricTile label="Conversas iniciadas" value={n(selected.total_conversas_iniciadas)} accent="success" />
+                        <MetricTile label="Valor usado" value={brl(selected.total_spend)} accent="purple" />
+                        <MetricTile label="Custo por conversa" value={selected.custo_por_conversa != null ? brl(selected.custo_por_conversa) : "—"} accent="warning" />
+                        <MetricTile label="Leads Meta" value={n(selected.total_leads_meta)} />
+                        <MetricTile label="CPL Meta" value={selected.cpl_meta != null ? brl(selected.cpl_meta) : "—"} />
+                        <MetricTile label="Impressões" value={n(selected.total_impressions)} />
+                        <MetricTile label="Alcance" value={n(selected.alcance)} />
+                        <MetricTile label="Cliques" value={n(selected.total_clicks)} />
+                        <MetricTile label="Cliques no link" value={n(selected.total_link_clicks)} />
+                        <MetricTile label="CTR" value={pct(selected.avg_ctr)} />
+                        <MetricTile label="CPC" value={brl(selected.avg_cpc)} />
+                        <MetricTile label="CPM" value={brl(selected.avg_cpm)} />
+                        <MetricTile label="Frequência" value={selected.frequency != null ? Number(selected.frequency).toFixed(2) : "—"} accent="primary" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Charts */}
+            {!loading && filtered.length > 0 && (
+              <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="rounded-2xl border border-border bg-surface/40 p-5">
+                  <h3 className="text-sm font-semibold mb-4">Conversas por anúncio</h3>
+                  <div className="h-[320px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={conversasChart} layout="vertical" margin={{ left: 10, right: 16 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                        <XAxis type="number" stroke="var(--color-muted-foreground)" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} />
+                        <YAxis dataKey="name" type="category" stroke="var(--color-muted-foreground)"
+                          tick={{ fill: "var(--color-foreground)", fontSize: 11 }} width={160}
+                          tickFormatter={(v: string) => (v.length > 22 ? v.slice(0, 22) + "…" : v)} />
+                        <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={tooltipStyle}
+                          formatter={(v: number) => [n(v), "Conversas"]} />
+                        <Bar dataKey="value" fill="var(--color-success)" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-surface/40 p-5">
+                  <h3 className="text-sm font-semibold mb-4">Investimento por anúncio</h3>
+                  <div className="h-[320px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={spendChart} layout="vertical" margin={{ left: 10, right: 16 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                        <XAxis type="number" stroke="var(--color-muted-foreground)" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+                          tickFormatter={(v) => brl(v)} />
+                        <YAxis dataKey="name" type="category" stroke="var(--color-muted-foreground)"
+                          tick={{ fill: "var(--color-foreground)", fontSize: 11 }} width={160}
+                          tickFormatter={(v: string) => (v.length > 22 ? v.slice(0, 22) + "…" : v)} />
+                        <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={tooltipStyle}
+                          formatter={(v: number) => [brl(v), "Investimento"]} />
+                        <Bar dataKey="value" fill="#a78bfa" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Full table */}
+            {!loading && filtered.length > 0 && (
+              <section className="rounded-2xl border border-border bg-surface/40 overflow-hidden">
+                <div className="px-5 py-4 border-b border-border/70 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Dados completos dos anúncios</h3>
+                  <span className="text-xs text-muted-foreground">{filtered.length} registro(s)</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[1100px]">
+                    <thead>
+                      <tr className="text-muted-foreground border-b border-border">
+                        <th className="text-left font-medium py-3 px-3">Imagem</th>
+                        <th className="text-left font-medium py-3 px-3">Nome</th>
+                        <th className="text-left font-medium py-3 px-3">Oferta</th>
+                        <th className="text-left font-medium py-3 px-3">Status</th>
+                        <th className="text-left font-medium py-3 px-3">Performance</th>
+                        <th className="text-right font-medium py-3 px-3">Conversas</th>
+                        <th className="text-right font-medium py-3 px-3">Investimento</th>
+                        <th className="text-right font-medium py-3 px-3">Custo/conv.</th>
+                        <th className="text-right font-medium py-3 px-3">Leads</th>
+                        <th className="text-right font-medium py-3 px-3">Impressões</th>
+                        <th className="text-right font-medium py-3 px-3">CTR</th>
+                        <th className="text-right font-medium py-3 px-3">CPC</th>
+                        <th className="text-right font-medium py-3 px-3">CPM</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((r) => (
+                        <tr key={r.id} className="border-b border-border/50 hover:bg-surface/40 transition-colors cursor-pointer" onClick={() => setSelectedId(r.id)}>
+                          <td className="py-2 px-3">
+                            <div className="w-10 h-10 rounded overflow-hidden border border-border bg-card/60">
+                              <SafeImage src={r.ad_image_url} alt={cleanDisplayName(r)} fit="cover" className="w-full h-full" />
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 max-w-[200px] truncate" title={cleanDisplayName(r)}>{cleanDisplayName(r)}</td>
+                          <td className="py-2 px-3 max-w-[180px] truncate" title={r.offer_name ?? ""}>{r.offer_name ?? "—"}</td>
+                          <td className="py-2 px-3"><StatusBadge value={r.status_formatado} /></td>
+                          <td className="py-2 px-3"><PerfBadge value={r.performance_status} /></td>
+                          <td className="py-2 px-3 text-right tabular-nums">{n(r.total_conversas_iniciadas)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{brl(r.total_spend)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{r.custo_por_conversa != null ? brl(r.custo_por_conversa) : "—"}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{n(r.total_leads_meta)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{n(r.total_impressions)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{pct(r.avg_ctr)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{brl(r.avg_cpc)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{brl(r.avg_cpm)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Help dialog */}
+      {helpOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm" onClick={() => setHelpOpen(false)}>
+          <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold mb-1">Como o status de performance é calculado?</h2>
+            <p className="text-sm text-muted-foreground mb-4">Cada oferta recebe uma classificação automática com base no custo por conversa (CPL) do período.</p>
+            <div className="space-y-3">
+              {PERF_EXPLANATIONS.map((p) => (
+                <div key={p.label} className="flex items-start gap-3 rounded-lg border border-border bg-surface/40 p-3">
+                  <div className="shrink-0"><Badge tone={p.tone}>{p.label}</Badge></div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{p.description}</p>
                 </div>
               ))}
             </div>
-          </Panel>
-        )}
-
-        {/* Gráfico: conversas por anúncio (colorido por performance) */}
-        <Panel title="Conversas iniciadas por anúncio" note="Top 8 no período — cor = performance">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData} margin={{ left: -12, right: 8, top: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis dataKey="name" tick={axisTick} axisLine={false} tickLine={false} interval={0} angle={-18} textAnchor="end" height={70} />
-              <YAxis tick={axisTick} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--color-muted)", opacity: 0.25 }} />
-              <Bar dataKey="conversas" radius={[6, 6, 0, 0]} name="Conversas">
-                {chartData.map((d, i) => <Cell key={i} fill={perfColor(d.perf ?? null)} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {(["Excelente", "Positivo", "Atenção", "Crítico"] as const).map((p) => (
-              <span key={p} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="size-2.5 rounded-full" style={{ background: perfColor(p) }} /> {p}
-              </span>
-            ))}
+            <button onClick={() => setHelpOpen(false)} className="mt-4 w-full rounded-lg bg-foreground text-background py-2 text-sm font-medium hover:opacity-90 transition-opacity">
+              Entendi
+            </button>
           </div>
-        </Panel>
-
-        {/* Lista + prévia */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
-          <Panel title="Anúncios" note={`${filtered.length} no período`}>
-            {filtered.length === 0 ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Nenhum anúncio para os filtros atuais.</div>
-            ) : (
-              <div className="divide-y divide-border/60 -my-2">
-                {filtered.map((r) => {
-                  const isSel = r.id === selectedId;
-                  const custo = r.custo_por_conversa;
-                  return (
-                    <button key={r.id} onClick={() => setSelectedId(r.id)}
-                      className={`w-full text-left py-3 flex gap-3 rounded-xl px-2 transition-colors ${isSel ? "bg-surface" : "hover:bg-surface/50"}`}>
-                      <div className="shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-border bg-card/60">
-                        <SafeImage src={r.ad_image_url} alt={displayName(r)} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate" title={displayName(r)}>{displayName(r)}</div>
-                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                          <StatusBadge value={r.status_formatado} />
-                          <PerfBadge value={r.performance_status} />
-                        </div>
-                        <div className="mt-1.5 text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-0.5">
-                          <span>Conv.: <span className="text-foreground tabular-nums">{n(num(r.total_conversas_iniciadas))}</span></span>
-                          <span>Valor: <span className="text-foreground tabular-nums">{brl(num(r.total_spend))}</span></span>
-                          <span>Custo/conv.: <span className="text-foreground tabular-nums">{custo != null ? brl(custo) : "—"}</span></span>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </Panel>
-
-          <Panel title="Prévia do anúncio">
-            {!selected ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Selecione um anúncio para ver os detalhes.</div>
-            ) : (
-              <div className="space-y-4">
-                <div className="aspect-video rounded-xl overflow-hidden border border-border bg-card/60">
-                  <SafeImage src={selected.ad_image_url} alt={displayName(selected)} />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">{displayName(selected)}</div>
-                  <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                    <StatusBadge value={selected.status_formatado} />
-                    <PerfBadge value={selected.performance_status} />
-                  </div>
-                  {selected.performance_reason && (
-                    <p className="mt-2 text-xs text-muted-foreground">{selected.performance_reason}</p>
-                  )}
-                </div>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                  {[
-                    ["Investimento", brl(num(selected.total_spend))],
-                    ["Conversas", n(num(selected.total_conversas_iniciadas))],
-                    ["Custo/conversa", selected.custo_por_conversa != null ? brl(selected.custo_por_conversa) : "—"],
-                    ["Leads Meta", n(num(selected.total_leads_meta))],
-                    ["Impressões", n(num(selected.total_impressions))],
-                    ["Cliques", n(num(selected.total_clicks))],
-                    ["CTR", pct(num(selected.avg_ctr))],
-                    ["CPC", brl(num(selected.avg_cpc))],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex flex-col">
-                      <dt className="text-muted-foreground">{k}</dt>
-                      <dd className="font-medium tabular-nums">{v}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            )}
-          </Panel>
         </div>
-      </div>
+      )}
     </AppLayout>
   );
 }

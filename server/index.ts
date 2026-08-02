@@ -726,6 +726,56 @@ async function startServer() {
     res.json({ configured: true, rows: data ?? [] });
   });
 
+  // ─── Offers / Anúncios (view vw_meta_ads_offer_ads) ────────────────────────
+  app.get("/api/metrics/offers", requireAuth, async (req, res) => {
+    const sb = getSupabase();
+    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+    let q = sb.from("vw_meta_ads_offer_ads").select("*");
+    if (clientId) q = q.eq("client_id", clientId);
+    if (start) q = q.gte("date_start", start);
+    if (end) q = q.lte("date_start", end);
+    const { data, error } = await q.order("total_spend", { ascending: false });
+    if (error) { res.status(502).json({ error: error.message }); return; }
+    res.json({ configured: true, rows: data ?? [] });
+  });
+
+  // Tenta a RPC fn_offers_by_period se existir, senão fallback para a view
+  app.get("/api/metrics/offers-rpc", requireAuth, async (req, res) => {
+    const sb = getSupabase();
+    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+    const { data, error } = await sb.rpc("fn_offers_by_period", {
+      p_client_id: clientId ?? null,
+      p_date_start: start ?? null,
+      p_date_stop: end ?? null,
+    });
+    if (error) {
+      if (error.message?.includes("fn_offers_by_period")) {
+        let q = sb.from("vw_meta_ads_offer_ads").select("*");
+        if (clientId) q = q.eq("client_id", clientId);
+        if (start) q = q.gte("date_start", start);
+        if (end) q = q.lte("date_start", end);
+        const fallback = await q.order("total_spend", { ascending: false });
+        if (fallback.error) { res.status(502).json({ error: fallback.error.message }); return; }
+        res.json({ configured: true, rows: fallback.data ?? [] });
+        return;
+      }
+      res.status(502).json({ error: error.message }); return;
+    }
+    res.json({ configured: true, rows: data ?? [] });
+  });
+
+  // ─── Units (lista dinâmica de unidades/clientes do Supabase) ──────────────
+  app.get("/api/metrics/units", requireAuth, async (_req, res) => {
+    const sb = getSupabase();
+    if (!sb) { res.json({ configured: false, units: [] }); return; }
+    const { data, error } = await sb.from("clients").select("id, name, client_group").order("name");
+    if (error) { res.status(502).json({ error: error.message }); return; }
+    const units = (data ?? []).map((c: any) => c.name);
+    res.json({ configured: true, units, clients: data ?? [] });
+  });
+
   // ─── Excel Import ─────────────────────────────────────────────────────────
   app.post("/api/clients/import/excel", requireAuth, requireAdmin, upload.single("file"), (req, res) => {
     if (!req.file) { res.status(400).json({ error: "Nenhum arquivo enviado" }); return; }

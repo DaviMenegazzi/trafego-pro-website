@@ -45,16 +45,28 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     try {
       const token = localStorage.getItem("tp_token");
       if (!token) { setLoading(false); return; }
-      const res = await fetch("/api/clients", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) { setLoading(false); return; }
-      const data = await res.json();
-      setClients(data);
-      // Auto-select first client if none selected
-      if (!selectedClientId && data.length > 0) {
-        setSelectedClientId(data[0].id);
-      }
+
+      // Busca clientes do Supabase (fonte primária) e do banco local em paralelo
+      const [sbRes, localRes] = await Promise.allSettled([
+        fetch("/api/metrics/clients", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+        fetch("/api/clients", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      ]);
+
+      const sbClients: Client[] = sbRes.status === "fulfilled" && sbRes.value.configured && Array.isArray(sbRes.value.clients)
+        ? sbRes.value.clients.map((c: any) => ({ id: c.id, name: c.name }))
+        : [];
+      const localClients: Client[] = localRes.status === "fulfilled" && Array.isArray(localRes.value)
+        ? localRes.value
+        : [];
+
+      // Supabase primeiro, depois locais que não têm nome duplicado
+      const seen = new Set(sbClients.map(c => c.name.toLowerCase()));
+      const merged = [
+        ...sbClients,
+        ...localClients.filter(c => !seen.has(c.name.toLowerCase())),
+      ];
+
+      setClients(merged);
     } catch {
       // ignore
     } finally {

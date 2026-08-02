@@ -47,11 +47,7 @@ function isAdminUser(): boolean {
 // ─── Nav items ──────────────────────────────────────────────────────────────
 const NAV_BASE = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch },
   { to: "/dashboard/clientes", label: "Clientes", icon: Users2 },
-  { to: "/dashboard/pagamentos", label: "Pagamentos", icon: CreditCard },
-  { to: "/dashboard/meu-trabalho", label: "Meu Trabalho", icon: ClipboardList },
-  { to: "/dashboard/atualizacoes", label: "Atualizações", icon: Newspaper },
   { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
   { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];
@@ -87,33 +83,6 @@ function ClientSelector({ collapsed }: { collapsed: boolean }) {
       </div>
     );
   }
-
-  return (
-    <div className="relative">
-      {collapsed ? (
-        <button
-          title="Selecionar cliente"
-          className="w-full flex items-center justify-center py-2 rounded-lg hover:bg-sidebar-accent/50 transition-colors"
-        >
-          <Users2 className="size-4 text-muted-foreground" />
-        </button>
-      ) : (
-        <select
-          value={selectedClientId ?? ""}
-          onChange={(e) => setSelectedClientId(e.target.value || null)}
-          className="w-full text-xs rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          {/* Só admins podem ver "Todos os clientes" */}
-          {isAdminUser() && <option value="">Todos os clientes</option>}
-          {filteredClients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      )}
-    </div>
-  );
 }
 
 function UserProfileButton({ collapsed }: { collapsed: boolean }) {

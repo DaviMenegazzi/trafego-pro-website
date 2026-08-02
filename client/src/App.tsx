@@ -14,6 +14,7 @@ import DashboardPagamentos from "./pages/DashboardPagamentos";
 import DashboardMeuTrabalho from "./pages/DashboardMeuTrabalho";
 import DashboardAtualizacoes from "./pages/DashboardAtualizacoes";
 import DashboardConfiguracoes from "./pages/DashboardConfiguracoes";
+import DashboardAnuncios from "./pages/DashboardAnuncios";
 import DashboardFeedbackLeads from "./pages/DashboardFeedbackLeads";
 import DashboardUsuarios from "./pages/DashboardUsuarios";
 
@@ -38,6 +39,8 @@ function Router() {
       <Route path={"/dashboard/configuracoes/"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/feedback-leads"} component={DashboardFeedbackLeads} />
       <Route path={"/dashboard/feedback-leads/"} component={DashboardFeedbackLeads} />
+      <Route path={"/dashboard/anuncios"} component={DashboardAnuncios} />
+      <Route path={"/dashboard/anuncios/"} component={DashboardAnuncios} />
       <Route path={"/dashboard/usuarios"} component={DashboardUsuarios} />
       <Route path={"/dashboard/usuarios/"} component={DashboardUsuarios} />
       <Route path={"/404"} component={NotFound} />

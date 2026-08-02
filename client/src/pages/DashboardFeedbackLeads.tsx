@@ -17,24 +17,12 @@ function useAuthGuard() {
   }, [setLocation]);
 }
 
-const UNITS = [
-  "Ijuí",
-  "Passo Fundo",
-  "Bento Gonçalves",
-  "Canela",
-  "Tupanciretã",
-  "Júlio de Castilhos",
-  "Belo Horizonte/Barreiro",
-  "Lajeado",
-  "Sant'Ana do Livramento",
-  "Santa Maria",
-  "Santo Ângelo",
-  "Alegrete",
-  "Caxias do Sul",
-  "Chapecó",
-  "Erechim",
-  "Itaqui",
-  "Uruguaiana",
+// Fallback hardcoded — usado apenas se o Supabase não estiver configurado
+const FALLBACK_UNITS = [
+  "Ijuí", "Passo Fundo", "Bento Gonçalves", "Canela", "Tupanciretã",
+  "Júlio de Castilhos", "Belo Horizonte/Barreiro", "Lajeado",
+  "Sant'Ana do Livramento", "Santa Maria", "Santo Ângelo", "Alegrete",
+  "Caxias do Sul", "Chapecó", "Erechim", "Itaqui", "Uruguaiana",
 ];
 
 const REASONS = [
@@ -69,6 +57,22 @@ export default function DashboardFeedbackLeads() {
   useAuthGuard();
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
+  const [units, setUnits] = useState<string[]>(FALLBACK_UNITS);
+
+  // Carrega unidades dinamicamente do Supabase (clients.name)
+  useEffect(() => {
+    const token = localStorage.getItem("tp_token");
+    if (!token) return;
+    fetch("/api/metrics/units", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.configured && Array.isArray(d.units) && d.units.length > 0) {
+          setUnits(d.units);
+        }
+      })
+      .catch(() => { /* mantém fallback */ });
+  }, []);
+
   const [formData, setFormData] = useState<FormData>({
     unit: "",
     responsible: "",
@@ -195,7 +199,7 @@ export default function DashboardFeedbackLeads() {
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
                     <option value="">Selecione a unidade</option>
-                    {UNITS.map((u) => (
+                    {units.map((u) => (
                       <option key={u} value={u}>
                         {u}
                       </option>

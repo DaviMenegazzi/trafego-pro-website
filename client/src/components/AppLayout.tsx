@@ -16,6 +16,7 @@ import {
   User,
   MessageSquare,
   ShieldCheck,
+  Tag,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 
@@ -48,6 +49,7 @@ function isAdminUser(): boolean {
 const NAV_BASE = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/clientes", label: "Clientes", icon: Users2 },
+  { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
   { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
   { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];

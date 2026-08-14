@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { shouldRedirectToLogin } from "./adminAuthPolicy";
 
 export interface AdminUser {
   email: string;
@@ -15,7 +16,7 @@ export function useAdminAuth() {
   useEffect(() => {
     const token = localStorage.getItem("tp_token");
     const userStr = localStorage.getItem("tp_user");
-    if (!token || !userStr) {
+    if (shouldRedirectToLogin(token, userStr, true)) {
       navigate("/login");
       setLoading(false);
       return;
@@ -31,14 +32,13 @@ export function useAdminAuth() {
           navigate("/login");
           return null;
         }
-        const parsed = JSON.parse(userStr) as AdminUser;
-        if (parsed.role !== "admin") {
+        if (shouldRedirectToLogin(token, userStr, res.ok)) {
           localStorage.removeItem("tp_token");
           localStorage.removeItem("tp_user");
           navigate("/login");
           return null;
         }
-        return parsed;
+        return JSON.parse(userStr!) as AdminUser;
       })
       .then((u) => {
         if (u) setUser(u);

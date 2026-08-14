@@ -15,7 +15,7 @@ import DashboardMeuTrabalho from "./pages/DashboardMeuTrabalho";
 import DashboardAtualizacoes from "./pages/DashboardAtualizacoes";
 import DashboardConfiguracoes from "./pages/DashboardConfiguracoes";
 import DashboardAnuncios from "./pages/DashboardAnuncios";
-import DashboardFeedbackLeads from "./pages/DashboardFeedbackLeads";
+import DashboardFeedbackLeads, { StandaloneFeedbackLeads } from "./pages/DashboardFeedbackLeads";
 import DashboardUsuarios from "./pages/DashboardUsuarios";
 
 function Router() {
@@ -23,6 +23,8 @@ function Router() {
     <Switch>
       <Route path={"/"} component={TrafegoProHome} />
       <Route path={"/login"} component={Login} />
+      <Route path={"/feedback-leads"} component={StandaloneFeedbackLeads} />
+      <Route path={"/feedback-leads/"} component={StandaloneFeedbackLeads} />
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/dashboard/"} component={Dashboard} />
       <Route path={"/dashboard/pipeline"} component={DashboardPipeline} />

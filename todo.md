@@ -67,3 +67,17 @@
 
 - [x] Adicionar testes do endpoint `/api/feedback-leads` para 401 sem token, sucesso com Bearer válido e erro de validação
 - [x] Isolar e testar a lógica de guarda/redirecionamento da rota independente `/feedback-leads`
+
+## Melhoria de legibilidade da página independente de feedback
+
+- [x] Melhorar contraste e hierarquia visual da página `/feedback-leads`
+- [x] Ajustar espaçamento, largura das colunas e leitura dos campos
+- [x] Melhorar responsividade em telemóvel e desktop
+- [x] Validar que autenticação e envio continuam funcionando após os ajustes visuais
+- [x] Atualizar testes e salvar novo checkpoint da melhoria visual
+
+## Validação final da melhoria visual
+
+- [x] Validar `/feedback-leads` em viewport móvel real e registrar evidência de leitura e espaçamento
+- [x] Adicionar ou atualizar testes automatizados relacionados à estrutura e estados da página após a refatoração visual
+- [ ] Salvar um novo checkpoint após concluir e validar a melhoria visual

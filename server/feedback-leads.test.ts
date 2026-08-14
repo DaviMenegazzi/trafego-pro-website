@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { FALLBACK_UNITS, REASONS } from "../client/src/pages/feedbackLeadsConfig";
+import { FALLBACK_UNITS, FEEDBACK_LAYOUT, REASONS } from "../client/src/pages/feedbackLeadsConfig";
 import { submitFeedbackLead } from "../client/src/pages/feedbackLeadsApi";
 import { shouldRedirectToLogin } from "../client/src/hooks/adminAuthPolicy";
 import { deleteFeedbackLead } from "./db.js";
@@ -21,6 +21,15 @@ describe("Lead feedback form configuration", () => {
       "Já é cliente/duplicado",
       "Outro",
     ]);
+  });
+
+  it("keeps the standalone form readable across responsive breakpoints", () => {
+    expect(FEEDBACK_LAYOUT.page).toContain("max-w-5xl");
+    expect(FEEDBACK_LAYOUT.page).toContain("px-4");
+    expect(FEEDBACK_LAYOUT.page).toContain("sm:px-8");
+    expect(FEEDBACK_LAYOUT.identityGrid).toBe("grid grid-cols-1 gap-4 md:grid-cols-3");
+    expect(FEEDBACK_LAYOUT.metricsGrid).toBe("grid grid-cols-1 gap-4 md:grid-cols-2");
+    expect(FEEDBACK_LAYOUT.fieldMinHeight).toBeGreaterThanOrEqual(44);
   });
 
   it("requires a token before attempting submission", async () => {

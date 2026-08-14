@@ -354,3 +354,53 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee { animation: none; }
 }
+
+
+/* Formulário independente de feedback — alto contraste e leitura confortável */
+@layer components {
+  .feedback-form-shell {
+    color-scheme: dark;
+  }
+
+  .feedback-form-shell input,
+  .feedback-form-shell textarea,
+  .feedback-form-shell select {
+    background: #0b0e11 !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+  }
+
+  .feedback-form-shell input {
+    min-height: 2.75rem;
+  }
+
+  .feedback-form-shell textarea {
+    min-height: 7.5rem;
+    resize: vertical;
+    padding: 0.75rem;
+  }
+
+  .feedback-form-shell input::placeholder,
+  .feedback-form-shell textarea::placeholder {
+    color: rgba(255, 255, 255, 0.38);
+  }
+
+  .feedback-form-shell input:focus,
+  .feedback-form-shell textarea:focus,
+  .feedback-form-shell select:focus {
+    border-color: rgba(110, 231, 183, 0.72) !important;
+    box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.12);
+    outline: none;
+  }
+
+  .feedback-form-shell input[type="date"] {
+    color-scheme: dark;
+  }
+
+  .feedback-form-shell select option {
+    background: #111519 !important;
+    color: #ffffff !important;
+  }
+}

@@ -26,3 +26,12 @@ export const REASONS = [
   "Já é cliente/duplicado",
   "Outro",
 ] as const;
+
+
+export const FEEDBACK_LAYOUT = {
+  page: "mx-auto max-w-5xl space-y-8 px-4 py-7 sm:px-8 sm:py-10",
+  form: "space-y-6",
+  identityGrid: "grid grid-cols-1 gap-4 md:grid-cols-3",
+  metricsGrid: "grid grid-cols-1 gap-4 md:grid-cols-2",
+  fieldMinHeight: 44,
+} as const;

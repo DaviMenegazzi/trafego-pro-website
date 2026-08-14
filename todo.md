@@ -80,4 +80,26 @@
 
 - [x] Validar `/feedback-leads` em viewport móvel real e registrar evidência de leitura e espaçamento
 - [x] Adicionar ou atualizar testes automatizados relacionados à estrutura e estados da página após a refatoração visual
-- [ ] Salvar um novo checkpoint após concluir e validar a melhoria visual
+- [x] Salvar um novo checkpoint após concluir e validar a melhoria visual
+
+## Permissões de unidades no feedback
+
+- [x] Mapear a origem das unidades autorizadas no utilizador autenticado
+- [x] Filtrar o dropdown de unidade pelas permissões da sessão
+- [x] Validar no backend que o feedback só aceita unidades autorizadas
+- [x] Adicionar testes para unidades permitidas e não permitidas
+- [x] Validar a interface e salvar novo checkpoint
+
+## Correções de segurança da filtragem de unidades
+
+- [x] Remover o fallback que expõe as 17 unidades quando não há unidades autorizadas retornadas
+- [x] Validar no navegador com uma sessão não-admin que só aparecem unidades permitidas
+- [x] Adicionar teste HTTP 403 para submissão de unidade não autorizada
+- [x] Adicionar teste do endpoint de unidades filtrado por `allowedClientIds`
+- [ ] Salvar checkpoint específico da regra de permissões por unidade
+
+## Acesso do feedback para utilizadores com unidades atribuídas
+
+- [x] Ajustar a guarda de `/feedback-leads` para aceitar sessões autenticadas não-admin com unidades autorizadas
+- [x] Cobrir a nova regra de guarda em testes
+- [x] Validar a sessão restrita no navegador sem alterar credenciais reais

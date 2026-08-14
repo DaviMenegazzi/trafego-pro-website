@@ -6,6 +6,7 @@ export interface AdminUser {
   email: string;
   role: string;
   name: string;
+  allowedClientIds?: string[];
 }
 
 export function useAdminAuth() {

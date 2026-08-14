@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { ArrowLeft, Send, LogOut, ShieldCheck } from "lucide-react";
 import { useAdminAuth, getToken } from "@/hooks/useAdminAuth";
-import { FALLBACK_UNITS, FEEDBACK_LAYOUT, REASONS } from "./feedbackLeadsConfig";
+import { FALLBACK_UNITS, FEEDBACK_LAYOUT, REASONS, getAuthorizedUnitNames } from "./feedbackLeadsConfig";
 import { submitFeedbackLead } from "./feedbackLeadsApi";
 export { FALLBACK_UNITS, REASONS } from "./feedbackLeadsConfig";
 
@@ -128,21 +128,25 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
 
-  const [units, setUnits] = useState<string[]>(() => [...FALLBACK_UNITS]);
+  const [units, setUnits] = useState<string[]>([]);
 
-  // Carrega unidades dinamicamente do Supabase (clients.name)
+  // Carrega apenas as unidades que o backend autorizou para esta sessão.
   useEffect(() => {
+    if (!user) return;
     const token = getToken();
     if (!token) return;
+
     fetch("/api/metrics/units", { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.configured && Array.isArray(d.units) && d.units.length > 0) {
-          setUnits(d.units);
-        }
+      .then((response) => {
+        if (!response.ok) throw new Error("Não foi possível carregar as unidades autorizadas");
+        return response.json();
       })
-      .catch(() => { /* mantém fallback */ });
-  }, []);
+      .then((data) => {
+        const clients = Array.isArray(data.clients) ? data.clients : [];
+        setUnits(getAuthorizedUnitNames(clients, [], user.allowedClientIds ?? [], user.role));
+      })
+      .catch(() => setUnits([]));
+  }, [user]);
 
   const [formData, setFormData] = useState<FormData>({
     unit: "",
@@ -261,12 +265,15 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                     value={formData.unit}
                     onChange={handleChange}
                     required
+                    disabled={units.length === 0}
                     className={fieldClassName}
                   >
-                    <option value="">Selecione a unidade</option>
-                    {units.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
+                    <option value="">
+                      {units.length > 0 ? "Selecione a unidade" : "Nenhuma unidade disponível para este usuário"}
+                    </option>
+                    {units.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {unit}
                       </option>
                     ))}
                   </select>

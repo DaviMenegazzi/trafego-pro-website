@@ -178,6 +178,10 @@ function isAdmin(claims: JwtClaims): boolean {
   return isAdminRole(claims.role) || claims.allowedClientIds.includes("*");
 }
 
+export function hasUnitAccess(clientId: string | number, claims: Pick<JwtClaims, "role" | "allowedClientIds">): boolean {
+  return isAdminRole(claims.role) || claims.allowedClientIds.includes("*") || claims.allowedClientIds.includes(String(clientId));
+}
+
 function normalizeRawOfferRow(row: Record<string, any>) {
   const totalSpend = Number(row.spend ?? row.total_spend ?? 0);
   const totalConversas = Number(row.conversations_started ?? row.total_conversas_iniciadas ?? 0);
@@ -650,12 +654,34 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     res.json(getAllFeedbackLeads());
   });
 
-  app.post("/api/feedback-leads", requireAuth, (req, res) => {
+  app.post("/api/feedback-leads", requireAuth, async (req, res) => {
     const body = req.body as Partial<FeedbackLeadInput> & { unit: string; responsible: string; weekStart: string };
     if (!body.unit?.trim() || !body.responsible?.trim() || !body.weekStart) {
       res.status(400).json({ error: "Campos obrigatórios faltando" });
       return;
     }
+
+    if (!isAdmin(req.claims!)) {
+      const sb = getSupabase();
+      if (!sb) {
+        res.status(503).json({ error: "Não foi possível validar a unidade autorizada" });
+        return;
+      }
+      const { data: client, error } = await sb
+        .from("clients")
+        .select("id")
+        .eq("name", body.unit.trim())
+        .maybeSingle();
+      if (error) {
+        res.status(502).json({ error: "Não foi possível validar a unidade autorizada" });
+        return;
+      }
+      if (!client || !hasUnitAccess(client.id, req.claims!)) {
+        res.status(403).json({ error: "Sem acesso a essa unidade" });
+        return;
+      }
+    }
+
     const feedback = createFeedbackLead({
       unit: body.unit, responsible: body.responsible, weekStart: body.weekStart,
       totalLeads: Number(body.totalLeads) || 0, leadsCard: Number(body.leadsCard) || 0,
@@ -817,13 +843,15 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   });
 
   // ─── Units (lista dinâmica de unidades/clientes do Supabase) ──────────────
-  app.get("/api/metrics/units", requireAuth, async (_req, res) => {
+  app.get("/api/metrics/units", requireAuth, async (req, res) => {
     const sb = getSupabase();
     if (!sb) { res.json({ configured: false, units: [] }); return; }
     const { data, error } = await sb.from("clients").select("id, name, client_group").order("name");
     if (error) { res.status(502).json({ error: error.message }); return; }
-    const units = (data ?? []).map((c: any) => c.name);
-    res.json({ configured: true, units, clients: data ?? [] });
+
+    const clients = (data ?? []).filter((client: any) => hasUnitAccess(client.id, req.claims!));
+    const units = clients.map((client: any) => client.name);
+    res.json({ configured: true, units, clients });
   });
 
   // ─── Excel Import ─────────────────────────────────────────────────────────

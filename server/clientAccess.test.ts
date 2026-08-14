@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupClientAccessByUser } from "./clientAccess.js";
+import { groupClientAccessByUser, uniqueGrantedClientIds } from "./clientAccess.js";
 
 describe("contrato de acessos de usuário por unidade", () => {
   it("anexa unidade, grupo e identificador da concessão a cada acesso", () => {
@@ -42,5 +42,15 @@ describe("contrato de acessos de usuário por unidade", () => {
       client_name: null,
       client_group: null,
     });
+  });
+
+  it("resolve IDs únicos de unidades a partir das concessões do Supabase", () => {
+    const ids = uniqueGrantedClientIds([
+      { client_id: "unidade-ijuí" },
+      { client_id: "unidade-canela" },
+      { client_id: "unidade-ijuí" },
+    ]);
+
+    expect(ids).toEqual(["unidade-ijuí", "unidade-canela"]);
   });
 });

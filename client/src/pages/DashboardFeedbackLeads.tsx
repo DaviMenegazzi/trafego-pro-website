@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
+import { useClientContext } from "@/contexts/ClientContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -109,22 +110,15 @@ export default function DashboardFeedbackLeads() {
 
 function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: boolean }) {
   const { user, loading: authLoading, logout } = useAdminAuth();
+  const { clients, loading: clientsLoading } = useClientContext();
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
-  const [units, setUnits] = useState<string[]>([]);
   const [formData, setFormData] = useState<FormData>(emptyForm);
 
-  useEffect(() => {
-    if (!user) return;
-    const token = getToken();
-    if (!token) return;
-    fetch("/api/metrics/units", { headers: { Authorization: `Bearer ${token}` } })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("unidades")))
-      .then((data) => setUnits(getAuthorizedUnitNames(Array.isArray(data.clients) ? data.clients : [], FALLBACK_UNITS, user.allowedClientIds ?? [], user.role)))
-      .catch(() => setUnits([]));
-  }, [user]);
-
   if (authLoading || !user) return <FeedbackLoading />;
+
+  const units = getAuthorizedUnitNames(clients, FALLBACK_UNITS, user.allowedClientIds ?? [], user.role);
+  const unitSelectDisabled = clientsLoading || units.length === 0;
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
@@ -170,7 +164,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
             <FormSectionHeading step="1" title="Identificação" description="Informe quem preencheu, a unidade e o período semanal analisado." />
             <div className={FEEDBACK_LAYOUT.identityGrid}>
               <div className="space-y-2"><Label htmlFor="responsible" className={labelClassName}>Nome do gerente/vendedor responsável *</Label><Input id="responsible" name="responsible" value={formData.responsible} onChange={handleChange} placeholder="Nome do responsável" required /></div>
-              <div className="space-y-2"><Label htmlFor="unit" className={labelClassName}>Unidade *</Label><select id="unit" name="unit" value={formData.unit} onChange={handleChange} required disabled={units.length === 0} className={fieldClassName}><option value="">{units.length ? "Selecione a unidade" : "Nenhuma unidade disponível para este usuário"}</option>{units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></div>
+              <div className="space-y-2"><Label htmlFor="unit" className={labelClassName}>Unidade *</Label><select id="unit" name="unit" value={formData.unit} onChange={handleChange} required disabled={unitSelectDisabled} className={fieldClassName}><option value="">{clientsLoading ? "Carregando unidades..." : units.length ? "Selecione a unidade" : "Nenhuma unidade disponível para este usuário"}</option>{units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></div>
               <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="weekStart" className={labelClassName}>Início *</Label><Input id="weekStart" name="weekStart" type="date" value={formData.weekStart} onChange={handleChange} required /></div><div className="space-y-2"><Label htmlFor="weekEnd" className={labelClassName}>Fim *</Label><Input id="weekEnd" name="weekEnd" type="date" min={formData.weekStart || undefined} value={formData.weekEnd} onChange={handleChange} required /></div></div>
             </div>
           </Card>
@@ -201,7 +195,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
 
           <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={() => setLocation(standalone ? "/" : "/dashboard")} className="h-11 rounded-xl border-white/15 bg-transparent px-5 text-white/70 hover:bg-white/5 hover:text-white">Cancelar</Button>
-            <Button type="submit" disabled={loading || units.length === 0} className="h-11 gap-2 rounded-xl bg-emerald-300 px-5 font-semibold text-[#06120b] shadow-[0_8px_24px_rgba(110,231,183,0.16)] hover:bg-emerald-200"><Send className="size-4" />{loading ? "Salvando..." : "Enviar feedback semanal"}</Button>
+            <Button type="submit" disabled={loading || unitSelectDisabled} className="h-11 gap-2 rounded-xl bg-emerald-300 px-5 font-semibold text-[#06120b] shadow-[0_8px_24px_rgba(110,231,183,0.16)] hover:bg-emerald-200"><Send className="size-4" />{loading ? "Salvando..." : "Enviar feedback semanal"}</Button>
           </div>
         </form>
       </div>

@@ -10,6 +10,7 @@ import * as XLSX from "xlsx";
 import { getSupabase, isSupabaseConfigured } from "./supabase.js";
 import { groupClientAccessByUser } from "./clientAccess.js";
 import { validateMetricsClientSelection } from "./metricsAccess.js";
+import { createFeedbackLeadSql, listFeedbackLeadsSql } from "./feedbackSql.js";
 import {
   getAllClients,
   getClientById,
@@ -26,8 +27,6 @@ import {
   createUser,
   updateUserPassword,
   deleteUser,
-  getAllFeedbackLeads,
-  createFeedbackLead,
   type ClientInput,
   type CampaignInput,
   type Client,
@@ -251,7 +250,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 
 // Middleware adicional: exige role admin
 function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!req.claims || !isAdmin(req.claims)) {
+  if (!req.claims || !isAdminRole(req.claims.role)) {
     res.status(403).json({ error: "Acesso restrito a administradores" });
     return;
   }
@@ -650,8 +649,21 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   });
 
   // ─── Feedback Leads ──────────────────────────────────────────────────────
-  app.get("/api/feedback-leads", requireAuth, (_req, res) => {
-    res.json(getAllFeedbackLeads());
+  // A consulta é exclusiva para admins; o formulário de envio continua disponível
+  // para utilizadores autenticados com acesso à unidade correspondente.
+  app.get("/api/feedback-leads", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const query = req.query as { unit?: string; weekStart?: string; weekEnd?: string };
+      const feedbacks = await listFeedbackLeadsSql({
+        unit: typeof query.unit === "string" && query.unit ? query.unit : undefined,
+        weekStart: typeof query.weekStart === "string" && query.weekStart ? query.weekStart : undefined,
+        weekEnd: typeof query.weekEnd === "string" && query.weekEnd ? query.weekEnd : undefined,
+      });
+      res.json(feedbacks);
+    } catch (error) {
+      console.error("[feedback-leads] Falha ao listar feedbacks SQL:", error);
+      res.status(503).json({ error: "Não foi possível carregar os feedbacks" });
+    }
   });
 
   app.post("/api/feedback-leads", requireAuth, async (req, res) => {
@@ -682,17 +694,29 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       }
     }
 
-    const feedback = createFeedbackLead({
-      unit: body.unit, responsible: body.responsible, weekStart: body.weekStart,
-      totalLeads: Number(body.totalLeads) || 0, leadsCard: Number(body.leadsCard) || 0,
-      leadsConsultation: Number(body.leadsConsultation) || 0, leadsDentistry: Number(body.leadsDentistry) || 0,
-      leadsBusinessPJ: Number(body.leadsBusinessPJ) || 0, leadsOutOfArea: Number(body.leadsOutOfArea) || 0,
-      leadsAnswered: Number(body.leadsAnswered) || 0, leadsNoAnswer: Number(body.leadsNoAnswer) || 0,
-      salesClosed: Number(body.salesClosed) || 0, mainReason: body.mainReason ?? "",
-      creativeFeedback: body.creativeFeedback ?? "", generalObservations: body.generalObservations ?? "",
-      supportNeeded: body.supportNeeded ?? "", submittedAt: body.submittedAt ?? new Date().toISOString(),
-    });
-    res.status(201).json(feedback);
+    const submittedAt = body.submittedAt ? new Date(body.submittedAt) : new Date();
+    if (Number.isNaN(submittedAt.getTime())) {
+      res.status(400).json({ error: "Data de envio inválida" });
+      return;
+    }
+
+    try {
+      const feedback = await createFeedbackLeadSql({
+        unit: body.unit.trim(), responsible: body.responsible.trim(), weekStart: body.weekStart,
+        totalLeads: Number(body.totalLeads) || 0, leadsCard: Number(body.leadsCard) || 0,
+        leadsConsultation: Number(body.leadsConsultation) || 0, leadsDentistry: Number(body.leadsDentistry) || 0,
+        leadsBusinessPJ: Number(body.leadsBusinessPJ) || 0, leadsOutOfArea: Number(body.leadsOutOfArea) || 0,
+        leadsAnswered: Number(body.leadsAnswered) || 0, leadsNoAnswer: Number(body.leadsNoAnswer) || 0,
+        salesClosed: Number(body.salesClosed) || 0, mainReason: body.mainReason ?? "",
+        creativeFeedback: body.creativeFeedback ?? "", generalObservations: body.generalObservations ?? "",
+        supportNeeded: body.supportNeeded ?? "", submittedAt: submittedAt.toISOString(),
+        submittedByUserId: req.claims?.id ?? null, submittedByEmail: req.claims?.email ?? "",
+      });
+      res.status(201).json(feedback);
+    } catch (error) {
+      console.error("[feedback-leads] Falha ao guardar feedback SQL:", error);
+      res.status(503).json({ error: "Não foi possível guardar o feedback" });
+    }
   });
 
   // ─── Métricas (Supabase / Meta Ads) ────────────────────────────────────────

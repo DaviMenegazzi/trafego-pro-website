@@ -15,11 +15,13 @@ import {
   LogOut,
   User,
   MessageSquare,
+  Inbox,
   ShieldCheck,
   Tag,
   ChevronDown,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
+import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
 
 const DURATION = "200ms";
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
@@ -39,11 +41,7 @@ function getStoredUser(): {
 }
 
 function isAdminUser(): boolean {
-  const user = getStoredUser();
-  return (
-    user.role === "admin" ||
-    (Array.isArray(user.allowedClientIds) && user.allowedClientIds.includes("*"))
-  );
+  return canSeeAdminFeedbacks(getStoredUser());
 }
 
 // ─── Nav items ──────────────────────────────────────────────────────────────
@@ -56,6 +54,7 @@ const NAV_BASE = [
 ];
 
 const NAV_ADMIN_ONLY = [
+  { to: "/dashboard/feedback-leads/list", label: "Feedbacks enviados", icon: Inbox },
   { to: "/dashboard/usuarios", label: "Usuários", icon: ShieldCheck },
 ];
 

@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FALLBACK_UNITS, FEEDBACK_LAYOUT, REASONS, getAuthorizedUnitNames } from "../client/src/pages/feedbackLeadsConfig";
 import { submitFeedbackLead } from "../client/src/pages/feedbackLeadsApi";
 import { shouldRedirectToLogin } from "../client/src/hooks/adminAuthPolicy";
-import { deleteFeedbackLead } from "./db.js";
+import { canSeeAdminFeedbacks } from "../client/src/components/adminNavigationPolicy";
+import { deleteFeedbackLeadSql } from "./feedbackSql.js";
 import { hasUnitAccess, signToken, startServer } from "./index.js";
 
 describe("Lead feedback form configuration", () => {
@@ -177,7 +178,37 @@ describe("Protected feedback endpoint", () => {
     expect(data.clients.every((client) => client.id === "client-id-that-does-not-exist")).toBe(true);
   });
 
-  it("creates a feedback record for an authenticated valid submission", async () => {
+  it("denies the feedback list to a non-admin session", async () => {
+    const token = signToken({
+      email: "viewer@trafego.pro",
+      name: "Viewer",
+      role: "client_viewer",
+      id: 996,
+      allowedClientIds: ["client-id-that-does-not-exist"],
+    });
+    const response = await fetch(`${baseUrl}/api/feedback-leads`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Acesso restrito a administradores" });
+  });
+
+  it("lists SQL feedback records for an authenticated admin", async () => {
+    const token = signToken({
+      email: "admin-list@trafego.pro",
+      name: "Admin List",
+      role: "admin",
+      id: 995,
+      allowedClientIds: ["*"],
+    });
+    const response = await fetch(`${baseUrl}/api/feedback-leads?unit=__no_match__`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual([]);
+  });
+
+  it("creates a SQL feedback record for an authenticated valid submission", async () => {
     const token = signToken({
       email: "endpoint-test@trafego.pro",
       name: "Endpoint Test",
@@ -202,10 +233,20 @@ describe("Protected feedback endpoint", () => {
     expect(response.status).toBe(201);
     const created = (await response.json()) as { id: number; unit: string; totalLeads: number };
     expect(created).toMatchObject({ unit: "Ijuí", totalLeads: 12 });
-    deleteFeedbackLead(created.id);
+    await deleteFeedbackLeadSql(created.id);
   });
 });
 
+
+describe("Admin feedback navigation policy", () => {
+  it("shows the submitted-feedback tab only for admins", () => {
+    expect(canSeeAdminFeedbacks({ role: "admin" })).toBe(true);
+    expect(canSeeAdminFeedbacks({ role: "socio" })).toBe(false);
+    expect(canSeeAdminFeedbacks({ role: "gerente" })).toBe(false);
+    expect(canSeeAdminFeedbacks({ role: "client_viewer" })).toBe(false);
+    expect(canSeeAdminFeedbacks({ role: "admin", allowedClientIds: ["client-ijui"] })).toBe(true);
+  });
+});
 
 describe("Standalone feedback auth guard policy", () => {
   const adminUser = JSON.stringify({ email: "admin@trafego.pro", role: "admin", name: "Admin" });

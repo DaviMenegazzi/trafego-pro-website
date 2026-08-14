@@ -12,14 +12,14 @@
 - [x] `.env.example` documentando todas as variáveis
 - [ ] **Manual:** tornar o repositório privado
 - [ ] **Manual:** trocar TODAS as senhas/segredos antigos (considerar comprometidos)
-- [ ] **Manual:** `git rm --cached data/db.json` e commitar
-- [ ] **Manual:** rodar `pnpm install` (baixa o bcryptjs) e `pnpm check`
+- [x] **Manual:** `git rm --cached data/db.json` e commitar (o ficheiro não está versionado e está ignorado)
+- [x] **Manual:** rodar `pnpm install` (baixa o bcryptjs) e `pnpm check`
 - [ ] **Manual (opcional):** reescrever histórico do git para apagar o segredo antigo
       (BFG ou `git filter-repo`), já que o valor ficou registrado em commits passados
 
 ## Deploy
 
-- [ ] Definir onde o back-end Express vai rodar (host com Node, não estático)
+- [x] Definir onde o back-end Express vai rodar (host com Node, não estático; projeto em hosting Autoscale)
 - [ ] Configurar `JWT_SECRET` e variáveis de admin no ambiente de produção
 - [ ] Validar login + dashboard em produção (rotas `/api/*` no ar)
 
@@ -123,3 +123,23 @@
 
 - [x] Salvar novo checkpoint após a migração SQL e a aba administrativa de feedbacks
 - [x] Validar no navegador uma sessão não-admin tentando abrir a aba administrativa
+
+## Estratégia de produção do backend
+
+- [x] Confirmar e documentar que o backend Express roda em hosting Node Autoscale, não-estático
+- [x] Validar no projeto a configuração de runtime, porta dinâmica e variáveis de produção
+
+## Formulário semanal e exportação completa
+
+- [x] Atualizar o formulário para o novo conjunto semanal de identificação, panorama e satisfação
+- [x] Migrar a tabela SQL preservando registros existentes e adotando o novo contrato
+- [x] Atualizar endpoints e listagem administrativa para os novos campos
+- [x] Adicionar exportação completa dos feedbacks para administradores
+- [x] Cobrir migração, validação, exportação e autorização com testes
+- [x] Validar interface e build
+- [ ] Salvar checkpoint da atualização semanal e exportação completa
+
+## Finalização da migração semanal
+
+- [x] Tornar `week_end` obrigatório no banco e criar o índice de período semanal em operações compatíveis
+- [x] Adicionar teste automatizado do backfill de registros legados para o contrato semanal

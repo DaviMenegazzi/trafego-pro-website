@@ -18,15 +18,16 @@ export const FALLBACK_UNITS = [
   "Uruguaiana",
 ] as const;
 
-export const REASONS = [
-  "Preço/Objeção de valor",
-  "Cliente pediu tempo para decidir",
-  "Sem resposta do lead",
-  "Fora da área de atuação",
-  "Já é cliente/duplicado",
+export const LOSS_REASONS = [
+  "Preço",
+  "Não respondeu",
+  "Não tinha interesse",
+  "Fora do perfil",
   "Outro",
 ] as const;
 
+export const COMMUNICATION_OPTIONS = ["Sim", "Parcialmente", "Não"] as const;
+export const RATING_OPTIONS = [1, 2, 3, 4, 5] as const;
 
 export const FEEDBACK_LAYOUT = {
   page: "mx-auto max-w-5xl space-y-8 px-4 py-7 sm:px-8 sm:py-10",
@@ -36,7 +37,6 @@ export const FEEDBACK_LAYOUT = {
   fieldMinHeight: 44,
 } as const;
 
-
 export type AuthorizedUnitClient = {
   id: string | number;
   name: string;
@@ -44,21 +44,16 @@ export type AuthorizedUnitClient = {
 
 export function getAuthorizedUnitNames(
   clients: AuthorizedUnitClient[],
-  fallbackUnits: readonly string[],
+  _fallbackUnits: readonly string[],
   allowedClientIds: readonly string[] = [],
   role = "",
 ): string[] {
   const hasFullAccess = role === "admin" || allowedClientIds.includes("*");
+  if (clients.length === 0) return [];
 
-  if (clients.length > 0) {
-    const allowed = new Set(allowedClientIds.map(String));
-    return clients
-      .filter((client) => hasFullAccess || allowed.has(String(client.id)))
-      .map((client) => client.name)
-      .filter((name, index, names) => Boolean(name) && names.indexOf(name) === index);
-  }
-
-  // Sem clientes devolvidos pelo backend, não há disponibilidade comprovada.
-  // O formulário deve permanecer vazio em vez de expor a lista global.
-  return [];
+  const allowed = new Set(allowedClientIds.map(String));
+  return clients
+    .filter((client) => hasFullAccess || allowed.has(String(client.id)))
+    .map((client) => client.name)
+    .filter((name, index, names) => Boolean(name) && names.indexOf(name) === index);
 }

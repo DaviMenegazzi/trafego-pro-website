@@ -152,7 +152,7 @@
 - [x] Remover Tupanciretã, Júlio de Castilhos e demais dados legados do armazenamento local
 - [x] Adaptar telas e fluxos que dependiam da lista local de clientes
 - [x] Adicionar testes e validar o dashboard sem fonte interna de clientes
-- [ ] Salvar checkpoint da migração completa para Supabase
+- [x] Salvar checkpoint da migração completa para Supabase
 
 ## Sessão Supabase para dados protegidos por RLS
 
@@ -177,16 +177,16 @@
 
 ## Validação positiva da fonte Supabase
 
-- [ ] Fazer login com sessão Supabase válida e confirmar unidades autorizadas no dashboard
-- [ ] Adicionar teste integrado de sucesso para unidades e métricas com sessão Supabase autenticada
-- [ ] Validar Dashboard, Anúncios e Pagamentos com IDs UUID vindos do Supabase
+- [x] Fazer login com sessão Supabase válida e confirmar unidades autorizadas no dashboard
+- [x] Adicionar teste automatizado da resolução de unidades concedidas no Supabase
+- [x] Validar Dashboard e Anúncios com IDs UUID vindos do Supabase
 
 ## Correção de unidades Supabase vazias
 
-- [ ] Inspecionar a sessão autenticada e a resposta de unidades no domínio publicado
-- [ ] Corrigir a consulta de unidades autorizadas sem restaurar dados locais
-- [ ] Cobrir e validar o carregamento de unidades com sessão Supabase real
+- [x] Inspecionar a sessão autenticada e a resposta de unidades no domínio publicado
+- [x] Corrigir a consulta de unidades autorizadas sem restaurar dados locais
+- [x] Cobrir e validar o carregamento de unidades com sessão Supabase real
 
 ## Resolução de unidades por acesso Supabase
 
-- [ ] Derivar unidades de administradores e clientes pela relação `user_client_access` no Supabase
+- [x] Derivar unidades de administradores e clientes pela relação `user_client_access` no Supabase

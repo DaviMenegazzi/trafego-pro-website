@@ -21,6 +21,11 @@ export type EnrichedClientAccess = {
   created_at: string;
 };
 
+/** Retorna IDs únicos de unidades concedidas por meio de user_client_access. */
+export function uniqueGrantedClientIds(accessRows: Pick<ClientAccessRow, "client_id">[]): string[] {
+  return Array.from(new Set(accessRows.map((row) => String(row.client_id)).filter(Boolean)));
+}
+
 /** Agrupa acessos por usuário e anexa os metadados da unidade exibidos na dashboard. */
 export function groupClientAccessByUser(
   accessRows: ClientAccessRow[],

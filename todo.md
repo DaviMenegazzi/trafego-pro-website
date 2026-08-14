@@ -180,3 +180,13 @@
 - [ ] Fazer login com sessão Supabase válida e confirmar unidades autorizadas no dashboard
 - [ ] Adicionar teste integrado de sucesso para unidades e métricas com sessão Supabase autenticada
 - [ ] Validar Dashboard, Anúncios e Pagamentos com IDs UUID vindos do Supabase
+
+## Correção de unidades Supabase vazias
+
+- [ ] Inspecionar a sessão autenticada e a resposta de unidades no domínio publicado
+- [ ] Corrigir a consulta de unidades autorizadas sem restaurar dados locais
+- [ ] Cobrir e validar o carregamento de unidades com sessão Supabase real
+
+## Resolução de unidades por acesso Supabase
+
+- [ ] Derivar unidades de administradores e clientes pela relação `user_client_access` no Supabase

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
-import { ShieldCheck, Plus, Trash2, X, Users2, UserCog, Link2 } from "lucide-react";
+import { ShieldCheck, Plus, Trash2, X, Users2, UserCog, Link2, Building2 } from "lucide-react";
 import { toast } from "sonner";
 
 function useAuthGuard() {
@@ -29,7 +29,14 @@ type ProfileRow = {
   avatar_url: string | null;
   created_at: string;
   updated_at: string;
-  client_access: Array<{ client_id: string; granted_by: string; created_at: string }>;
+  client_access: Array<{
+    id: string;
+    client_id: string;
+    client_name: string | null;
+    client_group: string | null;
+    granted_by: string;
+    created_at: string;
+  }>;
 };
 
 type MetricsClient = { id: string; name: string; client_group?: string };
@@ -119,8 +126,14 @@ export default function DashboardUsuariosPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  function clientName(clientId: string): string {
-    return clients.find((c) => c.id === clientId)?.name ?? clientId.slice(0, 8);
+  function clientName(access: ProfileRow["client_access"][number]): string {
+    return access.client_name ?? clients.find((client) => client.id === access.client_id)?.name ?? access.client_id.slice(0, 8);
+  }
+
+  function unitsSummary(profile: ProfileRow): string {
+    if (profile.role === "admin") return "Todas as unidades";
+    if (profile.client_access.length === 0) return "Sem unidades individuais";
+    return profile.client_access.map(clientName).join(", ");
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -284,6 +297,10 @@ export default function DashboardUsuariosPage() {
                         {profile.full_name || profile.user_email.split("@")[0]}
                       </div>
                       <div className="text-xs text-muted-foreground truncate">{profile.user_email}</div>
+                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground" title={unitsSummary(profile)}>
+                        <Building2 className="size-3 shrink-0" />
+                        <span className="truncate">{unitsSummary(profile)}</span>
+                      </div>
                     </div>
 
                     {/* Role badge */}
@@ -387,10 +404,15 @@ export default function DashboardUsuariosPage() {
                               key={`${access.client_id}-${i}`}
                               className="group flex items-center gap-1.5 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-1 text-xs"
                             >
-                              <Link2 className="size-3 text-muted-foreground" />
-                              <span>{clientName(access.client_id)}</span>
+                              <Building2 className="size-3 text-muted-foreground" />
+                              <span>{clientName(access)}</span>
+                              {access.client_group && (
+                                <span className="rounded bg-background/60 px-1 py-0.5 text-[10px] text-muted-foreground">
+                                  {access.client_group}
+                                </span>
+                              )}
                               <button
-                                onClick={() => handleRevokeAccess(access.client_id)}
+                                onClick={() => handleRevokeAccess(access.id)}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
                                 title="Revogar acesso"
                               >

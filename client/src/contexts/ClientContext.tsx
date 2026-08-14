@@ -38,7 +38,9 @@ const ClientContext = createContext<ClientContextType>({
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : localStorage.getItem("tp_selected_client_id"),
+  );
   const [loading, setLoading] = useState(true);
 
   const fetchClients = async () => {
@@ -59,14 +61,21 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         ? localRes.value
         : [];
 
-      // Supabase primeiro, depois locais que não têm nome duplicado
-      const seen = new Set(sbClients.map(c => c.name.toLowerCase()));
+      // Supabase primeiro, depois locais que ainda não existem pelo identificador.
+      // Unidades podem compartilhar nomes parecidos, portanto nunca devem ser deduplicadas por nome.
+      const seenIds = new Set(sbClients.map((c) => String(c.id)));
       const merged = [
         ...sbClients,
-        ...localClients.filter(c => !seen.has(c.name.toLowerCase())),
+        ...localClients.filter((c) => !seenIds.has(String(c.id))),
       ];
 
       setClients(merged);
+      setSelectedClientId((current) => {
+        if (current && merged.some((client) => String(client.id) === String(current))) {
+          return current;
+        }
+        return merged[0]?.id ?? null;
+      });
     } catch {
       // ignore
     } finally {
@@ -75,6 +84,14 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => { fetchClients(); }, []);
+
+  useEffect(() => {
+    if (selectedClientId) {
+      localStorage.setItem("tp_selected_client_id", selectedClientId);
+    } else {
+      localStorage.removeItem("tp_selected_client_id");
+    }
+  }, [selectedClientId]);
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 

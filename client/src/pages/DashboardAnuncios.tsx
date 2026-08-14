@@ -235,7 +235,7 @@ export default function DashboardAnunciosPage() {
   useAuthGuard();
   useEffect(() => { document.title = "Tráfego Pro — Anúncios"; }, []);
 
-  const { selectedClientId, selectedClient } = useClientContext();
+  const { selectedClientId, selectedClient, loading: clientsLoading } = useClientContext();
   const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 
@@ -257,15 +257,21 @@ export default function DashboardAnunciosPage() {
 
   // ─── Fetch offers ─────────────────────────────────────────────────────────
   const fetchOffers = useCallback(async () => {
-    if (!authHeaders) return;
+    if (!authHeaders || !selectedClientId) {
+      setRows([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const { start, end } = rangeFor(period);
-      const qs = new URLSearchParams({ start, end, ...(selectedClientId ? { clientId: String(selectedClientId) } : {}) }).toString();
+      const qs = new URLSearchParams({ start, end, clientId: String(selectedClientId) }).toString();
       // Tenta a RPC primeiro, depois fallback para a view
       const res = await fetch(`/api/metrics/offers-rpc?${qs}`, { headers: authHeaders });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Não foi possível carregar os anúncios");
       setConfigured(data.configured !== false);
       if (Array.isArray(data.rows)) setRows(data.rows);
       if (data.error) setError(data.error);
@@ -423,7 +429,7 @@ export default function DashboardAnunciosPage() {
           </button>
 
           <span className="text-xs text-muted-foreground">
-            {loading ? "Carregando…" : notSynced ? "Supabase não configurado" : `${rows.length} anúncio(s) encontrado(s)`}
+            {loading || clientsLoading ? "Carregando…" : !selectedClientId ? "Selecione uma unidade" : notSynced ? "Supabase não configurado" : `${rows.length} anúncio(s) encontrado(s)`}
           </span>
         </div>
 

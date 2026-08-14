@@ -8,6 +8,8 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { getSupabase, isSupabaseConfigured } from "./supabase.js";
+import { groupClientAccessByUser } from "./clientAccess.js";
+import { validateMetricsClientSelection } from "./metricsAccess.js";
 import {
   getAllClients,
   getClientById,
@@ -174,6 +176,41 @@ async function fetchUserAccess(supabaseUid: string): Promise<{
 // ─── Helper: checa se admin ─────────────────────────────────────────────────
 function isAdmin(claims: JwtClaims): boolean {
   return isAdminRole(claims.role) || claims.allowedClientIds.includes("*");
+}
+
+function normalizeRawOfferRow(row: Record<string, any>) {
+  const totalSpend = Number(row.spend ?? row.total_spend ?? 0);
+  const totalConversas = Number(row.conversations_started ?? row.total_conversas_iniciadas ?? 0);
+  const custoPorConversa = row.cost_per_conversation ?? row.custo_por_conversa ?? (totalConversas > 0 ? totalSpend / totalConversas : null);
+  const status = row.offer_status;
+
+  let performanceStatus = "Sem classificação";
+  if (totalSpend === 0 && totalConversas > 0) performanceStatus = "Residual";
+  else if (totalSpend > 0 && totalConversas === 0) performanceStatus = "Sem conversas";
+  else if (custoPorConversa != null) {
+    const custo = Number(custoPorConversa);
+    if (custo < 5) performanceStatus = "Excelente";
+    else if (custo < 9) performanceStatus = "Positivo";
+    else if (custo < 13) performanceStatus = "Atenção";
+    else performanceStatus = "Crítico";
+  }
+
+  return {
+    ...row,
+    total_spend: totalSpend,
+    total_conversas_iniciadas: totalConversas,
+    total_leads_meta: row.leads_meta ?? row.total_leads_meta ?? 0,
+    alcance: row.reach ?? row.alcance ?? 0,
+    total_impressions: row.impressions ?? row.total_impressions ?? 0,
+    total_clicks: row.clicks ?? row.total_clicks ?? 0,
+    total_link_clicks: row.inline_link_clicks ?? row.total_link_clicks ?? 0,
+    avg_ctr: row.ctr ?? row.avg_ctr ?? 0,
+    avg_cpc: row.cpc ?? row.avg_cpc ?? 0,
+    avg_cpm: row.cpm ?? row.avg_cpm ?? 0,
+    custo_por_conversa: custoPorConversa,
+    status_formatado: status === "ACTIVE" ? "Ativa" : ["PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"].includes(status) ? "Pausada" : status ?? null,
+    performance_status: performanceStatus,
+  };
 }
 
 // ─── Auth middleware: valida JWT e injeta req.claims ─────────────────────────
@@ -377,22 +414,19 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
     // Busca os acessos de cada usuário em user_client_access
     const profileIds = profiles.map((p: { id: string }) => p.id);
-    const { data: accessRows } = await sb
+    const { data: accessRows, error: accessError } = await sb
       .from("user_client_access")
-      .select("user_id, client_id, granted_by, created_at")
+      .select("id, user_id, client_id, granted_by, created_at")
       .in("user_id", profileIds);
+    if (accessError) { res.status(502).json({ error: accessError.message }); return; }
 
-    // Agrupa acessos por user_id
-    const accessByUser: Record<string, Array<{ client_id: string; granted_by: string; created_at: string }>> = {};
-    for (const row of (accessRows ?? [])) {
-      const uid = (row as any).user_id;
-      if (!accessByUser[uid]) accessByUser[uid] = [];
-      accessByUser[uid].push({
-        client_id: (row as any).client_id,
-        granted_by: (row as any).granted_by,
-        created_at: (row as any).created_at,
-      });
-    }
+    const clientIds = Array.from(new Set((accessRows ?? []).map((row: any) => row.client_id).filter(Boolean)));
+    const { data: accessClients, error: accessClientsError } = clientIds.length > 0
+      ? await sb.from("clients").select("id, name, client_group").in("id", clientIds)
+      : { data: [], error: null };
+    if (accessClientsError) { res.status(502).json({ error: accessClientsError.message }); return; }
+
+    const accessByUser = groupClientAccessByUser(accessRows ?? [], accessClients ?? []);
 
     const formatted = profiles.map((p: any) => ({
       id: p.id,
@@ -732,8 +766,10 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     const sb = getSupabase();
     if (!sb) { res.json({ configured: false, rows: [] }); return; }
     const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+    const selectionError = validateMetricsClientSelection(clientId, req.claims);
+    if (selectionError) { res.status(selectionError.status).json({ error: selectionError.error }); return; }
     let q = sb.from("vw_meta_ads_offer_ads").select("*");
-    if (clientId) q = q.eq("client_id", clientId);
+    q = q.eq("client_id", clientId);
     if (start) q = q.gte("date_start", start);
     if (end) q = q.lte("date_start", end);
     const { data, error } = await q.order("total_spend", { ascending: false });
@@ -746,20 +782,33 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     const sb = getSupabase();
     if (!sb) { res.json({ configured: false, rows: [] }); return; }
     const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+    const selectionError = validateMetricsClientSelection(clientId, req.claims);
+    if (selectionError) { res.status(selectionError.status).json({ error: selectionError.error }); return; }
     const { data, error } = await sb.rpc("fn_offers_by_period", {
-      p_client_id: clientId ?? null,
+      p_client_id: clientId,
       p_date_start: start ?? null,
       p_date_stop: end ?? null,
     });
     if (error) {
       if (error.message?.includes("fn_offers_by_period")) {
         let q = sb.from("vw_meta_ads_offer_ads").select("*");
-        if (clientId) q = q.eq("client_id", clientId);
+        q = q.eq("client_id", clientId);
         if (start) q = q.gte("date_start", start);
         if (end) q = q.lte("date_start", end);
         const fallback = await q.order("total_spend", { ascending: false });
-        if (fallback.error) { res.status(502).json({ error: fallback.error.message }); return; }
-        res.json({ configured: true, rows: fallback.data ?? [] });
+        if (!fallback.error) {
+          res.json({ configured: true, rows: fallback.data ?? [] });
+          return;
+        }
+
+        // Compatibilidade durante a atualização da view legada, que ainda pode
+        // não expor client_id. A tabela de origem preserva o filtro por unidade.
+        let rawQuery = sb.from("meta_ads_offers").select("*").eq("client_id", clientId);
+        if (start) rawQuery = rawQuery.gte("date_start", start);
+        if (end) rawQuery = rawQuery.lte("date_start", end);
+        const rawFallback = await rawQuery.order("spend", { ascending: false });
+        if (rawFallback.error) { res.status(502).json({ error: fallback.error.message }); return; }
+        res.json({ configured: true, rows: (rawFallback.data ?? []).map(normalizeRawOfferRow) });
         return;
       }
       res.status(502).json({ error: error.message }); return;

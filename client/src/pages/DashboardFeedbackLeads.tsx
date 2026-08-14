@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { ArrowLeft, Send, LogOut, ShieldCheck } from "lucide-react";
 import { useAdminAuth, getToken } from "@/hooks/useAdminAuth";
-import { FALLBACK_UNITS, REASONS } from "./feedbackLeadsConfig";
+import { FALLBACK_UNITS, FEEDBACK_LAYOUT, REASONS } from "./feedbackLeadsConfig";
 import { submitFeedbackLead } from "./feedbackLeadsApi";
 export { FALLBACK_UNITS, REASONS } from "./feedbackLeadsConfig";
 
@@ -24,10 +24,10 @@ function StandaloneFeedbackShell({
 }) {
   return (
     <div className="min-h-screen bg-[#080808] text-white" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <header className="border-b border-white/10 bg-black/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+      <header className="border-b border-white/10 bg-[#080808]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
           <a href="/" className="flex items-center gap-3" aria-label="Voltar para Tráfego Pro">
-            <img src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" alt="Tráfego Pro" className="h-5 w-auto" />
+            <img src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" alt="Tráfego Pro" className="h-6 w-auto" />
             <span className="hidden border-l border-white/15 pl-3 text-xs font-light tracking-[0.18em] text-white/45 sm:inline">
               FEEDBACK DE LEADS
             </span>
@@ -37,7 +37,7 @@ function StandaloneFeedbackShell({
             <button
               type="button"
               onClick={onLogout}
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-xs font-light text-white/70 transition hover:border-white/35 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3.5 py-2 text-xs font-medium text-white/75 transition hover:border-white/45 hover:bg-white/5 hover:text-white"
             >
               <LogOut className="size-3.5" />
               Sair
@@ -45,14 +45,14 @@ function StandaloneFeedbackShell({
           </div>
         </div>
       </header>
-      <div className="border-b border-white/5 bg-[#0d0d0d]">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-5 py-3 text-xs font-light text-white/45 sm:px-8">
+      <div className="border-b border-emerald-300/10 bg-[#0d1212]">
+        <div className="mx-auto flex max-w-6xl items-center gap-2 px-5 py-3.5 text-sm text-white/60 sm:px-8">
           <ShieldCheck className="size-3.5 text-emerald-400/80" />
           Página protegida · seus dados são enviados apenas após autenticação
         </div>
       </div>
       <main>{children}</main>
-      <footer className="mx-auto max-w-6xl px-5 pb-8 pt-2 text-xs font-light text-white/25 sm:px-8">
+      <footer className="mx-auto max-w-6xl px-5 pb-10 pt-3 text-sm text-white/35 sm:px-8">
         Tráfego Pro · Feedback semanal de conversão
       </footer>
     </div>
@@ -65,7 +65,7 @@ export function StandaloneFeedbackLeads() {
 
 function FeedbackLoading() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#080808] text-sm font-light text-white/55">
+    <div className="flex min-h-screen items-center justify-center bg-[#080808] text-sm text-white/70">
       Verificando autenticação…
     </div>
   );
@@ -91,6 +91,33 @@ type FormData = {
   generalObservations: string;
   supportNeeded: string;
 };
+
+const fieldClassName =
+  "mt-1 h-11 w-full rounded-xl border border-white/15 bg-[#0b0e11] px-3 text-sm text-white shadow-inner shadow-black/10 outline-none transition placeholder:text-white/35 focus:border-emerald-300/70 focus:ring-2 focus:ring-emerald-300/15";
+const labelClassName = "text-sm font-medium leading-5 text-white/80";
+const cardClassName = "rounded-2xl border border-white/10 bg-[#111519] p-5 shadow-[0_18px_45px_rgba(0,0,0,0.16)] sm:p-6";
+
+function FormSectionHeading({
+  step,
+  title,
+  description,
+}: {
+  step: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 border-b border-white/10 pb-4">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-300/15 text-xs font-semibold text-emerald-200 ring-1 ring-inset ring-emerald-300/30">
+        {step}
+      </span>
+      <div>
+        <h2 className="text-base font-semibold tracking-tight text-white sm:text-lg">{title}</h2>
+        <p className="mt-1 text-sm leading-5 text-white/50">{description}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardFeedbackLeads() {
   return <DashboardFeedbackLeadsContent />;
@@ -198,34 +225,34 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
   };
 
   const content = (
-    <div className="flex-1 overflow-auto">
-      <div className="mx-auto max-w-4xl space-y-6 p-5 sm:p-6">
+    <div className="feedback-form-shell flex-1 overflow-auto">
+      <div className={FEEDBACK_LAYOUT.page}>
           {/* Header */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-3 sm:gap-4">
             <button
               onClick={() => setLocation("/dashboard")}
-              className="p-2 hover:bg-sidebar-accent rounded-lg transition-colors"
+              className="mt-0.5 rounded-xl border border-white/10 p-2.5 text-white/60 transition-colors hover:border-white/25 hover:bg-white/5 hover:text-white"
               title="Voltar"
             >
-              <ArrowLeft className="size-5 text-muted-foreground" />
+              <ArrowLeft className="size-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">
+              <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
                 Feedback de Conversão de Leads
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55 sm:text-base">
                 Preencha os dados da semana para identificar gargalos em tráfego, atendimento e conversão
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className={FEEDBACK_LAYOUT.form}>
             {/* Seção: Identificação */}
-            <Card className="p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Identificação</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className={cardClassName}>
+              <FormSectionHeading step="1" title="Identificação" description="Informe a unidade, a pessoa responsável e a segunda-feira da semana." />
+              <div className={FEEDBACK_LAYOUT.identityGrid}>
                 <div className="space-y-2">
-                  <Label htmlFor="unit" className="text-sm font-medium">
+                  <Label htmlFor="unit" className={labelClassName}>
                     Unidade *
                   </Label>
                   <select
@@ -234,7 +261,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                     value={formData.unit}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    className={fieldClassName}
                   >
                     <option value="">Selecione a unidade</option>
                     {units.map((u) => (
@@ -246,7 +273,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="responsible" className="text-sm font-medium">
+                  <Label htmlFor="responsible" className={labelClassName}>
                     Responsável pelo preenchimento *
                   </Label>
                   <Input
@@ -261,7 +288,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="weekStart" className="text-sm font-medium">
+                  <Label htmlFor="weekStart" className={labelClassName}>
                     Semana de referência (segunda-feira) *
                   </Label>
                   <Input
@@ -277,11 +304,11 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
             </Card>
 
             {/* Seção: Volume de Leads */}
-            <Card className="p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Volume de Leads</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className={cardClassName}>
+              <FormSectionHeading step="2" title="Volume de leads" description="Separe os leads por produto e sinalize contatos fora da área." />
+              <div className={FEEDBACK_LAYOUT.metricsGrid}>
                 <div className="space-y-2">
-                  <Label htmlFor="totalLeads" className="text-sm font-medium">
+                  <Label htmlFor="totalLeads" className={labelClassName}>
                     Total de leads/conversas recebidos na semana
                   </Label>
                   <Input
@@ -296,7 +323,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="leadsCard" className="text-sm font-medium">
+                  <Label htmlFor="leadsCard" className={labelClassName}>
                     Leads — Cartão (venda direta)
                   </Label>
                   <Input
@@ -311,7 +338,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="leadsConsultation" className="text-sm font-medium">
+                  <Label htmlFor="leadsConsultation" className={labelClassName}>
                     Leads — Consulta/Agendamento
                   </Label>
                   <Input
@@ -326,7 +353,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="leadsDentistry" className="text-sm font-medium">
+                  <Label htmlFor="leadsDentistry" className={labelClassName}>
                     Leads — Odontologia
                   </Label>
                   <Input
@@ -341,7 +368,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="leadsBusinessPJ" className="text-sm font-medium">
+                  <Label htmlFor="leadsBusinessPJ" className={labelClassName}>
                     Leads — Empresarial/PJ
                   </Label>
                   <Input
@@ -356,7 +383,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="leadsOutOfArea" className="text-sm font-medium">
+                  <Label htmlFor="leadsOutOfArea" className={labelClassName}>
                     Leads de fora da área de atuação
                   </Label>
                   <Input
@@ -373,11 +400,11 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
             </Card>
 
             {/* Seção: Atendimento e Conversão */}
-            <Card className="p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Atendimento e Conversão</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className={cardClassName}>
+              <FormSectionHeading step="3" title="Atendimento e conversão" description="Compare resposta, perda de retorno e vendas fechadas." />
+              <div className={FEEDBACK_LAYOUT.metricsGrid}>
                 <div className="space-y-2">
-                  <Label htmlFor="leadsAnswered" className="text-sm font-medium">
+                  <Label htmlFor="leadsAnswered" className={labelClassName}>
                     Leads respondidos
                   </Label>
                   <Input
@@ -392,7 +419,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="leadsNoAnswer" className="text-sm font-medium">
+                  <Label htmlFor="leadsNoAnswer" className={labelClassName}>
                     Leads sem resposta/sem retorno
                   </Label>
                   <Input
@@ -407,7 +434,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="salesClosed" className="text-sm font-medium">
+                  <Label htmlFor="salesClosed" className={labelClassName}>
                     Vendas fechadas na semana
                   </Label>
                   <Input
@@ -422,7 +449,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="mainReason" className="text-sm font-medium">
+                  <Label htmlFor="mainReason" className={labelClassName}>
                     Motivo principal de não conversão
                   </Label>
                   <select
@@ -430,7 +457,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                     name="mainReason"
                     value={formData.mainReason}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    className={fieldClassName}
                   >
                     <option value="">Selecione um motivo</option>
                     {REASONS.map((r) => (
@@ -444,11 +471,11 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
             </Card>
 
             {/* Seção: Qualitativo */}
-            <Card className="p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Qualitativo</h2>
+            <Card className={cardClassName}>
+              <FormSectionHeading step="4" title="Qualitativo" description="Registre padrões percebidos e qualquer necessidade de apoio." />
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="creativeFeedback" className="text-sm font-medium">
+                  <Label htmlFor="creativeFeedback" className={labelClassName}>
                     Algum criativo/anúncio específico gerou leads de qualidade nítida (bom ou ruim)?
                   </Label>
                   <Textarea
@@ -462,7 +489,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="generalObservations" className="text-sm font-medium">
+                  <Label htmlFor="generalObservations" className={labelClassName}>
                     Observações gerais / pontos de atenção para a agência
                   </Label>
                   <Textarea
@@ -476,7 +503,7 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="supportNeeded" className="text-sm font-medium">
+                  <Label htmlFor="supportNeeded" className={labelClassName}>
                     Precisa de suporte da agência esta semana? Em quê?
                   </Label>
                   <Textarea
@@ -492,18 +519,19 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
             </Card>
 
             {/* Botões de ação */}
-            <div className="flex gap-3 justify-end">
+            <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setLocation("/dashboard")}
+                className="h-11 rounded-xl border-white/15 bg-transparent px-5 text-white/70 hover:bg-white/5 hover:text-white"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 disabled={loading}
-                className="gap-2"
+                className="h-11 gap-2 rounded-xl bg-emerald-300 px-5 font-semibold text-[#06120b] shadow-[0_8px_24px_rgba(110,231,183,0.16)] hover:bg-emerald-200"
               >
                 <Send className="size-4" />
                 {loading ? "Salvando..." : "Enviar Feedback"}

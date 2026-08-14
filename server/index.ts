@@ -4,36 +4,11 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
-import multer from "multer";
 import * as XLSX from "xlsx";
-import { getSupabase, isSupabaseConfigured } from "./supabase.js";
+import { getSupabase, getSupabaseForAccessToken, isSupabaseConfigured } from "./supabase.js";
 import { groupClientAccessByUser } from "./clientAccess.js";
 import { validateMetricsClientSelection } from "./metricsAccess.js";
 import { createFeedbackLeadSql, listAllFeedbackLeadsForExportSql, listFeedbackLeadsSql } from "./feedbackSql.js";
-import {
-  getAllClients,
-  getClientById,
-  getCampaignsByClientId,
-  createClient,
-  updateClient,
-  deleteClient,
-  createCampaign,
-  updateCampaign,
-  deleteCampaign,
-  getUserByEmail,
-  getUserByName,
-  getAllUsers,
-  createUser,
-  updateUserPassword,
-  deleteUser,
-  type ClientInput,
-  type CampaignInput,
-  type Client,
-  type Campaign,
-  type User,
-  type FeedbackLead,
-} from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,18 +42,6 @@ function verifyToken(token: string): Record<string, unknown> | null {
   }
 }
 
-// ─── Verificação de senha (bcrypt) com migração automática de senhas antigas ──
-function checkPassword(plain: string, stored: string, userId: number): boolean {
-  if (stored.startsWith("$2")) return bcrypt.compareSync(plain, stored);
-  if (stored === plain) {
-    try {
-      updateUserPassword(userId, bcrypt.hashSync(plain, 10));
-    } catch { /* migração best-effort */ }
-    return true;
-  }
-  return false;
-}
-
 // ─── Tipos de claims no JWT ─────────────────────────────────────────────────
 // Roles reais do sistema (do user_profiles):
 //   admin, viewer, client_viewer, designer, cs,
@@ -87,7 +50,7 @@ interface JwtClaims {
   email: string;
   name: string;
   role: string;
-  id: number;
+  id: string;
   allowedClientIds: string[];  // ["*"] = acesso total
   iat: number;
 }
@@ -105,13 +68,13 @@ function isTeamRole(role: string): boolean {
 // ─── Busca perfil + acessos do usuário no Supabase ────────────────────────
 // Usa user_profiles (role) + user_client_access (clientes permitidos)
 // Ambas as tabelas JÁ EXISTEM no Supabase — zero mudança no banco.
-async function fetchUserAccess(supabaseUid: string): Promise<{
+async function fetchUserAccess(supabaseUid: string, accessToken?: string): Promise<{
   role: string;
   allowedClientIds: string[];
 }> {
-  const sb = getSupabase();
+  const sb = getSupabaseForAccessToken(accessToken);
   if (!sb) {
-    return { role: "admin", allowedClientIds: ["*"] };
+    return { role: "", allowedClientIds: [] };
   }
 
   // 1. Busca role no user_profiles
@@ -256,8 +219,20 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
   next();
 }
 
-// ─── Multer (in-memory for Excel upload) ────────────────────────────────────
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const SUPABASE_ACCESS_COOKIE = "tp_supabase_access";
+const SUPABASE_COOKIE_MAX_AGE_MS = 50 * 60 * 1000;
+
+function readCookie(req: express.Request, cookieName: string): string | undefined {
+  const raw = req.headers.cookie;
+  if (!raw) return undefined;
+  const value = raw.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${cookieName}=`));
+  if (!value) return undefined;
+  try { return decodeURIComponent(value.slice(cookieName.length + 1)); } catch { return undefined; }
+}
+
+function getSupabaseForRequest(req: express.Request) {
+  return getSupabaseForAccessToken(readCookie(req, SUPABASE_ACCESS_COOKIE));
+}
 
 export async function startServer({ listen = true }: { listen?: boolean } = {}) {
   const app = express();
@@ -267,25 +242,13 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
   app.post("/api/auth/login", async (req, res) => {
-    const { email, name, password } = req.body as { email?: string; name?: string; password: string };
+    const { email, password } = req.body as { email?: string; password: string };
 
-    const identifier = email || name;
-    if (!identifier || !password) {
+    if (!email || !password) {
       res.status(400).json({ error: "Identificação e senha são obrigatórios" });
       return;
     }
-
-    const isEmail = identifier.includes("@");
-    let loginEmail = identifier;
-
-    if (!isEmail) {
-      const localUser = getUserByName(identifier);
-      if (!localUser) {
-        res.status(401).json({ error: "Usuário não encontrado" });
-        return;
-      }
-      loginEmail = localUser.email;
-    }
+    const loginEmail = email.trim().toLowerCase();
 
     // Tenta autenticar contra o Supabase Auth
     const supabase = getSupabase();
@@ -298,38 +261,42 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
         }
 
         // Busca role + acessos usando o UID do Supabase Auth
-        const access = await fetchUserAccess(data.user.id);
+        const accessToken = data.session?.access_token;
+        const access = await fetchUserAccess(data.user.id, accessToken);
 
         if (!access.role || access.allowedClientIds.length === 0) {
           res.status(403).json({ error: "Sem permissão. Contate o administrador." });
           return;
         }
 
-        // Cria/atualiza no banco local (para consistência)
-        let dbUser = getUserByEmail(loginEmail);
-        if (!dbUser) {
-          dbUser = createUser({
-            name: data.user.user_metadata?.name || loginEmail.split("@")[0],
-            email: loginEmail,
-            password: "[supabase-auth]",
-            role: access.role as "admin" | "user",
-          });
+        if (!accessToken) {
+          res.status(500).json({ error: "Sessão Supabase indisponível" });
+          return;
         }
 
+        const userName = data.user.user_metadata?.name || loginEmail.split("@")[0];
+
         const token = signToken({
-          email: dbUser.email,
-          name: dbUser.name,
+          email: loginEmail,
+          name: userName,
           role: access.role,
-          id: dbUser.id,
+          id: data.user.id,
           allowedClientIds: access.allowedClientIds,
+        });
+        res.cookie(SUPABASE_ACCESS_COOKIE, accessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: SUPABASE_COOKIE_MAX_AGE_MS,
+          path: "/",
         });
         res.json({
           token,
           user: {
-            email: dbUser.email,
-            name: dbUser.name,
+            email: loginEmail,
+            name: userName,
             role: access.role,
-            id: dbUser.id,
+            id: data.user.id,
             allowedClientIds: access.allowedClientIds,
           },
         });
@@ -341,30 +308,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       }
     }
 
-    // Fallback local (sem Supabase)
-    console.warn("[auth] Supabase não configurado, usando autenticação local");
-    let dbUser = getUserByEmail(loginEmail);
-    if (!dbUser) {
-      dbUser = createUser({
-        name: loginEmail.split("@")[0], email: loginEmail, password, role: "admin",
-      });
-    }
-
-    if (dbUser && checkPassword(password, dbUser.password, dbUser.id)) {
-      const token = signToken({
-        email: dbUser.email, name: dbUser.name,
-        role: "admin", id: dbUser.id, allowedClientIds: ["*"],
-      });
-      res.json({
-        token, user: {
-          email: dbUser.email, name: dbUser.name,
-          role: "admin", id: dbUser.id, allowedClientIds: ["*"],
-        },
-      });
-      return;
-    }
-
-    res.status(401).json({ error: "Credenciais inválidas" });
+    res.status(503).json({ error: "Supabase não configurado para autenticação" });
   });
 
   // ─── Auth me ──────────────────────────────────────────────────────────────
@@ -372,38 +316,16 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     res.json(req.claims);
   });
 
-  // ─── Users (admin only, banco local) ──────────────────────────────────────
-  app.get("/api/users", requireAuth, requireAdmin, (_req, res) => {
-    const users = getAllUsers().map(({ password: _p, ...u }) => u);
-    res.json(users);
-  });
-
-  app.post("/api/users", requireAuth, requireAdmin, (req, res) => {
-    const { name, email, password, role: rawRole } = req.body as { name: string; email: string; password: string; role?: string };
-    const role = rawRole === "admin" || rawRole === "user" ? rawRole : undefined;
-    if (!name?.trim() || !password?.trim()) {
-      res.status(400).json({ error: "Nome e senha são obrigatórios" });
-      return;
-    }
-    if (getUserByName(name)) {
-      res.status(409).json({ error: "Já existe um usuário com esse nome" });
-      return;
-    }
-    const user = createUser({ name, email: email || `${name.toLowerCase().replace(/\s+/g, '.')}@trafego.pro`, password, role });
-    const { password: _p, ...safeUser } = user;
-    res.status(201).json(safeUser);
-  });
-
-  app.delete("/api/users/:id", requireAuth, requireAdmin, (req, res) => {
-    deleteUser(parseInt(req.params.id));
-    res.json({ success: true });
+  app.post("/api/auth/logout", requireAuth, (_req, res) => {
+    res.clearCookie(SUPABASE_ACCESS_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+    res.status(204).end();
   });
 
   // ─── User Profiles (admin only) via Supabase ─────────────────────────────
   // Lista todos os profiles do Supabase com seus acessos
-  app.get("/api/user-access", requireAuth, requireAdmin, async (_req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.json([]); return; }
+  app.get("/api/user-access", requireAuth, requireAdmin, async (req, res) => {
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
 
     const { data: profiles, error } = await sb
       .from("user_profiles")
@@ -448,8 +370,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // Atualiza o role/status de um profile
   app.put("/api/user-access/:id", requireAuth, requireAdmin, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.status(503).json({ error: "Supabase não configurado" }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { role, full_name, status } = req.body as { role?: string; full_name?: string; status?: string };
     const updates: Record<string, unknown> = {};
     if (role) updates.role = role;
@@ -473,8 +395,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // Cria um novo profile
   app.post("/api/user-access", requireAuth, requireAdmin, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.status(503).json({ error: "Supabase não configurado" }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { user_email, full_name, role, bio } = req.body as {
       user_email: string; full_name?: string; role?: string; bio?: string;
     };
@@ -511,8 +433,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // Desativa um profile (não exclui)
   app.delete("/api/user-access/:id", requireAuth, requireAdmin, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.status(503).json({ error: "Supabase não configurado" }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { error } = await sb
       .from("user_profiles")
       .update({ status: "inactive", updated_at: new Date().toISOString() })
@@ -524,8 +446,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   // ─── Client Access Management (admin only) via user_client_access ────────
   // Concede acesso a um usuário a um client
   app.post("/api/client-access", requireAuth, requireAdmin, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.status(503).json({ error: "Supabase não configurado" }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { user_id, client_id } = req.body as { user_id: string; client_id: string };
     if (!user_id || !client_id) {
       res.status(400).json({ error: "user_id e client_id são obrigatórios" });
@@ -549,102 +471,14 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // Remove acesso de um usuário a um client
   app.delete("/api/client-access/:id", requireAuth, requireAdmin, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.status(503).json({ error: "Supabase não configurado" }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { error } = await sb
       .from("user_client_access")
       .delete()
       .eq("id", req.params.id);
     if (error) { res.status(502).json({ error: error.message }); return; }
     res.json({ ok: true });
-  });
-
-  // ─── Clients ──────────────────────────────────────────────────────────────
-  app.get("/api/clients", requireAuth, (_req, res) => {
-    const clients = getAllClients();
-    res.json(clients);
-  });
-
-  app.post("/api/clients", requireAuth, requireAdmin, (req, res) => {
-    const body = req.body as Partial<ClientInput> & { name: string };
-    if (!body.name?.trim()) {
-      res.status(400).json({ error: "Nome é obrigatório" });
-      return;
-    }
-    const client = createClient(body);
-    res.status(201).json(client);
-  });
-
-  app.get("/api/clients/:id", requireAuth, (req, res) => {
-    const client = getClientById(Number(req.params.id));
-    if (!client) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
-    const campaigns = getCampaignsByClientId(client.id);
-    res.json({ ...client, campaigns });
-  });
-
-  app.put("/api/clients/:id", requireAuth, requireAdmin, (req, res) => {
-    const id = Number(req.params.id);
-    if (!getClientById(id)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
-    const updated = updateClient(id, req.body as Partial<ClientInput>);
-    res.json(updated);
-  });
-
-  app.delete("/api/clients/:id", requireAuth, requireAdmin, (req, res) => {
-    const id = Number(req.params.id);
-    if (!getClientById(id)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
-    deleteClient(id);
-    res.json({ ok: true });
-  });
-
-  // ─── Campaigns ────────────────────────────────────────────────────────────
-  app.post("/api/clients/:clientId/campaigns", requireAuth, requireAdmin, (req, res) => {
-    const clientId = Number(req.params.clientId);
-    if (!getClientById(clientId)) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
-    const body = req.body as Partial<CampaignInput> & { name: string };
-    if (!body.name?.trim()) { res.status(400).json({ error: "Nome da campanha é obrigatório" }); return; }
-    const campaign = createCampaign(clientId, body);
-    res.status(201).json(campaign);
-  });
-
-  app.put("/api/campaigns/:id", requireAuth, requireAdmin, (req, res) => {
-    const id = Number(req.params.id);
-    const updated = updateCampaign(id, req.body as Partial<CampaignInput>);
-    if (!updated) { res.status(404).json({ error: "Campanha não encontrada" }); return; }
-    res.json(updated);
-  });
-
-  app.delete("/api/campaigns/:id", requireAuth, requireAdmin, (req, res) => {
-    deleteCampaign(Number(req.params.id));
-    res.json({ ok: true });
-  });
-
-  // ─── Excel Export ─────────────────────────────────────────────────────────
-  app.get("/api/clients/export/excel", requireAuth, requireAdmin, (_req, res) => {
-    const clients = getAllClients();
-    const clientsSheet = XLSX.utils.json_to_sheet(
-      clients.map((c) => ({
-        ID: c.id, Nome: c.name, Cidade: c.city, Estado: c.state,
-        Status: c.status === "active" ? "Ativo" : "Pausado", Plano: c.plan,
-        "Data de Início": c.startDate, "Orçamento Mensal (R$)": c.monthlyBudget,
-        Contato: c.contact, Telefone: c.phone, Email: c.email,
-        "URL da LP": c.lpUrl, Observações: c.notes,
-      }))
-    );
-    const allCampaigns = clients.flatMap((c) =>
-      getCampaignsByClientId(c.id).map((camp) => ({
-        "ID Cliente": c.id, "Nome do Cliente": c.name, "ID Campanha": camp.id,
-        "Nome da Campanha": camp.name, Plataforma: camp.platform,
-        Status: camp.status === "active" ? "Ativa" : "Pausada", "Orçamento (R$)": camp.budget,
-      }))
-    );
-    const campaignsSheet = XLSX.utils.json_to_sheet(allCampaigns);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, clientsSheet, "Clientes");
-    XLSX.utils.book_append_sheet(wb, campaignsSheet, "Campanhas");
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=\"clientes-trafego-pro.xlsx\"");
-    res.send(buf);
   });
 
   // ─── Feedback semanal de leads ───────────────────────────────────────────
@@ -745,8 +579,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     }
 
     if (!isAdmin(req.claims!)) {
-      const sb = getSupabase();
-      if (!sb) { res.status(503).json({ error: "Não foi possível validar a unidade autorizada" }); return; }
+      const sb = getSupabaseForRequest(req);
+      if (!sb) { res.status(403).json({ error: "Sem acesso a essa unidade" }); return; }
       const { data: client, error } = await sb.from("clients").select("id").eq("name", unit).maybeSingle();
       if (error) { res.status(502).json({ error: "Não foi possível validar a unidade autorizada" }); return; }
       if (!client || !hasUnitAccess(client.id, req.claims!)) { res.status(403).json({ error: "Sem acesso a essa unidade" }); return; }
@@ -765,7 +599,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
         observations: typeof body.observations === "string" ? body.observations.trim() : "",
         agencySatisfaction, communicationClarity,
         agencyAdjustment: typeof body.agencyAdjustment === "string" ? body.agencyAdjustment.trim() : "",
-        submittedAt: submittedAt.toISOString(), submittedByUserId: req.claims?.id ?? null,
+        submittedAt: submittedAt.toISOString(), submittedByUserId: req.claims ? String(req.claims.id) : null,
         submittedByEmail: req.claims?.email ?? "",
       });
       res.status(201).json(feedback);
@@ -782,8 +616,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // Lista de clients do Supabase — filtrada por acesso
   app.get("/api/metrics/clients", requireAuth, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.json({ configured: false, clients: [] }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { data, error } = await sb.from("clients").select("id, name, client_group").order("name");
     if (error) { res.status(502).json({ error: error.message }); return; }
 
@@ -800,8 +634,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // Métricas diárias — filtradas por acesso
   app.get("/api/metrics/daily", requireAuth, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
 
     if (clientId && req.claims && !isAdmin(req.claims)) {
@@ -832,8 +666,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // Métricas por campanha — filtradas por acesso
   app.get("/api/metrics/campaigns", requireAuth, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
 
     if (clientId && req.claims && !isAdmin(req.claims)) {
@@ -869,8 +703,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // ─── Offers / Anúncios (view vw_meta_ads_offer_ads) ────────────────────────
   app.get("/api/metrics/offers", requireAuth, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
     const selectionError = validateMetricsClientSelection(clientId, req.claims);
     if (selectionError) { res.status(selectionError.status).json({ error: selectionError.error }); return; }
@@ -885,8 +719,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // Tenta a RPC fn_offers_by_period se existir, senão fallback para a view
   app.get("/api/metrics/offers-rpc", requireAuth, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.json({ configured: false, rows: [] }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
     const selectionError = validateMetricsClientSelection(clientId, req.claims);
     if (selectionError) { res.status(selectionError.status).json({ error: selectionError.error }); return; }
@@ -924,49 +758,14 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // ─── Units (lista dinâmica de unidades/clientes do Supabase) ──────────────
   app.get("/api/metrics/units", requireAuth, async (req, res) => {
-    const sb = getSupabase();
-    if (!sb) { res.json({ configured: false, units: [] }); return; }
+    const sb = getSupabaseForRequest(req);
+    if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const { data, error } = await sb.from("clients").select("id, name, client_group").order("name");
     if (error) { res.status(502).json({ error: error.message }); return; }
 
     const clients = (data ?? []).filter((client: any) => hasUnitAccess(client.id, req.claims!));
     const units = clients.map((client: any) => client.name);
     res.json({ configured: true, units, clients });
-  });
-
-  // ─── Excel Import ─────────────────────────────────────────────────────────
-  app.post("/api/clients/import/excel", requireAuth, requireAdmin, upload.single("file"), (req, res) => {
-    if (!req.file) { res.status(400).json({ error: "Nenhum arquivo enviado" }); return; }
-    try {
-      const wb = XLSX.read(req.file.buffer, { type: "buffer" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-      let imported = 0;
-      let errors: string[] = [];
-      for (const row of rows) {
-        const name = String(row["Nome"] || row["name"] || "").trim();
-        if (!name) { errors.push(`Linha ignorada: nome vazio`); continue; }
-        try {
-          createClient({
-            name, city: String(row["Cidade"] || row["city"] || ""),
-            state: String(row["Estado"] || row["state"] || ""),
-            status: String(row["Status"] || row["status"] || "active") === "Ativo" ? "active" : "paused",
-            plan: String(row["Plano"] || row["plan"] || ""),
-            startDate: String(row["Data de Início"] || row["startDate"] || row["start_date"] || ""),
-            monthlyBudget: Number(row["Orçamento Mensal (R$)"] || row["monthlyBudget"] || row["monthly_budget"] || 0),
-            contact: String(row["Contato"] || row["contact"] || ""),
-            phone: String(row["Telefone"] || row["phone"] || ""),
-            email: String(row["Email"] || row["email"] || ""),
-            lpUrl: String(row["URL da LP"] || row["lpUrl"] || row["lp_url"] || ""),
-            notes: String(row["Observações"] || row["notes"] || ""),
-          });
-          imported++;
-        } catch (e) { errors.push(`Erro ao importar "${name}": ${(e as Error).message}`); }
-      }
-      res.json({ imported, errors, total: rows.length });
-    } catch (e) {
-      res.status(400).json({ error: `Erro ao processar planilha: ${(e as Error).message}` });
-    }
   });
 
   // ─── Static files (production only) ────────────────────────────────────────

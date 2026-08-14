@@ -40,6 +40,22 @@ export function getSupabase(): SupabaseClient | null {
   return baseClient();
 }
 
+/**
+ * Cria um cliente de curta duração que executa consultas com o access token
+ * do próprio usuário. Assim, as políticas RLS do Supabase continuam sendo a
+ * fonte de verdade para unidades, métricas e permissões do dashboard.
+ */
+export function getSupabaseForAccessToken(accessToken: string | undefined): SupabaseClient | null {
+  if (!accessToken) return null;
+  if (SERVICE_KEY) return baseClient();
+  if (!SUPABASE_URL || !PUBLISHABLE_KEY) return null;
+
+  return createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+  });
+}
+
 // Client autorizado para leitura protegida por RLS.
 // - service key: retorna direto (já ignora RLS).
 // - publishable + credenciais: garante uma sessão logada antes de retornar.

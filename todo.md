@@ -143,3 +143,40 @@
 
 - [x] Tornar `week_end` obrigatório no banco e criar o índice de período semanal em operações compatíveis
 - [x] Adicionar teste automatizado do backfill de registros legados para o contrato semanal
+
+## Migração de clientes para Supabase
+
+- [x] Mapear todas as dependências do armazenamento interno de clientes e campanhas
+- [x] Usar Supabase como fonte exclusiva de clientes, unidades e permissões
+- [x] Remover a aba Clientes e todo o CRUD interno correspondente
+- [x] Remover Tupanciretã, Júlio de Castilhos e demais dados legados do armazenamento local
+- [x] Adaptar telas e fluxos que dependiam da lista local de clientes
+- [x] Adicionar testes e validar o dashboard sem fonte interna de clientes
+- [ ] Salvar checkpoint da migração completa para Supabase
+
+## Sessão Supabase para dados protegidos por RLS
+
+- [x] Preservar a sessão autenticada do Supabase em cookie HTTP-only após o login
+- [x] Executar as consultas de clientes e métricas com o token Supabase do usuário autenticado
+- [x] Remover a dependência de consultas anônimas e de clientes locais como fallback
+- [x] Limpar a sessão Supabase HTTP-only ao sair do dashboard
+
+## Identidade do remetente no feedback SQL
+
+- [x] Migrar `submitted_by_user_id` para aceitar UUIDs do Supabase sem perder registros existentes
+
+## Transição de sessões antigas
+
+- [x] Redirecionar sessões legadas sem cookie Supabase para novo login em vez de exibir dashboard vazio
+
+## Eliminação do armazenamento lowdb legado
+
+- [x] Remover o módulo `server/db.ts`, os usuários locais e os testes de CRUD interno
+- [x] Remover endpoints locais de usuários, clientes, campanhas e importação de planilha
+- [x] Excluir o arquivo de dados legado sem afetar a tabela SQL de feedbacks
+
+## Validação positiva da fonte Supabase
+
+- [ ] Fazer login com sessão Supabase válida e confirmar unidades autorizadas no dashboard
+- [ ] Adicionar teste integrado de sucesso para unidades e métricas com sessão Supabase autenticada
+- [ ] Validar Dashboard, Anúncios e Pagamentos com IDs UUID vindos do Supabase

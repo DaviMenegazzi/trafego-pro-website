@@ -9,7 +9,6 @@ import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import DashboardPipeline from "./pages/DashboardPipeline";
-import DashboardClientes from "./pages/DashboardClientes";
 import DashboardPagamentos from "./pages/DashboardPagamentos";
 import DashboardMeuTrabalho from "./pages/DashboardMeuTrabalho";
 import DashboardAtualizacoes from "./pages/DashboardAtualizacoes";
@@ -30,8 +29,6 @@ function Router() {
       <Route path={"/dashboard/"} component={Dashboard} />
       <Route path={"/dashboard/pipeline"} component={DashboardPipeline} />
       <Route path={"/dashboard/pipeline/"} component={DashboardPipeline} />
-      <Route path={"/dashboard/clientes"} component={DashboardClientes} />
-      <Route path={"/dashboard/clientes/"} component={DashboardClientes} />
       <Route path={"/dashboard/pagamentos"} component={DashboardPagamentos} />
       <Route path={"/dashboard/pagamentos/"} component={DashboardPagamentos} />
       <Route path={"/dashboard/meu-trabalho"} component={DashboardMeuTrabalho} />

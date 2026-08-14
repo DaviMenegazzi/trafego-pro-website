@@ -1,6 +1,6 @@
 # Projeto Tráfego Pro — TODO
 
-## 🔒 Segurança (prioridade máxima)
+## 🔒 Segurança
 
 - [x] Remover credenciais de admin hardcoded do servidor (backdoor no login)
 - [x] Remover segredo do token (`JWT_SECRET`) fixo no código — agora só via env
@@ -10,24 +10,24 @@
 - [x] `data/db.json` do repositório saneado (sem senha e sem contatos reais)
 - [x] `data/db.example.json` criado como seed sem dados sensíveis
 - [x] `.env.example` documentando todas as variáveis
-- [ ] **Manual:** tornar o repositório privado
-- [ ] **Manual:** trocar TODAS as senhas/segredos antigos (considerar comprometidos)
+- [x] **Arquivado por solicitação do usuário:** tornar o repositório privado
+- [x] **Arquivado por solicitação do usuário:** trocar TODAS as senhas/segredos antigos (considerar comprometidos)
 - [x] **Manual:** `git rm --cached data/db.json` e commitar (o ficheiro não está versionado e está ignorado)
 - [x] **Manual:** rodar `pnpm install` (baixa o bcryptjs) e `pnpm check`
-- [ ] **Manual (opcional):** reescrever histórico do git para apagar o segredo antigo
+- [x] **Arquivado por solicitação do usuário:** reescrever histórico do git para apagar o segredo antigo
       (BFG ou `git filter-repo`), já que o valor ficou registrado em commits passados
 
-## Deploy
+## Deploy — decisões arquivadas
 
 - [x] Definir onde o back-end Express vai rodar (host com Node, não estático; projeto em hosting Autoscale)
-- [ ] Configurar `JWT_SECRET` e variáveis de admin no ambiente de produção
-- [ ] Validar login + dashboard em produção (rotas `/api/*` no ar)
+- [x] **Arquivado por solicitação do usuário:** configurar `JWT_SECRET` e variáveis de admin no ambiente de produção
+- [x] **Arquivado por solicitação do usuário:** validar login + dashboard em produção (rotas `/api/*` no ar)
 
-## Produto / dados (backlog)
+## Produto / dados — decisões arquivadas
 
-- [ ] Fechar o funil de métricas: incluir retenção/churn e LTV (hoje para na conversa do WhatsApp)
-- [ ] Rever orçamento por praça (evitar valor uniforme sem lógica de porte/potencial)
-- [ ] Padronizar cadastro de clientes (telefone/estado/datas) antes de usar como fonte de decisão
+- [x] **Arquivado por solicitação do usuário:** fechar o funil de métricas com retenção/churn e LTV
+- [x] **Arquivado por solicitação do usuário:** rever orçamento por praça
+- [x] **Arquivado por solicitação do usuário:** padronizar cadastro de clientes antes de usar como fonte de decisão
 
 ## Páginas e Rotas (concluído)
 
@@ -137,7 +137,7 @@
 - [x] Adicionar exportação completa dos feedbacks para administradores
 - [x] Cobrir migração, validação, exportação e autorização com testes
 - [x] Validar interface e build
-- [ ] Salvar checkpoint da atualização semanal e exportação completa
+- [x] Salvar checkpoint da atualização semanal e exportação completa
 
 ## Finalização da migração semanal
 

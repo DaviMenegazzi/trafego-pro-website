@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { useClientContext } from "@/contexts/ClientContext";
+import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -267,7 +268,8 @@ export default function DashboardAnunciosPage() {
     setError(null);
     try {
       const { start, end } = rangeFor(period);
-      const qs = new URLSearchParams({ start, end, clientId: String(selectedClientId) }).toString();
+      const qs = buildClientMetricsQuery(start, end, selectedClientId);
+      if (!qs) return;
       // Tenta a RPC primeiro, depois fallback para a view
       const res = await fetch(`/api/metrics/offers-rpc?${qs}`, { headers: authHeaders });
       const data = await res.json();

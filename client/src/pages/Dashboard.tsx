@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
+import { useClientContext } from "@/contexts/ClientContext";
+import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
@@ -54,8 +56,6 @@ type CampaignRow = {
   avg_cpc: number | null;
   avg_cpm: number | null;
 };
-type ClientOpt = { id: string; name: string };
-
 // ─── Formatação (pt-BR) ───────────────────────────────────────────────────────
 const n = (v: number) => v.toLocaleString("pt-BR");
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -118,31 +118,28 @@ export default function DashboardPage() {
   useEffect(() => { document.title = "Tráfego Pro — Dashboard"; }, []);
 
   const [period, setPeriod] = useState("30");
-  const [clientId, setClientId] = useState("");
-  const [clientOpts, setClientOpts] = useState<ClientOpt[]>([]);
   const [daily, setDaily] = useState<DailyRow[]>(FALLBACK_DAILY);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>(FALLBACK_CAMPAIGNS);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { clients: clientOpts, selectedClientId, selectedClient, setSelectedClientId, loading: clientsLoading } = useClientContext();
+  const clientId = selectedClientId ?? "";
 
   const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 
-  // Lista de clientes (do Supabase) para o filtro
-  useEffect(() => {
-    if (!authHeaders) return;
-    fetch("/api/metrics/clients", { headers: authHeaders })
-      .then((r) => r.json())
-      .then((d) => { if (d.configured) setClientOpts(d.clients ?? []); })
-      .catch(() => {});
-  }, [token]);
-
   // Carrega métricas ao mudar período/cliente
   useEffect(() => {
-    if (!authHeaders) return;
+    if (!authHeaders || !selectedClientId) {
+      setDaily([]);
+      setCampaigns([]);
+      setLoading(false);
+      return;
+    }
     const { start, end } = rangeFor(period);
-    const qs = new URLSearchParams({ start, end, ...(clientId ? { clientId } : {}) }).toString();
+    const qs = buildClientMetricsQuery(start, end, selectedClientId);
+    if (!qs) return;
     setLoading(true); setError(null);
     Promise.all([
       fetch(`/api/metrics/daily?${qs}`, { headers: authHeaders }).then((r) => r.json()),
@@ -158,7 +155,7 @@ export default function DashboardPage() {
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [token, period, clientId]);
+  }, [token, period, selectedClientId]);
 
   // ─── Agregações (mesma lógica da dashboard antiga) ──────────────────────────
   const kpi = useMemo(() => {
@@ -220,7 +217,7 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex flex-col gap-1">
           <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-            {clientOpts.find((c) => c.id === clientId)?.name ?? "Todos os clientes"}
+            {selectedClient?.name ?? "Selecione uma unidade"}
           </p>
           <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-[-0.02em]">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">Visão geral da performance de mídia.</p>
@@ -238,9 +235,9 @@ export default function DashboardPage() {
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           </div>
           <div className="relative">
-            <select value={clientId} onChange={(e) => setClientId(e.target.value)}
-              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              <option value="">Todos os clientes</option>
+            <select value={clientId} onChange={(e) => setSelectedClientId(e.target.value)} disabled={clientsLoading || clientOpts.length === 0}
+              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60">
+              {!clientId && <option value="">Selecione uma unidade</option>}
               {clientOpts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -253,7 +250,7 @@ export default function DashboardPage() {
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Atualizar dados
           </button>
           <span className="text-xs text-muted-foreground">
-            {loading ? "Carregando…" : notSynced ? "Supabase não configurado — exibindo dados de exemplo" : "Dados sincronizados do Supabase"}
+            {clientsLoading || loading ? "Carregando…" : !selectedClientId ? "Selecione uma unidade para ver as métricas" : notSynced ? "Supabase não configurado — exibindo dados de exemplo" : "Dados sincronizados do Supabase"}
           </span>
         </div>
 

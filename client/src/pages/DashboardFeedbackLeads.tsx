@@ -7,32 +7,71 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, LogOut, ShieldCheck } from "lucide-react";
+import { useAdminAuth, getToken } from "@/hooks/useAdminAuth";
+import { FALLBACK_UNITS, REASONS } from "./feedbackLeadsConfig";
+import { submitFeedbackLead } from "./feedbackLeadsApi";
+export { FALLBACK_UNITS, REASONS } from "./feedbackLeadsConfig";
 
-function useAuthGuard() {
-  const [, setLocation] = useLocation();
-  useEffect(() => {
-    const token = localStorage.getItem("tp_token");
-    if (!token) setLocation("/login");
-  }, [setLocation]);
+function StandaloneFeedbackShell({
+  children,
+  userName,
+  onLogout,
+}: {
+  children: React.ReactNode;
+  userName?: string;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="min-h-screen bg-[#080808] text-white" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <header className="border-b border-white/10 bg-black/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+          <a href="/" className="flex items-center gap-3" aria-label="Voltar para Tráfego Pro">
+            <img src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" alt="Tráfego Pro" className="h-5 w-auto" />
+            <span className="hidden border-l border-white/15 pl-3 text-xs font-light tracking-[0.18em] text-white/45 sm:inline">
+              FEEDBACK DE LEADS
+            </span>
+          </a>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs font-light text-white/45 sm:inline">{userName || "Usuário autenticado"}</span>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-xs font-light text-white/70 transition hover:border-white/35 hover:text-white"
+            >
+              <LogOut className="size-3.5" />
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+      <div className="border-b border-white/5 bg-[#0d0d0d]">
+        <div className="mx-auto flex max-w-6xl items-center gap-2 px-5 py-3 text-xs font-light text-white/45 sm:px-8">
+          <ShieldCheck className="size-3.5 text-emerald-400/80" />
+          Página protegida · seus dados são enviados apenas após autenticação
+        </div>
+      </div>
+      <main>{children}</main>
+      <footer className="mx-auto max-w-6xl px-5 pb-8 pt-2 text-xs font-light text-white/25 sm:px-8">
+        Tráfego Pro · Feedback semanal de conversão
+      </footer>
+    </div>
+  );
+}
+
+export function StandaloneFeedbackLeads() {
+  return <DashboardFeedbackLeadsContent standalone />;
+}
+
+function FeedbackLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#080808] text-sm font-light text-white/55">
+      Verificando autenticação…
+    </div>
+  );
 }
 
 // Fallback hardcoded — usado apenas se o Supabase não estiver configurado
-const FALLBACK_UNITS = [
-  "Ijuí", "Passo Fundo", "Bento Gonçalves", "Canela", "Tupanciretã",
-  "Júlio de Castilhos", "Belo Horizonte/Barreiro", "Lajeado",
-  "Sant'Ana do Livramento", "Santa Maria", "Santo Ângelo", "Alegrete",
-  "Caxias do Sul", "Chapecó", "Erechim", "Itaqui", "Uruguaiana",
-];
-
-const REASONS = [
-  "Preço/Objeção de valor",
-  "Cliente pediu tempo para decidir",
-  "Sem resposta do lead",
-  "Fora da área de atuação",
-  "Já é cliente/duplicado",
-  "Outro",
-];
 
 type FormData = {
   unit: string;
@@ -54,14 +93,19 @@ type FormData = {
 };
 
 export default function DashboardFeedbackLeads() {
-  useAuthGuard();
+  return <DashboardFeedbackLeadsContent />;
+}
+
+function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: boolean }) {
+  const { user, loading: authLoading, logout } = useAdminAuth();
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
-  const [units, setUnits] = useState<string[]>(FALLBACK_UNITS);
+
+  const [units, setUnits] = useState<string[]>(() => [...FALLBACK_UNITS]);
 
   // Carrega unidades dinamicamente do Supabase (clients.name)
   useEffect(() => {
-    const token = localStorage.getItem("tp_token");
+    const token = getToken();
     if (!token) return;
     fetch("/api/metrics/units", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
@@ -92,6 +136,8 @@ export default function DashboardFeedbackLeads() {
     supportNeeded: "",
   });
 
+  if (authLoading || !user) return <FeedbackLoading />;
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -108,7 +154,7 @@ export default function DashboardFeedbackLeads() {
       return;
     }
 
-    const token = localStorage.getItem("tp_token");
+    const token = getToken();
     if (!token) {
       toast.error("Sessão expirada. Por favor, faça login novamente.");
       setLocation("/login");
@@ -117,19 +163,7 @@ export default function DashboardFeedbackLeads() {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/feedback-leads", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...formData,
-          submittedAt: new Date().toISOString(),
-        }),
-      });
-
-      if (!response.ok) throw new Error("Erro ao salvar feedback");
+      await submitFeedbackLead(formData, token);
 
       toast.success("Feedback salvo com sucesso!");
       setFormData({
@@ -151,17 +185,21 @@ export default function DashboardFeedbackLeads() {
         supportNeeded: "",
       });
     } catch (error) {
-      toast.error("Erro ao salvar feedback. Tente novamente.");
-      console.error(error);
+      if (error instanceof Error && error.message === "SESSION_EXPIRED") {
+        toast.error("Sessão expirada. Por favor, faça login novamente.");
+        setLocation("/login");
+      } else {
+        toast.error(error instanceof Error ? error.message : "Erro ao salvar feedback. Tente novamente.");
+        console.error(error);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <AppLayout>
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto p-6 space-y-6">
+  const content = (
+    <div className="flex-1 overflow-auto">
+      <div className="mx-auto max-w-4xl space-y-6 p-5 sm:p-6">
           {/* Header */}
           <div className="flex items-center gap-4">
             <button
@@ -472,8 +510,17 @@ export default function DashboardFeedbackLeads() {
               </Button>
             </div>
           </form>
-        </div>
       </div>
-    </AppLayout>
+    </div>
   );
+
+  if (standalone) {
+    return (
+      <StandaloneFeedbackShell userName={user.name} onLogout={logout}>
+        {content}
+      </StandaloneFeedbackShell>
+    );
+  }
+
+  return <AppLayout>{content}</AppLayout>;
 }

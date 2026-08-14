@@ -48,3 +48,22 @@
 ## Identidade Visual (concluído)
 
 - [x] Logo, fontes (Space Grotesk + Inter) e paletas Tráfego Pro / Vida Card
+
+## Página independente de feedback
+
+- [x] Criar página independente `/feedback-leads` fora da dashboard
+- [x] Proteger `/feedback-leads` com a autenticação existente
+- [x] Conectar o formulário independente ao endpoint autenticado de feedback
+- [x] Validar a nova página e o fluxo de envio no navegador
+- [x] Escrever ou atualizar testes para a página independente de feedback
+
+## Validações adicionais da página independente
+
+- [x] Testar redirecionamento de `/feedback-leads` sem sessão e acesso com sessão válida
+- [x] Testar no navegador o envio do formulário independente sem persistir dados reais
+- [x] Ampliar testes automatizados para autenticação, rota e submissão do feedback
+
+## Cobertura automatizada adicional
+
+- [x] Adicionar testes do endpoint `/api/feedback-leads` para 401 sem token, sucesso com Bearer válido e erro de validação
+- [x] Isolar e testar a lógica de guarda/redirecionamento da rota independente `/feedback-leads`

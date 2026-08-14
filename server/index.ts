@@ -49,7 +49,7 @@ const JWT_SECRET =
     return crypto.randomBytes(32).toString("hex");
   })();
 
-function signToken(payload: object): string {
+export function signToken(payload: object): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
   const body = Buffer.from(JSON.stringify({ ...payload, iat: Date.now() })).toString("base64url");
   const sig = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
@@ -220,7 +220,7 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
 // ─── Multer (in-memory for Excel upload) ────────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-async function startServer() {
+export async function startServer({ listen = true }: { listen?: boolean } = {}) {
   const app = express();
   const server = createServer(app);
 
@@ -340,7 +340,8 @@ async function startServer() {
   });
 
   app.post("/api/users", requireAuth, requireAdmin, (req, res) => {
-    const { name, email, password, role } = req.body as { name: string; email: string; password: string; role?: string };
+    const { name, email, password, role: rawRole } = req.body as { name: string; email: string; password: string; role?: string };
+    const role = rawRole === "admin" || rawRole === "user" ? rawRole : undefined;
     if (!name?.trim() || !password?.trim()) {
       res.status(400).json({ error: "Nome e senha são obrigatórios" });
       return;
@@ -820,10 +821,16 @@ async function startServer() {
     });
   }
 
-  const port = process.env.PORT || (process.env.NODE_ENV === "production" ? 3000 : 4000);
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
+  if (listen) {
+    const port = process.env.PORT || (process.env.NODE_ENV === "production" ? 3000 : 4000);
+    server.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}/`);
+    });
+  }
+
+  return { app, server };
 }
 
-startServer().catch(console.error);
+if (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") {
+  startServer().catch(console.error);
+}

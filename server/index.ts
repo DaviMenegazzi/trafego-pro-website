@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import crypto from "crypto";
 import * as XLSX from "xlsx";
 import { getSupabase, getSupabaseForAccessToken, isSupabaseConfigured } from "./supabase.js";
-import { groupClientAccessByUser } from "./clientAccess.js";
+import { groupClientAccessByUser, uniqueGrantedClientIds } from "./clientAccess.js";
 import { validateMetricsClientSelection } from "./metricsAccess.js";
 import { createFeedbackLeadSql, listAllFeedbackLeadsForExportSql, listFeedbackLeadsSql } from "./feedbackSql.js";
 
@@ -137,6 +137,52 @@ async function fetchUserAccess(supabaseUid: string, accessToken?: string): Promi
 // ─── Helper: checa se admin ─────────────────────────────────────────────────
 function isAdmin(claims: JwtClaims): boolean {
   return isAdminRole(claims.role) || claims.allowedClientIds.includes("*");
+}
+
+type SupabaseDashboardClient = { id: string; name: string; client_group: string | null };
+
+/**
+ * Resolve unidades exclusivamente a partir das tabelas Supabase. Para admins,
+ * usa os vínculos existentes em user_client_access como catálogo autorizado;
+ * para demais roles, usa os IDs concedidos à própria sessão.
+ */
+async function listDashboardClientsFromSupabase(
+  sb: any,
+  claims: JwtClaims,
+): Promise<{ clients: SupabaseDashboardClient[]; error?: string }> {
+  let clientIds = claims.allowedClientIds.filter((id) => id !== "*");
+
+  if (isAdminRole(claims.role)) {
+    const { data: accessRows, error: accessError } = await sb
+      .from("user_client_access")
+      .select("client_id");
+    if (accessError) return { clients: [], error: accessError.message };
+    clientIds = uniqueGrantedClientIds(accessRows ?? []);
+  }
+
+  if (clientIds.length > 0) {
+    const { data, error } = await sb
+      .from("clients")
+      .select("id, name, client_group")
+      .in("id", clientIds)
+      .order("name");
+    if (error) return { clients: [], error: error.message };
+    return { clients: data ?? [] };
+  }
+
+  // Roles de equipe sem vínculo individual veem somente as unidades de equipe
+  // liberadas pelas próprias regras RLS do Supabase. Nunca há fallback local.
+  if (claims.allowedClientIds.includes("*") && !isAdminRole(claims.role)) {
+    const { data, error } = await sb
+      .from("clients")
+      .select("id, name, client_group")
+      .eq("client_group", "marketing_pro")
+      .order("name");
+    if (error) return { clients: [], error: error.message };
+    return { clients: data ?? [] };
+  }
+
+  return { clients: [] };
 }
 
 export function hasUnitAccess(clientId: string | number, claims: Pick<JwtClaims, "role" | "allowedClientIds">): boolean {
@@ -618,18 +664,9 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.get("/api/metrics/clients", requireAuth, async (req, res) => {
     const sb = getSupabaseForRequest(req);
     if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
-    const { data, error } = await sb.from("clients").select("id, name, client_group").order("name");
-    if (error) { res.status(502).json({ error: error.message }); return; }
-
-    let clients = data ?? [];
-
-    // Filtra pela permissão do usuário
-    if (req.claims && !isAdmin(req.claims)) {
-      const allowed = req.claims.allowedClientIds;
-      clients = clients.filter((c) => allowed.includes(String(c.id)));
-    }
-
-    res.json({ configured: true, clients });
+    const result = await listDashboardClientsFromSupabase(sb, req.claims!);
+    if (result.error) { res.status(502).json({ error: result.error }); return; }
+    res.json({ configured: true, clients: result.clients });
   });
 
   // Métricas diárias — filtradas por acesso
@@ -760,12 +797,10 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.get("/api/metrics/units", requireAuth, async (req, res) => {
     const sb = getSupabaseForRequest(req);
     if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
-    const { data, error } = await sb.from("clients").select("id, name, client_group").order("name");
-    if (error) { res.status(502).json({ error: error.message }); return; }
-
-    const clients = (data ?? []).filter((client: any) => hasUnitAccess(client.id, req.claims!));
-    const units = clients.map((client: any) => client.name);
-    res.json({ configured: true, units, clients });
+    const result = await listDashboardClientsFromSupabase(sb, req.claims!);
+    if (result.error) { res.status(502).json({ error: result.error }); return; }
+    const units = result.clients.map((client) => client.name);
+    res.json({ configured: true, units, clients: result.clients });
   });
 
   // ─── Static files (production only) ────────────────────────────────────────

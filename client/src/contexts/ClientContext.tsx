@@ -48,33 +48,28 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem("tp_token");
       if (!token) { setLoading(false); return; }
 
-      // Busca clientes do Supabase (fonte primária) e do banco local em paralelo
-      const [sbRes, localRes] = await Promise.allSettled([
-        fetch("/api/metrics/clients", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-        fetch("/api/clients", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      ]);
-
-      const sbClients: Client[] = sbRes.status === "fulfilled" && sbRes.value.configured && Array.isArray(sbRes.value.clients)
-        ? sbRes.value.clients.map((c: any) => ({ id: c.id, name: c.name }))
+      const response = await fetch("/api/metrics/clients", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status === 401) {
+        localStorage.removeItem("tp_token");
+        localStorage.removeItem("tp_user");
+        localStorage.removeItem("tp_selected_client_id");
+        window.location.href = "/login?session=renovada";
+        return;
+      }
+      if (!response.ok) throw new Error("Não foi possível carregar as unidades do Supabase");
+      const payload = await response.json();
+      const supabaseClients: Client[] = payload.configured && Array.isArray(payload.clients)
+        ? payload.clients.map((client: { id: string; name: string }) => ({ id: client.id, name: client.name }))
         : [];
-      const localClients: Client[] = localRes.status === "fulfilled" && Array.isArray(localRes.value)
-        ? localRes.value
-        : [];
 
-      // Supabase primeiro, depois locais que ainda não existem pelo identificador.
-      // Unidades podem compartilhar nomes parecidos, portanto nunca devem ser deduplicadas por nome.
-      const seenIds = new Set(sbClients.map((c) => String(c.id)));
-      const merged = [
-        ...sbClients,
-        ...localClients.filter((c) => !seenIds.has(String(c.id))),
-      ];
-
-      setClients(merged);
+      setClients(supabaseClients);
       setSelectedClientId((current) => {
-        if (current && merged.some((client) => String(client.id) === String(current))) {
+        if (current && supabaseClients.some((client) => String(client.id) === String(current))) {
           return current;
         }
-        return merged[0]?.id ?? null;
+        return supabaseClients[0]?.id ?? null;
       });
     } catch {
       // ignore

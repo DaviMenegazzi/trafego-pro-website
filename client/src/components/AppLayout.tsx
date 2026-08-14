@@ -3,7 +3,6 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
   GitBranch,
-  Users2,
   CreditCard,
   ClipboardList,
   Newspaper,
@@ -47,7 +46,6 @@ function isAdminUser(): boolean {
 // ─── Nav items ──────────────────────────────────────────────────────────────
 const NAV_BASE = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/dashboard/clientes", label: "Clientes", icon: Users2 },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
   { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
   { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
@@ -121,9 +119,16 @@ function UserProfileButton({ collapsed }: { collapsed: boolean }) {
   };
 
   function handleLogout() {
-    localStorage.removeItem("tp_token");
-    localStorage.removeItem("tp_user");
-    window.location.href = "/login";
+    const token = localStorage.getItem("tp_token");
+    void fetch("/api/auth/logout", {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }).finally(() => {
+      localStorage.removeItem("tp_token");
+      localStorage.removeItem("tp_user");
+      localStorage.removeItem("tp_selected_client_id");
+      window.location.href = "/login";
+    });
   }
 
   return (
@@ -217,7 +222,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             transition: `max-height ${DURATION} ${EASE}, opacity ${DURATION} ${EASE}`,
           }}
         >
-          <div className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground/70">Cliente</div>
+          <div className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground/70">Unidade</div>
         </div>
         <div className={isCollapsed ? "" : "-mx-3"}>
           <ClientSelector collapsed={isCollapsed} />

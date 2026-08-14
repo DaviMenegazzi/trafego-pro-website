@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSupabase, isSupabaseConfigured } from "./supabase.js";
+import { getSupabase, getSupabaseForAccessToken, isSupabaseConfigured } from "./supabase.js";
 
 describe("Supabase Connection", () => {
   it("should have Supabase configured", () => {
@@ -11,6 +11,11 @@ describe("Supabase Connection", () => {
     const supabase = getSupabase();
     expect(supabase).not.toBeNull();
     expect(supabase).toBeDefined();
+  });
+
+  it("should create a request-scoped client from a Supabase access token", () => {
+    expect(getSupabaseForAccessToken("session-token-for-test")).not.toBeNull();
+    expect(getSupabaseForAccessToken(undefined)).toBeNull();
   });
 
   it("should have valid Supabase URL in environment", () => {

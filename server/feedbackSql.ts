@@ -18,7 +18,7 @@ export type SqlFeedbackLeadInput = {
   communicationClarity: string;
   agencyAdjustment: string;
   submittedAt: string;
-  submittedByUserId: number | null;
+  submittedByUserId: string | null;
   submittedByEmail: string;
 };
 
@@ -119,7 +119,7 @@ function mapRow(row: FeedbackRow): SqlFeedbackLead {
     communicationClarity: row.communication_clarity,
     agencyAdjustment: row.agency_adjustment ?? "",
     submittedAt: toIso(row.submitted_at),
-    submittedByUserId: row.submitted_by_user_id == null ? null : Number(row.submitted_by_user_id),
+    submittedByUserId: row.submitted_by_user_id == null ? null : String(row.submitted_by_user_id),
     submittedByEmail: row.submitted_by_email,
     createdAt: toIso(row.created_at),
   };

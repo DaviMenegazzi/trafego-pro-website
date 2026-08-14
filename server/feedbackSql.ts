@@ -4,66 +4,73 @@ export type SqlFeedbackLeadInput = {
   unit: string;
   responsible: string;
   weekStart: string;
+  weekEnd: string;
   totalLeads: number;
-  leadsCard: number;
-  leadsConsultation: number;
-  leadsDentistry: number;
-  leadsBusinessPJ: number;
-  leadsOutOfArea: number;
-  leadsAnswered: number;
-  leadsNoAnswer: number;
-  salesClosed: number;
-  mainReason: string;
-  creativeFeedback: string;
-  generalObservations: string;
-  supportNeeded: string;
+  leadsContacted: number;
+  leadsResponded: number;
+  leadsConverted: number;
+  leadsLost: number;
+  leadsInNegotiation: number;
+  lossReason: string;
+  leadQuality: number;
+  observations: string;
+  agencySatisfaction: number;
+  communicationClarity: string;
+  agencyAdjustment: string;
   submittedAt: string;
   submittedByUserId: number | null;
   submittedByEmail: string;
 };
 
-export type SqlFeedbackLead = {
+export type SqlFeedbackLead = SqlFeedbackLeadInput & {
   id: number;
-  unit: string;
-  responsible: string;
-  weekStart: string;
-  totalLeads: number;
-  leadsCard: number;
-  leadsConsultation: number;
-  leadsDentistry: number;
-  leadsBusinessPJ: number;
-  leadsOutOfArea: number;
-  leadsAnswered: number;
-  leadsNoAnswer: number;
-  salesClosed: number;
-  mainReason: string;
-  creativeFeedback: string;
-  generalObservations: string;
-  supportNeeded: string;
-  submittedAt: string;
-  submittedByUserId: number | null;
-  submittedByEmail: string;
   createdAt: string;
 };
+
+export type LegacyFeedbackBackfillInput = {
+  weekStart: string;
+  leadsAnswered: number;
+  salesClosed: number;
+  leadsNoAnswer: number;
+  mainReason: string;
+  generalObservations: string;
+  supportNeeded: string;
+};
+
+export function planLegacyFeedbackBackfill(input: LegacyFeedbackBackfillInput) {
+  const start = new Date(`${input.weekStart}T12:00:00.000Z`);
+  start.setUTCDate(start.getUTCDate() + 6);
+  return {
+    weekEnd: start.toISOString().slice(0, 10),
+    leadsContacted: input.leadsAnswered,
+    leadsResponded: input.leadsAnswered,
+    leadsConverted: input.salesClosed,
+    leadsLost: input.leadsNoAnswer,
+    leadsInNegotiation: 0,
+    lossReason: input.mainReason,
+    observations: input.generalObservations,
+    agencyAdjustment: input.supportNeeded,
+  };
+}
 
 type FeedbackRow = RowDataPacket & {
   id: number | string;
   unit: string;
   responsible: string;
   week_start: string | Date;
+  week_end: string | Date;
   total_leads: number;
-  leads_card: number;
-  leads_consultation: number;
-  leads_dentistry: number;
-  leads_business_pj: number;
-  leads_out_of_area: number;
-  leads_answered: number;
-  leads_no_answer: number;
-  sales_closed: number;
-  main_reason: string;
-  creative_feedback: string;
-  general_observations: string;
-  support_needed: string;
+  leads_contacted: number;
+  leads_responded: number;
+  leads_converted: number;
+  leads_lost: number;
+  leads_in_negotiation: number;
+  loss_reason: string;
+  lead_quality: number;
+  observations: string | null;
+  agency_satisfaction: number;
+  communication_clarity: string;
+  agency_adjustment: string | null;
   submitted_at: string | Date;
   submitted_by_user_id: number | string | null;
   submitted_by_email: string;
@@ -74,17 +81,9 @@ let pool: Pool | null = null;
 
 function getPool(): Pool {
   const connectionString = process.env.DATABASE_URL || process.env.DRIZZLE_DATABASE_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL não configurada para persistência SQL dos feedbacks");
-  }
+  if (!connectionString) throw new Error("DATABASE_URL não configurada para persistência SQL dos feedbacks");
   if (!pool) {
-    pool = mysql.createPool({
-      uri: connectionString,
-      waitForConnections: true,
-      connectionLimit: 5,
-      queueLimit: 0,
-      enableKeepAlive: true,
-    });
+    pool = mysql.createPool({ uri: connectionString, waitForConnections: true, connectionLimit: 5, queueLimit: 0, enableKeepAlive: true });
   }
   return pool;
 }
@@ -106,19 +105,19 @@ function mapRow(row: FeedbackRow): SqlFeedbackLead {
     unit: row.unit,
     responsible: row.responsible,
     weekStart: toDateOnly(row.week_start),
+    weekEnd: toDateOnly(row.week_end),
     totalLeads: Number(row.total_leads),
-    leadsCard: Number(row.leads_card),
-    leadsConsultation: Number(row.leads_consultation),
-    leadsDentistry: Number(row.leads_dentistry),
-    leadsBusinessPJ: Number(row.leads_business_pj),
-    leadsOutOfArea: Number(row.leads_out_of_area),
-    leadsAnswered: Number(row.leads_answered),
-    leadsNoAnswer: Number(row.leads_no_answer),
-    salesClosed: Number(row.sales_closed),
-    mainReason: row.main_reason,
-    creativeFeedback: row.creative_feedback,
-    generalObservations: row.general_observations,
-    supportNeeded: row.support_needed,
+    leadsContacted: Number(row.leads_contacted),
+    leadsResponded: Number(row.leads_responded),
+    leadsConverted: Number(row.leads_converted),
+    leadsLost: Number(row.leads_lost),
+    leadsInNegotiation: Number(row.leads_in_negotiation),
+    lossReason: row.loss_reason,
+    leadQuality: Number(row.lead_quality),
+    observations: row.observations ?? "",
+    agencySatisfaction: Number(row.agency_satisfaction),
+    communicationClarity: row.communication_clarity,
+    agencyAdjustment: row.agency_adjustment ?? "",
     submittedAt: toIso(row.submitted_at),
     submittedByUserId: row.submitted_by_user_id == null ? null : Number(row.submitted_by_user_id),
     submittedByEmail: row.submitted_by_email,
@@ -127,44 +126,31 @@ function mapRow(row: FeedbackRow): SqlFeedbackLead {
 }
 
 const SELECT_COLUMNS = `
-  id, unit, responsible, week_start, total_leads, leads_card, leads_consultation,
-  leads_dentistry, leads_business_pj, leads_out_of_area, leads_answered, leads_no_answer,
-  sales_closed, main_reason, creative_feedback, general_observations, support_needed,
-  submitted_at, submitted_by_user_id, submitted_by_email, created_at
+  id, unit, responsible, week_start, week_end, total_leads, leads_contacted,
+  leads_responded, leads_converted, leads_lost, leads_in_negotiation, loss_reason,
+  lead_quality, observations, agency_satisfaction, communication_clarity,
+  agency_adjustment, submitted_at, submitted_by_user_id, submitted_by_email, created_at
 `;
 
 export async function createFeedbackLeadSql(input: SqlFeedbackLeadInput): Promise<SqlFeedbackLead> {
   const db = getPool();
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO feedback_leads (
-      unit, responsible, week_start, total_leads, leads_card, leads_consultation,
-      leads_dentistry, leads_business_pj, leads_out_of_area, leads_answered, leads_no_answer,
-      sales_closed, main_reason, creative_feedback, general_observations, support_needed,
-      submitted_at, submitted_by_user_id, submitted_by_email
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      unit, responsible, week_start, week_end, total_leads, leads_contacted,
+      leads_responded, leads_converted, leads_lost, leads_in_negotiation,
+      main_reason, loss_reason, lead_quality, creative_feedback, general_observations,
+      observations, agency_satisfaction, communication_clarity, agency_adjustment,
+      support_needed, submitted_at, submitted_by_user_id, submitted_by_email
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      input.unit,
-      input.responsible,
-      input.weekStart,
-      input.totalLeads,
-      input.leadsCard,
-      input.leadsConsultation,
-      input.leadsDentistry,
-      input.leadsBusinessPJ,
-      input.leadsOutOfArea,
-      input.leadsAnswered,
-      input.leadsNoAnswer,
-      input.salesClosed,
-      input.mainReason,
-      input.creativeFeedback,
-      input.generalObservations,
-      input.supportNeeded,
-      new Date(input.submittedAt),
-      input.submittedByUserId,
-      input.submittedByEmail,
+      input.unit, input.responsible, input.weekStart, input.weekEnd, input.totalLeads,
+      input.leadsContacted, input.leadsResponded, input.leadsConverted, input.leadsLost,
+      input.leadsInNegotiation, input.lossReason, input.lossReason, input.leadQuality, "",
+      input.observations, input.observations, input.agencySatisfaction, input.communicationClarity,
+      input.agencyAdjustment, input.agencyAdjustment, new Date(input.submittedAt),
+      input.submittedByUserId, input.submittedByEmail,
     ],
   );
-
   const created = await getFeedbackLeadSqlById(Number(result.insertId));
   if (!created) throw new Error("O feedback foi inserido, mas não pôde ser lido novamente");
   return created;
@@ -176,38 +162,26 @@ export async function getFeedbackLeadSqlById(id: number): Promise<SqlFeedbackLea
   return rows[0] ? mapRow(rows[0]) : null;
 }
 
-export async function listFeedbackLeadsSql(filters: {
-  unit?: string;
-  weekStart?: string;
-  weekEnd?: string;
-} = {}): Promise<SqlFeedbackLead[]> {
+export async function listFeedbackLeadsSql(filters: { unit?: string; weekStart?: string; weekEnd?: string } = {}): Promise<SqlFeedbackLead[]> {
   const db = getPool();
   const clauses: string[] = [];
   const values: string[] = [];
-  if (filters.unit) {
-    clauses.push("unit = ?");
-    values.push(filters.unit);
-  }
-  if (filters.weekStart) {
-    clauses.push("week_start >= ?");
-    values.push(filters.weekStart);
-  }
-  if (filters.weekEnd) {
-    clauses.push("week_start <= ?");
-    values.push(filters.weekEnd);
-  }
-
+  if (filters.unit) { clauses.push("unit = ?"); values.push(filters.unit); }
+  if (filters.weekStart) { clauses.push("week_start >= ?"); values.push(filters.weekStart); }
+  if (filters.weekEnd) { clauses.push("week_end <= ?"); values.push(filters.weekEnd); }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-  const [rows] = await db.query<FeedbackRow[]>(
-    `SELECT ${SELECT_COLUMNS} FROM feedback_leads ${where} ORDER BY week_start DESC, created_at DESC LIMIT 500`,
-    values,
-  );
+  const [rows] = await db.query<FeedbackRow[]>(`SELECT ${SELECT_COLUMNS} FROM feedback_leads ${where} ORDER BY week_start DESC, created_at DESC LIMIT 500`, values);
+  return rows.map(mapRow);
+}
+
+export async function listAllFeedbackLeadsForExportSql(): Promise<SqlFeedbackLead[]> {
+  const db = getPool();
+  const [rows] = await db.query<FeedbackRow[]>(`SELECT ${SELECT_COLUMNS} FROM feedback_leads ORDER BY week_start DESC, created_at DESC`);
   return rows.map(mapRow);
 }
 
 export async function deleteFeedbackLeadSql(id: number): Promise<void> {
-  const db = getPool();
-  await db.execute("DELETE FROM feedback_leads WHERE id = ?", [id]);
+  await getPool().execute("DELETE FROM feedback_leads WHERE id = ?", [id]);
 }
 
 export function resetFeedbackSqlPoolForTests(): void {

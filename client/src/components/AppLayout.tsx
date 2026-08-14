@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode } from "react";
+import { useEffect, useState, useMemo, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -17,6 +17,7 @@ import {
   MessageSquare,
   ShieldCheck,
   Tag,
+  ChevronDown,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 
@@ -60,7 +61,7 @@ const NAV_ADMIN_ONLY = [
 
 function ClientSelector({ collapsed }: { collapsed: boolean }) {
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
-  const user = getStoredUser();
+  const user = useMemo(() => getStoredUser(), []);
 
   // Filtra clients pelas permissões do usuário
   const filteredClients = useMemo(() => {
@@ -70,14 +71,20 @@ function ClientSelector({ collapsed }: { collapsed: boolean }) {
     return clients.filter((c) => user.allowedClientIds!.includes(String(c.id)));
   }, [clients, user.allowedClientIds]);
 
+  useEffect(() => {
+    if (filteredClients.length === 0) {
+      if (selectedClientId !== null) setSelectedClientId(null);
+      return;
+    }
+
+    const hasSelectedClient = filteredClients.some((client) => client.id === selectedClientId);
+    if (!hasSelectedClient) setSelectedClientId(filteredClients[0].id);
+  }, [filteredClients, selectedClientId, setSelectedClientId]);
+
   if (filteredClients.length === 0) return null;
 
-  // Se só tem 1 unidade, não mostra selector — auto-seleciona
+  // Se só tem 1 unidade, não mostra um controle sem alternativas.
   if (filteredClients.length === 1) {
-    // Auto-seleciona se não está selecionado
-    if (selectedClientId !== filteredClients[0].id) {
-      setTimeout(() => setSelectedClientId(filteredClients[0].id), 0);
-    }
     if (collapsed) return null;
     return (
       <div className="px-1 py-2 text-xs text-muted-foreground truncate">
@@ -85,6 +92,24 @@ function ClientSelector({ collapsed }: { collapsed: boolean }) {
       </div>
     );
   }
+
+  if (collapsed) return null;
+
+  return (
+    <div className="relative px-3">
+      <select
+        aria-label="Selecionar cliente"
+        value={selectedClientId ?? filteredClients[0].id}
+        onChange={(event) => setSelectedClientId(event.target.value)}
+        className="h-9 w-full appearance-none rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 pr-8 text-xs font-medium text-foreground outline-none transition-colors hover:bg-sidebar-accent focus:ring-1 focus:ring-ring"
+      >
+        {filteredClients.map((client) => (
+          <option key={client.id} value={client.id}>{client.name}</option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+    </div>
+  );
 }
 
 function UserProfileButton({ collapsed }: { collapsed: boolean }) {

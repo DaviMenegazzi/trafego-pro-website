@@ -3,8 +3,8 @@
 -- (a mesma origem já usada para as métricas de Meta Ads do painel).
 --
 -- Bandas de performance baseadas no custo por conversa (CPL de conversa).
--- Se você quiser filtrar anúncios por cliente na tela, adicione a coluna
--- client_id ao SELECT (ver comentário no final) — a view roda sem ela.
+-- A coluna client_id faz parte da view para permitir o isolamento de cada
+-- unidade na aba de anúncios.
 
 drop view if exists public.vw_meta_ads_offer_ads;
 
@@ -12,7 +12,7 @@ create view public.vw_meta_ads_offer_ads
 with (security_invoker = true)
 as
 select
-  id, account_id, date_start, date_stop, synced_at,
+  id, client_id, account_id, date_start, date_stop, synced_at,
   campaign_id, campaign_name, adset_id, adset_name,
   ad_id, ad_name, creative_id, creative_name,
   offer_name, offer_status, ad_image_url,
@@ -58,8 +58,5 @@ select
       then 'Custo por conversa entre R$ 9,00 e R$ 13,00, precisa de acompanhamento.'
     else 'Custo por conversa acima de R$ 13,00.'
   end as performance_reason
-  -- Para filtrar por cliente na tela, descomente a linha abaixo (a coluna
-  -- precisa existir em meta_ads_offers) e o endpoint /api/metrics/ads já a usa:
-  -- , client_id
 from public.meta_ads_offers
 order by spend desc;

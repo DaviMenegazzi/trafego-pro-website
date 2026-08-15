@@ -270,4 +270,10 @@
 - [x] Ajustar as cores dos estados selecionados nos menus de período e unidade
 - [x] Validar TypeScript, testes e build
 - [ ] Validar no navegador a legibilidade dos estados selecionados
-- [ ] Salvar checkpoint da correção de contraste
+- [x] Salvar checkpoint da correção de contraste
+
+## Simplificação visual dos filtros
+
+- [x] Remover os rótulos visuais de período e unidade junto aos seletores
+- [x] Validar TypeScript, testes e build após o refinamento
+- [ ] Salvar checkpoint da simplificação dos filtros

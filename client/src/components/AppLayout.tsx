@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, type ReactNode } from "react";
+import { useEffect, useState, useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -318,11 +318,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main
-        className="relative z-10 min-w-0 pt-16 md:pt-0 overflow-x-hidden"
+        className="relative z-10 min-w-0 overflow-x-hidden pt-16 md:ml-[var(--dashboard-sidebar-width)] md:pt-0"
         style={{
-          marginLeft: typeof window !== "undefined" && window.innerWidth >= 768 ? `${sidebarWidth}px` : 0,
+          "--dashboard-sidebar-width": `${sidebarWidth}px`,
           transition: `margin-left ${DURATION} ${EASE}`,
-        }}
+        } as CSSProperties}
       >
         {children}
       </main>

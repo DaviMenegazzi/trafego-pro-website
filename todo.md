@@ -208,3 +208,11 @@
 - [ ] Adicionar estados vazios dedicados para ausência de unidade e ausência de métricas no período
 - [ ] Validar a dashboard com sessão autenticada em desktop e viewport móvel real
 - [ ] Salvar checkpoint após a validação visual autenticada
+
+## Correção de layout móvel da dashboard
+
+- [ ] Corrigir o deslocamento horizontal da área principal quando a sidebar está recolhida em telemóvel
+
+## Renovação de sessão publicada
+
+- [ ] Renovar o login Supabase no domínio publicado para obter o cookie HTTP-only de dados

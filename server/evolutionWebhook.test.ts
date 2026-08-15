@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { signToken, startServer } from "./index.js";
 import { normalizeEvolutionWebhook } from "./evolutionWebhook.js";
-import { deleteEvolutionWebhookTestRows, recordEvolutionEventSql } from "./evolutionSql.js";
+import { deleteEvolutionWebhookTestRows, listEvolutionEventsSql, recordEvolutionEventSql } from "./evolutionSql.js";
 
 let server: Awaited<ReturnType<typeof startServer>>["server"] | undefined;
 let baseUrl = "";
@@ -74,6 +74,22 @@ describe("Evolution webhook normalization", () => {
     expect(event?.fingerprint).toHaveLength(64);
   });
 
+  it("preserva no evento os sinais de origem que chegam no payload Evolution", () => {
+    const event = normalizeEvolutionWebhook({
+      event: "messages.upsert",
+      instance: "vida-card-ijui",
+      data: {
+        key: { id: "message-origin", remoteJid: "5599999999999@s.whatsapp.net", fromMe: false },
+        message: { conversation: "Vim do anúncio" },
+        referral: { ctwa_clid: "ctwa-live-123", source_id: "ad-456", source_type: "ad" },
+      },
+    });
+
+    expect(event?.origin).toMatchObject({
+      platform: "meta", evidence: "verified", metaCtwaClid: "ctwa-live-123", metaSourceId: "ad-456",
+    });
+  });
+
   it("não transforma eventos de grupos em contatos classificáveis", () => {
     const event = normalizeEvolutionWebhook({
       event: "MESSAGES_UPSERT",
@@ -96,5 +112,35 @@ describe("Evolution webhook normalization", () => {
 
     await expect(recordEvolutionEventSql(event)).resolves.toEqual({ duplicate: false });
     await expect(recordEvolutionEventSql(event)).resolves.toEqual({ duplicate: true });
+  });
+
+  it("persiste somente as tags de origem permitidas para auditoria administrativa", async () => {
+    const instanceName = `__evolution_origin_${Date.now()}`;
+    const event = normalizeEvolutionWebhook({
+      event: "MESSAGES_UPSERT",
+      instance: instanceName,
+      data: {
+        key: { id: "origin-persistence", remoteJid: "5511999999999@s.whatsapp.net", fromMe: false },
+        message: { conversation: "Mensagem de teste para auditoria" },
+        referral: {
+          ctwa_clid: "ctwa-persisted-123",
+          source_id: "ad-persisted-456",
+          source_type: "ad",
+          source_url: "https://trafego.pro/contato?utm_source=facebook&ctwa_clid=ctwa-persisted-123",
+        },
+      },
+    });
+    if (!event) throw new Error("Evento de origem não foi normalizado");
+    webhookTestRows.push({ instanceName: event.instanceName, contactKey: event.contactKey, fingerprint: event.fingerprint });
+
+    await expect(recordEvolutionEventSql(event)).resolves.toEqual({ duplicate: false });
+    const saved = (await listEvolutionEventsSql(100)).find((item) => item.instanceName === instanceName);
+    expect(saved).toMatchObject({
+      originPlatform: "meta", originEvidence: "verified", metaCtwaClid: "ctwa-persisted-123",
+      metaSourceId: "ad-persisted-456",
+    });
+    expect(saved?.attributionPayload).toMatchObject({
+      ctwa_clid: "ctwa-persisted-123", source_url: "https://trafego.pro/contato", utm_source: "facebook",
+    });
   });
 });

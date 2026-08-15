@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { extractEvolutionOrigin, type EvolutionOrigin } from "./evolutionOrigin.js";
 
 export type NormalizedEvolutionEvent = {
   fingerprint: string;
@@ -14,6 +15,7 @@ export type NormalizedEvolutionEvent = {
   phoneLast4: string | null;
   contactName: string | null;
   connectionStatus: string | null;
+  origin: EvolutionOrigin;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -77,6 +79,7 @@ export function normalizeEvolutionWebhook(payload: unknown): NormalizedEvolution
     ? (fromMe ? "outgoing" : "incoming")
     : "system";
   const messageText = extractMessageText(message);
+  const origin = extractEvolutionOrigin(root, data, message);
   const timestamp = parseOccurredAt(data.messageTimestamp);
   const stableId = messageId ?? `${eventType}:${instanceName}:${remoteJid ?? "none"}:${timestamp?.toISOString() ?? "none"}`;
   const fingerprint = crypto.createHash("sha256").update(`${instanceName}|${stableId}|${direction}`).digest("hex");
@@ -95,6 +98,7 @@ export function normalizeEvolutionWebhook(payload: unknown): NormalizedEvolution
     phoneLast4: directPhone ? directPhone.slice(-4) : null,
     contactName: asString(data.pushName),
     connectionStatus: eventType === "CONNECTION_UPDATE" ? asString(data.state) : null,
+    origin,
   };
 }
 

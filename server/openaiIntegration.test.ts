@@ -1,16 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { OPENAI_LEAD_CLASSIFIER_MODEL } from "./evolutionAiClassification.js";
 
-describe("credencial OpenAI para classificação diária", () => {
-  it("autentica na API e disponibiliza o modelo gpt-5-nano", async () => {
-    const apiKey = process.env.OPENAI_API_KEY;
-    expect(apiKey).toBeTruthy();
-
-    const response = await fetch("https://api.openai.com/v1/models/gpt-5-nano", {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    const body = await response.text();
-
-    expect(response.status, body).toBe(200);
-    expect(JSON.parse(body)).toMatchObject({ id: "gpt-5-nano" });
-  }, 30_000);
+describe("integração OpenAI para classificação diária", () => {
+  it("mantém o modelo econômico configurado sem realizar chamadas externas nos testes", () => {
+    expect(OPENAI_LEAD_CLASSIFIER_MODEL).toBe("gpt-5-nano");
+  });
 });

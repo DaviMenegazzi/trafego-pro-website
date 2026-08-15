@@ -456,3 +456,12 @@
 - [x] Desabilitar visualmente o arrastar e soltar durante a classificação automática
 - [x] Exibir o label “Última atualização feita pela IA da Tráfego Pro” com data e etapa aplicadas
 - [x] Cobrir o bloqueio e os estados visuais em testes, validar e salvar checkpoint
+
+## Incidente de segurança — segredos no Git
+
+- [ ] Auditar arquivos rastreados, incluindo a configuração do projeto, sem revelar valores de segredos
+- [ ] Remover qualquer valor sensível presente em arquivos versionados e manter somente referências a variáveis de ambiente
+- [ ] Adicionar proteção automatizada contra chaves e credenciais antes de novos commits
+- [ ] Verificar o histórico Git e listar as credenciais que exigem rotação
+- [ ] Validar a higienização e salvar checkpoint de segurança
+- [x] Pausar a automação diária de IA até a disponibilização de uma nova chave após a higienização

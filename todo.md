@@ -231,7 +231,7 @@
 - [x] Corrigir a atualização inicial das métricas após o login
 - [x] Adicionar testes para o primeiro carregamento autenticado
 - [x] Validar no navegador a correção do primeiro carregamento autenticado
-- [ ] Salvar um checkpoint específico após a validação autenticada do primeiro carregamento
+- [x] Salvar um checkpoint específico após a validação autenticada do primeiro carregamento
 
 ## Validação em sessão limpa
 
@@ -395,3 +395,23 @@
 ## Robustez das novas abas Evolution
 
 - [x] Tratar respostas não JSON das consultas de atribuição e conversas sem expor erro de parsing
+
+## Correção de contatos e conversas Evolution
+
+- [x] Identificar corretamente o contato remoto para mensagens recebidas e enviadas
+- [x] Preservar e exibir o nome do remetente real, sem usar o perfil da instância como fallback indevido
+- [x] Processar atualizações de contato da Evolution quando mensagens não incluírem o nome do remetente
+- [x] Carregar no histórico as mensagens enviadas e recebidas, incluindo registros já existentes quando possível
+- [x] Cobrir em testes mensagens de entrada, saída e nomes de contato
+- [x] Validar a correção no painel administrativo
+- [ ] Salvar checkpoint da correção de contatos e conversas
+
+## Evolution multi-instância por unidade
+
+- [x] Criar vínculo explícito entre cada instância Evolution e uma unidade
+- [x] Permitir cadastrar e editar a identificação de instâncias no painel administrativo
+- [x] Adicionar filtro por unidade e por instância às visões de operação, conversas e atribuição
+- [x] Exibir consolidados de leads e métricas para todas as instâncias ou apenas a seleção atual
+- [x] Cobrir em testes a segregação e a agregação de múltiplas instâncias
+- [x] Validar no navegador os filtros e o cadastro multi-instância
+- [ ] Salvar checkpoint da expansão multi-instância

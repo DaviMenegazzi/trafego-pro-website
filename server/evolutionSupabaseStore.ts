@@ -195,6 +195,26 @@ export async function listEvolutionInstancesSupabase(): Promise<EvolutionInstanc
   return (data ?? []).map((row) => ({ instanceName: row.instance_name, displayName: row.display_name, unitName: row.unit_name, connectionStatus: row.connection_status, lastEventAt: iso(row.last_event_at), lastMessageAt: iso(row.last_message_at) }));
 }
 
+export async function updateEvolutionInstanceProfileSupabase(instanceName: string, input: { displayName: string; unitName: string }): Promise<EvolutionInstance | null> {
+  const displayName = input.displayName.trim().slice(0, 120) || null;
+  const unitName = input.unitName.trim().slice(0, 120) || null;
+  const { data, error } = await getEvolutionSupabase()
+    .from("evolution_instances")
+    .update({ display_name: displayName, unit_name: unitName, updated_at: new Date().toISOString() })
+    .eq("instance_name", instanceName)
+    .select("instance_name, display_name, unit_name, connection_status, last_event_at, last_message_at")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? {
+    instanceName: data.instance_name,
+    displayName: data.display_name,
+    unitName: data.unit_name,
+    connectionStatus: data.connection_status,
+    lastEventAt: iso(data.last_event_at),
+    lastMessageAt: iso(data.last_message_at),
+  } : null;
+}
+
 export async function listEvolutionEventsSupabase(limit = 40): Promise<EvolutionEvent[]> {
   const safeLimit = Math.max(1, Math.min(100, limit));
   const { data, error } = await getEvolutionSupabase().from("evolution_events").select("id, instance_name, event_type, direction, message_type, message_preview, origin_platform, origin_evidence, meta_ctwa_clid, meta_source_id, meta_source_type, google_click_id, attribution_payload_json, occurred_at, received_at").order("received_at", { ascending: false }).limit(safeLimit);
@@ -224,6 +244,17 @@ export async function findEvolutionLeadIdSupabase(instanceName: string, contactK
   const { data, error } = await getEvolutionSupabase().from("evolution_leads").select("id").eq("instance_name", instanceName).eq("contact_key", contactKey).maybeSingle();
   if (error) throw new Error(error.message);
   return data?.id ?? null;
+}
+
+export async function updateEvolutionContactNameSupabase(instanceName: string, contactKey: string, contactName: string): Promise<void> {
+  const safeName = contactName.trim().slice(0, 180);
+  if (!safeName) return;
+  const { error } = await getEvolutionSupabase()
+    .from("evolution_leads")
+    .update({ contact_name: safeName, updated_at: new Date().toISOString() })
+    .eq("instance_name", instanceName)
+    .eq("contact_key", contactKey);
+  if (error) throw new Error(error.message);
 }
 
 export async function upsertEvolutionMetaAttributionSupabase(input: EvolutionMetaAttributionInput): Promise<void> {

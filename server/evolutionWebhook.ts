@@ -16,6 +16,7 @@ export type NormalizedEvolutionEvent = {
   phoneLast4: string | null;
   contactName: string | null;
   connectionStatus: string | null;
+  contactUpdate: { contactKey: string; contactName: string } | null;
   origin: EvolutionOrigin;
 };
 
@@ -62,6 +63,18 @@ function parseOccurredAt(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function extractContactUpdate(eventType: string, instanceName: string, data: UnknownRecord, root: UnknownRecord): { contactKey: string; contactName: string } | null {
+  if (eventType !== "CONTACTS_UPSERT" && eventType !== "CONTACTS_UPDATE") return null;
+  const contactJid = asString(data.id) ?? asString(data.remoteJid) ?? asString(root.sender);
+  const phone = normalizePhoneFromJid(contactJid);
+  const contactName = asString(data.pushName) ?? asString(data.name) ?? asString(data.verifiedName);
+  if (!phone || !contactName) return null;
+  return {
+    contactKey: crypto.createHash("sha256").update(`${instanceName}:${phone}`).digest("hex"),
+    contactName,
+  };
+}
+
 export function normalizeEvolutionWebhook(payload: unknown): NormalizedEvolutionEvent | null {
   const root = asRecord(payload);
   const eventType = asString(root.event)?.toUpperCase().replace(/[.-]/g, "_");
@@ -82,6 +95,7 @@ export function normalizeEvolutionWebhook(payload: unknown): NormalizedEvolution
   const messageText = extractMessageText(message);
   const origin = extractEvolutionOrigin(root, data, message);
   const timestamp = parseOccurredAt(data.messageTimestamp);
+  const contactUpdate = extractContactUpdate(eventType, instanceName, data, root);
   const stableId = messageId ?? `${eventType}:${instanceName}:${remoteJid ?? "none"}:${timestamp?.toISOString() ?? "none"}`;
   const fingerprint = crypto.createHash("sha256").update(`${instanceName}|${stableId}|${direction}`).digest("hex");
 
@@ -98,8 +112,11 @@ export function normalizeEvolutionWebhook(payload: unknown): NormalizedEvolution
     occurredAt: timestamp,
     contactKey: isMessage && directPhone ? crypto.createHash("sha256").update(`${instanceName}:${directPhone}`).digest("hex") : null,
     phoneLast4: directPhone ? directPhone.slice(-4) : null,
-    contactName: asString(data.pushName),
+    // `pushName` em eventos fromMe pode ser o nome do próprio perfil da instância.
+    // Só nomes recebidos do contato remoto entram no cadastro do lead.
+    contactName: direction === "incoming" ? asString(data.pushName) : null,
     connectionStatus: eventType === "CONNECTION_UPDATE" ? asString(data.state) : null,
+    contactUpdate,
     origin,
   };
 }

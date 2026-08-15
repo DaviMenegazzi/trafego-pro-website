@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { Activity, ArrowLeft, BadgeCheck, Bot, CheckCircle2, ChevronRight, CircleAlert, Clock3, Database, FileJson, MessageCircleMore, MousePointerClick, RefreshCw, ShieldCheck, Signal, Tag, UsersRound, Webhook } from "lucide-react";
 import { canAccessEvolutionPanel } from "@/lib/evolutionAdminPolicy";
+import { scopeEvolutionData } from "@/lib/evolutionScope";
 
 type Summary = { totalLeads: number; pendingLeads: number; qualifiedLeads: number; closedLeads: number; eventsToday: number };
 type Instance = { instanceName: string; displayName: string | null; unitName: string | null; connectionStatus: string; lastEventAt: string | null; lastMessageAt: string | null };
@@ -64,30 +65,48 @@ function OriginPill({ platform, evidence }: { platform: OriginPlatform; evidence
 
 export default function EvolutionAdmin() {
   const [, navigate] = useLocation();
-  const [overview, setOverview] = useState<Overview>(emptyOverview);
+  const [rawOverview, setRawOverview] = useState<Overview>(emptyOverview);
   const [view, setView] = useState<View>("operacao");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingLead, setUpdatingLead] = useState<string | null>(null);
-  const [attributions, setAttributions] = useState<MetaAttribution[]>([]);
+  const [rawAttributions, setRawAttributions] = useState<MetaAttribution[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [conversationLoading, setConversationLoading] = useState(false);
+  const [unitScope, setUnitScope] = useState("all");
+  const [instanceScope, setInstanceScope] = useState("all");
+  const [savingInstance, setSavingInstance] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const token = useMemo(() => localStorage.getItem("tp_token"), []);
   const webhookUrl = useMemo(() => `${window.location.origin}/api/evolution/webhook`, []);
   const requestHeaders = useCallback(() => ({ Authorization: `Bearer ${localStorage.getItem("tp_token") ?? ""}`, "Content-Type": "application/json" }), []);
 
+  const scope = useMemo(() => scopeEvolutionData(rawOverview.instances, rawOverview.leads, rawOverview.events, unitScope, instanceScope), [instanceScope, rawOverview, unitScope]);
+  const unitOptions = scope.unitOptions;
+  const scopedInstances = scope.visibleInstances;
+  const scopedLeads = scope.visibleLeads;
+  const scopedEvents = scope.visibleEvents;
+  const scopedAttributions = useMemo(() => rawAttributions.filter((item) => scopedLeads.some((lead) => lead.id === item.leadId)), [rawAttributions, scopedLeads]);
+  const scopedSummary = useMemo<Summary>(() => ({
+    totalLeads: scopedLeads.length,
+    pendingLeads: scopedLeads.filter((lead) => lead.classification === "pendente").length,
+    qualifiedLeads: scopedLeads.filter((lead) => lead.funnelStage === "qualificado").length,
+    closedLeads: scopedLeads.filter((lead) => lead.funnelStage === "fechado").length,
+    eventsToday: scopedEvents.filter((event) => new Date(event.receivedAt).toDateString() === new Date().toDateString()).length,
+  }), [scopedEvents, scopedLeads]);
+  const overview = useMemo<Overview>(() => ({ ...rawOverview, summary: scopedSummary, instances: scopedInstances, leads: scopedLeads, events: scopedEvents }), [rawOverview, scopedEvents, scopedInstances, scopedLeads, scopedSummary]);
+  const attributions = scopedAttributions;
   const sourceStats = useMemo(() => ({
-    verifiedMeta: overview.leads.filter((lead) => lead.originPlatform === "meta" && lead.originEvidence === "verified").length,
-    observedMeta: overview.leads.filter((lead) => lead.originPlatform === "meta" && lead.originEvidence === "observed").length,
-    observedGoogle: overview.leads.filter((lead) => lead.originPlatform === "google_ads" && lead.originEvidence !== "none").length,
-    withoutEvidence: overview.leads.filter((lead) => lead.originEvidence === "none").length,
-  }), [overview.leads]);
+    verifiedMeta: scopedLeads.filter((lead) => lead.originPlatform === "meta" && lead.originEvidence === "verified").length,
+    observedMeta: scopedLeads.filter((lead) => lead.originPlatform === "meta" && lead.originEvidence === "observed").length,
+    observedGoogle: scopedLeads.filter((lead) => lead.originPlatform === "google_ads" && lead.originEvidence !== "none").length,
+    withoutEvidence: scopedLeads.filter((lead) => lead.originEvidence === "none").length,
+  }), [scopedLeads]);
 
-  const originEvents = useMemo(() => overview.events.filter((event) => event.originEvidence !== "none"), [overview.events]);
-  const selectedLead = useMemo(() => overview.leads.find((lead) => lead.id === selectedLeadId) ?? overview.leads[0] ?? null, [overview.leads, selectedLeadId]);
+  const originEvents = useMemo(() => scopedEvents.filter((event) => event.originEvidence !== "none"), [scopedEvents]);
+  const selectedLead = useMemo(() => scopedLeads.find((lead) => lead.id === selectedLeadId) ?? scopedLeads[0] ?? null, [scopedLeads, selectedLeadId]);
   const attributionByLead = useMemo(() => new Map(attributions.map((item) => [item.leadId, item])), [attributions]);
 
   const loadOverview = useCallback(async (background = false) => {
@@ -103,7 +122,7 @@ export default function EvolutionAdmin() {
       }
       const data = await response.json() as Overview | { error?: string };
       if (!response.ok || !("summary" in data)) throw new Error("error" in data ? data.error : "Não foi possível carregar o painel");
-      setOverview(data);
+      setRawOverview(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível carregar o painel Evolution");
     } finally {
@@ -117,7 +136,7 @@ export default function EvolutionAdmin() {
       const response = await fetch("/api/evolution/attributions", { headers: requestHeaders() });
       const data = await readEvolutionJson<{ rows?: MetaAttribution[]; error?: string }>(response, "Não foi possível carregar atribuições Meta");
       if (!response.ok) throw new Error(data.error ?? "Não foi possível carregar atribuições Meta");
-      setAttributions(data.rows ?? []);
+      setRawAttributions(data.rows ?? []);
     } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar atribuições Meta"); }
   }, [requestHeaders]);
 
@@ -153,7 +172,7 @@ export default function EvolutionAdmin() {
       });
       const data = await response.json() as Lead | { error?: string };
       if (!response.ok || !("id" in data)) throw new Error("error" in data ? data.error : "Não foi possível atualizar o lead");
-      setOverview((current) => ({ ...current, leads: current.leads.map((item) => item.id === data.id ? data : item) }));
+      setRawOverview((current) => ({ ...current, leads: current.leads.map((item) => item.id === data.id ? data : item) }));
       await loadOverview(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível atualizar o lead");
@@ -162,11 +181,28 @@ export default function EvolutionAdmin() {
     }
   }
 
+  async function updateInstanceProfile(event: React.FormEvent<HTMLFormElement>, instance: Instance) {
+    event.preventDefault();
+    setSavingInstance(instance.instanceName);
+    setError("");
+    const fields = new FormData(event.currentTarget);
+    try {
+      const response = await fetch(`/api/evolution/instances/${instance.instanceName}`, {
+        method: "PUT", headers: requestHeaders(), body: JSON.stringify({ displayName: fields.get("displayName"), unitName: fields.get("unitName") }),
+      });
+      const data = await readEvolutionJson<Instance & { error?: string }>(response, "Não foi possível atualizar a instância");
+      if (!response.ok || !("instanceName" in data)) throw new Error(data.error ?? "Não foi possível atualizar a instância");
+      setRawOverview((current) => ({ ...current, instances: current.instances.map((item) => item.instanceName === data.instanceName ? data : item) }));
+      await loadOverview(true);
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível atualizar a instância"); }
+    finally { setSavingInstance(null); }
+  }
+
   const metrics = [
-    { label: "Eventos hoje", value: overview.summary.eventsToday, icon: Activity, color: "text-cyan-300", bg: "bg-cyan-400/10" },
-    { label: "Contatos rastreados", value: overview.summary.totalLeads, icon: UsersRound, color: "text-indigo-300", bg: "bg-indigo-400/10" },
-    { label: "A validar", value: overview.summary.pendingLeads, icon: CircleAlert, color: "text-amber-300", bg: "bg-amber-400/10" },
-    { label: "Fechados", value: overview.summary.closedLeads, icon: CheckCircle2, color: "text-emerald-300", bg: "bg-emerald-400/10" },
+    { label: "Eventos hoje", value: scopedSummary.eventsToday, icon: Activity, color: "text-cyan-300", bg: "bg-cyan-400/10" },
+    { label: "Contatos rastreados", value: scopedSummary.totalLeads, icon: UsersRound, color: "text-indigo-300", bg: "bg-indigo-400/10" },
+    { label: "A validar", value: scopedSummary.pendingLeads, icon: CircleAlert, color: "text-amber-300", bg: "bg-amber-400/10" },
+    { label: "Fechados", value: scopedSummary.closedLeads, icon: CheckCircle2, color: "text-emerald-300", bg: "bg-emerald-400/10" },
   ];
 
   if (loading) {
@@ -183,10 +219,35 @@ export default function EvolutionAdmin() {
         </header>
 
         {error && <div role="alert" className="mb-6 rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
+        <section aria-label="Escopo de instâncias" className="mb-6 grid gap-3 rounded-2xl border border-white/8 bg-white/[.025] p-4 md:grid-cols-[1fr_1fr_auto]">
+          <label className="text-xs text-zinc-500">Unidade
+            <select value={unitScope} onChange={(event) => { setUnitScope(event.target.value); setInstanceScope("all"); }} className="mt-1.5 block w-full rounded-xl border border-white/10 bg-[#101214] px-3 py-2.5 text-sm text-zinc-200 outline-none focus:border-cyan-300/50">
+              <option value="all">Todas as unidades</option>
+              {unitOptions.map((unit) => <option key={unit} value={unit}>{unit === "__unassigned" ? "Sem unidade atribuída" : unit}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-zinc-500">Instância Evolution
+            <select value={instanceScope} onChange={(event) => setInstanceScope(event.target.value)} className="mt-1.5 block w-full rounded-xl border border-white/10 bg-[#101214] px-3 py-2.5 text-sm text-zinc-200 outline-none focus:border-cyan-300/50">
+              <option value="all">Todas as instâncias da seleção</option>
+              {scopedInstances.map((instance) => <option key={instance.instanceName} value={instance.instanceName}>{instance.displayName || instance.instanceName}</option>)}
+            </select>
+          </label>
+          <div className="flex items-end"><div className="rounded-xl border border-cyan-300/15 bg-cyan-400/5 px-4 py-2.5 text-xs leading-5 text-cyan-100"><strong className="font-medium">{scopedInstances.length}</strong> instância(s) · <strong className="font-medium">{scopedSummary.totalLeads}</strong> contato(s)</div></div>
+        </section>
 
         <nav aria-label="Áreas do Evolution Monitor" className="mb-8 flex flex-wrap gap-2 border-b border-white/8 pb-4">
           {([ ["operacao", "Operação", Activity], ["atribuicao", "Atribuição Meta", MousePointerClick], ["conversas", "Conversas", MessageCircleMore], ["origem", "Origem & tags", Tag], ["auditoria", "Auditoria", FileJson] ] as const).map(([id, label, Icon]) => <button key={id} onClick={() => setView(id)} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs transition ${view === id ? "bg-cyan-300 text-[#082124] font-medium" : "border border-white/10 bg-white/[.025] text-zinc-400 hover:bg-white/[.06] hover:text-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
         </nav>
+
+        {view === "operacao" && <section className="mb-8 rounded-2xl border border-white/8 bg-white/[.025] p-6">
+          <div className="mb-6 flex items-end justify-between gap-4"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Organização operacional</p><h2 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">Instâncias por unidade</h2><p className="mt-2 text-sm leading-6 text-zinc-500">Cadastre um nome de operação e a unidade responsável por cada WhatsApp. Cada nova instância que enviar eventos ao mesmo webhook aparecerá aqui.</p></div><Database className="h-5 w-5 text-zinc-600" /></div>
+          {scopedInstances.length === 0 ? <p className="rounded-xl border border-dashed border-white/10 px-5 py-8 text-center text-sm text-zinc-500">Nenhuma instância nesta seleção.</p> : <div className="space-y-3">{scopedInstances.map((instance) => <form key={instance.instanceName} onSubmit={(event) => updateInstanceProfile(event, instance)} className="grid gap-3 rounded-xl border border-white/8 bg-black/15 p-4 md:grid-cols-[1fr_1fr_auto_auto]">
+            <label className="text-[10px] uppercase tracking-[.14em] text-zinc-600">Nome da instância<input name="displayName" defaultValue={instance.displayName || ""} placeholder={instance.instanceName} className="mt-1.5 block w-full rounded-lg border border-white/10 bg-[#101214] px-3 py-2 text-xs normal-case tracking-normal text-zinc-200 outline-none focus:border-cyan-300/50" /></label>
+            <label className="text-[10px] uppercase tracking-[.14em] text-zinc-600">Unidade<input name="unitName" defaultValue={instance.unitName || ""} placeholder="Ex.: Vida Card Ijuí" className="mt-1.5 block w-full rounded-lg border border-white/10 bg-[#101214] px-3 py-2 text-xs normal-case tracking-normal text-zinc-200 outline-none focus:border-cyan-300/50" /></label>
+            <div className="flex items-end"><span className={`rounded-full border px-2.5 py-2 text-[10px] uppercase tracking-[.12em] ${statusClass(instance.connectionStatus)}`}>{instance.connectionStatus}</span></div>
+            <div className="flex items-end"><button disabled={savingInstance === instance.instanceName} className="rounded-lg bg-cyan-300 px-3 py-2 text-xs font-medium text-[#082124] disabled:opacity-60">{savingInstance === instance.instanceName ? "Salvando" : "Salvar"}</button></div>
+          </form>)}</div>}
+        </section>}
 
         {view === "operacao" && <>
           <section className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(({ label, value, icon: Icon, color, bg }) => <article key={label} className="rounded-2xl border border-white/8 bg-white/[.025] p-5 shadow-2xl shadow-black/10"><div className="mb-5 flex items-center justify-between"><span className="text-xs text-zinc-500">{label}</span><span className={`grid h-8 w-8 place-items-center rounded-lg ${bg} ${color}`}><Icon className="h-4 w-4" /></span></div><strong className="font-['Space_Grotesk'] text-3xl font-light tracking-[-.05em] text-white">{value}</strong></article>)}</section>

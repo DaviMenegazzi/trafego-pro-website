@@ -326,9 +326,9 @@
 
 ## Guia rápido Evolution sem Docker — sem alteração no projeto
 
-- [ ] Confirmar o modo local mínimo para teste e suas dependências
-- [ ] Documentar a criação da instância, QR e webhook Bearer sem Docker
-- [ ] Entregar comandos de teste temporário no WSL
+- [x] Confirmar o modo local mínimo para teste e suas dependências
+- [x] Documentar a criação da instância, QR e webhook Bearer sem Docker
+- [x] Entregar comandos de teste temporário no WSL
 
 ## Guia visual Evolution local — sem alteração no projeto
 
@@ -338,9 +338,9 @@
 
 ## Diagnóstico PostgreSQL da Evolution no WSL — sem alteração no projeto
 
-- [ ] Confirmar a URL de banco usada pela Evolution e a existência do usuário local
-- [ ] Corrigir as credenciais PostgreSQL e validar a conexão antes da migração
-- [ ] Retestar a geração e a implantação do banco Evolution
+- [x] Confirmar a URL de banco usada pela Evolution e a existência do usuário local
+- [x] Corrigir as credenciais PostgreSQL e validar a conexão antes da migração
+- [x] Retestar a geração e a implantação do banco Evolution
 
 ## Orientação de webhook no Evolution Manager — sem alteração no projeto
 
@@ -390,7 +390,7 @@
 - [x] Criar a aba Conversas com linha do tempo de mensagens por contato
 - [x] Cobrir ausência de `ctwa_clid`, correspondência Meta e leitura de conversas em testes
 - [x] Validar TypeScript, testes, build e novas abas administrativas no navegador
-- [ ] Salvar checkpoint da expansão de atribuição e conversas
+- [x] Salvar checkpoint da expansão de atribuição e conversas
 
 ## Robustez das novas abas Evolution
 

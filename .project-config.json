@@ -11,15 +11,13 @@
     "DRIZZLE_DATABASE_URL": "mysql://2GrmLjqk6jqj6xH.root:kzLM2DL97sNK71J3uxry@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/HCdtznE9dNy8ZoAnjMwrWj?ssl={\"rejectUnauthorized\":true}",
     "MANUS_WEBDEV_PROJECT_ID": "HCdtznE9dNy8ZoAnjMwrWj"
   },
-  "experiments": [
-    "no_db_push"
-  ],
+  "experiments": null,
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663655133524/HCdtznE9dNy8ZoAnjMwrWj",
-    "access_key_id": "ASIAZV3A2ECZDTNZTK5K",
-    "secret_access_key": "2nYlFQDRZ2IvsiRD4jVOvAXImgGq9cwLA/Llw+ld",
-    "session_token": "IQoJb3JpZ2luX2VjEDYaCXVzLWVhc3QtMSJHMEUCIAkSO43mRiaQj+3L0kxewFcYyUCUKGTi2GO0J2UP5Rk4AiEA+9V/x0w2BgkewWcg8rXc70AhrVCU/irKH5tS6B1FAIsq/wMI////////////ARAEGgw2NjUzODYwOTg4NjYiDEAFWKa5AL0pH0miIyrTA/khloI4ov4isCeSLI4PMBIutgS6nDyo61u+6emLJD3WvmG28VyuDASSckRZobm5NbgcZLT+PdWe8SwWPSY7p6DYBW7cuQvI5W4oDMeVCHxmlLkUir6A02QbSpyG6cGAxceKtho9d4+rlOsH8drQQin84A5P06AkuJY8+XdF2J2s975OBtbkFO0++5NJzo+bWe/BojUz389OoA0uDPBPAzUCKzwSw2V/PHwq9QCowz/JI+WdCHhATa2EqpXFrbEZvlBdFVqvgnylq32CpC9K0w3pioE51ulqOFG1R7Z6bpuRXp13XDmk6dO4BbQkGNa8OaZDwb50RSt3moNLL69iekaWQ7rk2LjTEN0GjWwELMzn7fcnsJ1qY/DtKIXGHisD3uygeAFBNF/oLtrOND5EkUA3bo4GkwqGrOBFbsyGb7g63kbj35kimxjYEZEXpPoHqNtEXznguc+zkzHB4r0HuUxpex4oDBjiMLA8PpheH1b59HlUf8rDc/O27n5iMorYOapFHwoaO9k5ILEOipSduH9gbRif97U+7lndLJ48535cceb69l+QYMqPV5hi306aXxOq1zJaoBZbShes82BU33ZN1rQSoykG0tsd3zUfH7KI9SRBMPSt/NMGOp0Bl9XV+NwTgFb8J5IwgpzXtaVh9YDik1xNecp6mLq1TYA8NbaJur8dMw0DnzLWb1tIdt9cMlLh9owfMJklMGjeKJqLbwcmBSiKCjhhEvrrppRBnyezA9MSigwkj13d1/ysLMWWYffKfxwXRx2rsvwrgdhYGtJQouFOG0RCiDiYSsegzh0KOzO6gjHpSasfgPCoArh4QlHQCzgnkdY0Pw==",
-    "expiration": "2026-08-15T01:24:04.000Z",
+    "access_key_id": "ASIAZV3A2ECZH235HS42",
+    "secret_access_key": "y34sdLrYgpVGcR3d9iA7rPG57PGgWGYlR9uHISen",
+    "session_token": "IQoJb3JpZ2luX2VjEE8aCXVzLWVhc3QtMSJGMEQCIEFbzTI5TXaZ/xE8Lpz0u0/Lth1ra9KvuSU+rxBTioKkAiBpCsG4jJgS+7/WcgoGpec4n1tvBYUiBCiWlxpYRzlPIir2AwgYEAQaDDY2NTM4NjA5ODg2NiIM1hHPoeqLoGb4JBynKtMD/2h7iySytbxpyH1dLrx7CvbThHDTgh1IsMlhnc9sVId0vafSMTUnLmvVsObFe+Mj1xILpXahrQX9xit7t1Bt7Cvmkd5Vi0twSzZG7GbHiNaqUmfa0vraOAFWDGsPpgYdpNpsLkaxX11lkry4VV2kD6JS2TjA0a/KLPOZk5ZO1moZJ6Zl+lvI85fbjjb2TnDG19XUPSNbHitbs8vHv8IG9gQA2p97uz56jc65/VfWY/euRH8ip171nbrk+o/LAFZIvFdd9VNUdUkL99XfxD4NT19TBS2v9eCP5lrL5E713qHvE6z2dJ8dobm7fWNqHAiDQCWVhO7PXmW76ICc5BUkHJ2FZnkKHqYDkS3Tg3wESPWJdBcu14EFLYvxdAsaNkmodyAq7E8BczWmXAJBTmQ40KpmMO1+eb2dgu6CqNL/X8XCutBzal1Ep+ehKsVJGjwyHg83G5vXd6oG6I3F2kG055nnOpSEz7o3DfZFqxi80t0U4hUevH+3dpnXuVq5HePwxWcGbYgUrRqGT8Pxp0r+2Y5HfNKDcgcIY6SjxKNvf2uDpl7cAalatjvsWRckWS1+NPeku+AXDFvzcXLuwKOfRtNbtNdMniOHTkUCXr5HOoikzXAwgf2B1AY6ngHo85DuvMXBY8PElQrVt9neiiXnb547mgdWmjsfcjJ3RMMZdbHINjfDyR4quW+Mm0Rs98DKpxTbwffTRLPEqFsXJqVWYcPlyDNwKij5a54Ol5/lPngpPoSJgeaZApTSROEavbhobSPcKTiuWkrD96JniFW0w7A/uULBJ5CK2PPm/U2pKiU56QAikuqh22pgfD3cAQE4CwcRDvJ/SZQvMg==",
+    "expiration": "2026-08-16T02:58:09.000Z",
     "backend": "GIT_BACKEND_S3"
   },
   "name": "vidacard-tupan-lp",
@@ -28,6 +26,7 @@
   "secrets": {
     "BUILT_IN_FORGE_API_KEY": "QqhX4sSfaEUg9MRuP6S4UU",
     "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
+    "EVOLUTION_WEBHOOK_SECRET": "segredo@123",
     "JWT_SECRET": "V7acck2whE2FeVpB5kScab",
     "OAUTH_SERVER_URL": "https://api.manus.im",
     "OWNER_NAME": "Davi",

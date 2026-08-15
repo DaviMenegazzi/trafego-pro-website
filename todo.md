@@ -221,5 +221,5 @@
 
 ## Checkpoint posterior à validação visual final
 
-- [ ] Salvar um novo checkpoint após as validações autenticadas em desktop e viewport móvel
-- [ ] Confirmar no checkpoint final a versão validada no domínio publicado
+- [x] Salvar um novo checkpoint após as validações autenticadas em desktop e viewport móvel
+- [x] Confirmar no checkpoint final a versão validada no domínio publicado

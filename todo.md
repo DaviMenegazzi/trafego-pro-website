@@ -432,3 +432,10 @@
 - [x] Exibir detalhe do contato com telefone, mensagens, origem, campanha, conjunto e criativo disponíveis
 - [x] Cobrir movimentação, persistência e isolamento entre instâncias em testes
 - [x] Validar no navegador e salvar checkpoint do CRM Evolution
+
+## Correção de usabilidade do pipeline CRM
+
+- [x] Eliminar o overflow lateral do pipeline CRM em desktop e dispositivos móveis
+- [x] Corrigir a movimentação por arrastar e soltar entre as etapas do pipeline
+- [x] Adicionar cobertura automatizada para a interação de mudança de etapa
+- [x] Validar visualmente o pipeline e salvar checkpoint da correção

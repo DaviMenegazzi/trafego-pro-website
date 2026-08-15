@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { Activity, ArrowLeft, BadgeCheck, Bot, CheckCircle2, ChevronRight, CircleAlert, Clock3, Database, FileJson, MessageCircleMore, MousePointerClick, Phone, RefreshCw, ShieldCheck, Signal, Tag, UsersRound, Webhook, X } from "lucide-react";
 import { canAccessEvolutionPanel } from "@/lib/evolutionAdminPolicy";
+import { resolveCrmDrop, type CrmStage } from "@/lib/crmPipeline";
 import { scopeEvolutionData } from "@/lib/evolutionScope";
 
 type Summary = { totalLeads: number; pendingLeads: number; qualifiedLeads: number; closedLeads: number; eventsToday: number };
@@ -9,7 +12,6 @@ type Instance = { instanceName: string; displayName: string | null; unitName: st
 type OriginPlatform = "meta" | "google_ads" | "mixed" | "unknown";
 type OriginEvidence = "verified" | "observed" | "none";
 type EventItem = { id: string; instanceName: string; eventType: string; direction: string; messageType: string | null; messagePreview: string | null; occurredAt: string | null; receivedAt: string; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; metaSourceId: string | null; metaSourceType: string | null; googleClickId: string | null; attributionPayload: Record<string, string> | null };
-type CrmStage = "lead_not_responded" | "lead_responded" | "follow_up" | "lead_replied" | "negotiation" | "closed_won" | "closed_lost";
 type Lead = { id: string; instanceName: string; contactKey: string; contactPhone: string | null; phoneLast4: string | null; contactName: string | null; classification: "pendente" | "lead" | "nao_lead"; funnelStage: "novo" | "qualificado" | "negociacao" | "perdido" | "fechado"; classificationNote: string | null; firstContactAt: string; lastMessageAt: string; messagesReceived: number; messagesSent: number; classifiedByEmail: string | null; classifiedAt: string | null; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; googleClickId: string | null; originDetectedAt: string | null; crmStage: CrmStage; crmStageUpdatedAt: string | null; crmStageUpdatedBy: string | null };
 type Overview = { summary: Summary; instances: Instance[]; events: EventItem[]; leads: Lead[] };
 type MetaAttribution = { leadId: string; sourceEventId: string | null; clientId: string | null; accountId: string | null; campaignId: string | null; campaignName: string | null; adsetId: string | null; adsetName: string | null; adId: string | null; adName: string | null; creativeId: string | null; creativeName: string | null; matchedBy: string; matchStatus: "matched" | "unresolved"; matchedAt: string };
@@ -80,6 +82,16 @@ function OriginPill({ platform, evidence }: { platform: OriginPlatform; evidence
   return <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[.12em] ${originClass(evidence)}`}><Tag className="h-3 w-3" />{originLabel(platform)} · {evidenceLabel(evidence)}</span>;
 }
 
+function CrmLeadCard({ lead, attribution, moving, onOpen }: { lead: Lead; attribution: MetaAttribution | undefined; moving: boolean; onOpen: (lead: Lead) => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id });
+  return <button ref={setNodeRef} type="button" style={{ transform: CSS.Translate.toString(transform) }} {...attributes} {...listeners} onClick={() => void onOpen(lead)} className={`w-full touch-none rounded-xl border border-white/10 bg-[#101214]/95 p-3 text-left shadow-lg shadow-black/10 transition hover:border-cyan-300/40 hover:bg-[#14181a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isDragging ? "cursor-grabbing opacity-35" : "cursor-grab"}`}><p className="truncate text-sm text-zinc-100">{lead.contactName || "Contato sem nome"}</p><p className="mt-1 flex items-center gap-1 text-[11px] text-zinc-500"><Phone className="h-3 w-3" />{formatAdminPhone(lead)}</p><p className="mt-2 text-[10px] text-zinc-600">{lead.instanceName} · {lead.messagesReceived} recebidas / {lead.messagesSent} enviadas</p>{attribution?.campaignName ? <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-cyan-200">{attribution.campaignName}</p> : <p className="mt-2 text-[10px] text-zinc-600">{originLabel(lead.originPlatform)}</p>}{moving && <p className="mt-2 text-[10px] text-cyan-300">Movendo…</p>}</button>;
+}
+
+function CrmStageColumn({ stage, leads, attributions, movingLeadId, onOpen }: { stage: typeof crmStages[number]; leads: Lead[]; attributions: Map<string, MetaAttribution>; movingLeadId: string | null; onOpen: (lead: Lead) => void }) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage.value });
+  return <article ref={setNodeRef} className={`min-h-[278px] rounded-2xl border p-3 transition-colors ${stage.color} ${isOver ? "ring-2 ring-cyan-300/60 ring-offset-2 ring-offset-[#090a0b]" : ""}`}><div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-medium text-zinc-100">{stage.label}</h3><span className="rounded-full border border-white/10 bg-black/15 px-2 py-0.5 text-[10px] text-zinc-400">{leads.length}</span></div><div className="space-y-2">{leads.length === 0 ? <p className={`rounded-xl border border-dashed px-3 py-6 text-center text-xs ${isOver ? "border-cyan-300/50 bg-cyan-300/10 text-cyan-100" : "border-white/10 text-zinc-600"}`}>Solte o contato aqui</p> : leads.map((lead) => <CrmLeadCard key={lead.id} lead={lead} attribution={attributions.get(lead.id)} moving={movingLeadId === lead.id} onOpen={onOpen} />)}</div></article>;
+}
+
 export default function EvolutionAdmin() {
   const [, navigate] = useLocation();
   const [rawOverview, setRawOverview] = useState<Overview>(emptyOverview);
@@ -94,6 +106,7 @@ export default function EvolutionAdmin() {
   const [crmHistory, setCrmHistory] = useState<CrmHistory[]>([]);
   const [crmDetailLeadId, setCrmDetailLeadId] = useState<string | null>(null);
   const [movingCrmLead, setMovingCrmLead] = useState<string | null>(null);
+  const [activeCrmLeadId, setActiveCrmLeadId] = useState<string | null>(null);
   const [unitScope, setUnitScope] = useState("all");
   const [instanceScope, setInstanceScope] = useState("all");
   const [savingInstance, setSavingInstance] = useState<string | null>(null);
@@ -129,6 +142,8 @@ export default function EvolutionAdmin() {
   const selectedLead = useMemo(() => scopedLeads.find((lead) => lead.id === selectedLeadId) ?? scopedLeads[0] ?? null, [scopedLeads, selectedLeadId]);
   const crmDetailLead = useMemo(() => scopedLeads.find((lead) => lead.id === crmDetailLeadId) ?? null, [crmDetailLeadId, scopedLeads]);
   const attributionByLead = useMemo(() => new Map(attributions.map((item) => [item.leadId, item])), [attributions]);
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const activeCrmLead = useMemo(() => scopedLeads.find((lead) => lead.id === activeCrmLeadId) ?? null, [activeCrmLeadId, scopedLeads]);
 
   const loadOverview = useCallback(async (background = false) => {
     if (background) setRefreshing(true); else setLoading(true);
@@ -242,6 +257,12 @@ export default function EvolutionAdmin() {
     finally { setMovingCrmLead(null); }
   }
 
+  function handleCrmDragEnd(event: DragEndEvent) {
+    setActiveCrmLeadId(null);
+    const drop = resolveCrmDrop(scopedLeads, String(event.active.id), event.over ? String(event.over.id) : null);
+    if (drop) void moveCrmLead(drop.lead, drop.stage);
+  }
+
   async function openCrmDetail(lead: Lead) {
     setCrmDetailLeadId(lead.id);
     setSelectedLeadId(lead.id);
@@ -260,7 +281,7 @@ export default function EvolutionAdmin() {
   }
 
   return (
-    <main className="min-h-screen bg-[#090a0b] text-zinc-100 selection:bg-cyan-300/30" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>
+    <main className="min-h-screen overflow-x-hidden bg-[#090a0b] text-zinc-100 selection:bg-cyan-300/30" style={{ fontFamily: "Inter, sans-serif", fontWeight: 300 }}>
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true"><div className="absolute -top-48 right-[-10rem] h-[32rem] w-[32rem] rounded-full bg-cyan-400/8 blur-[120px]" /><div className="absolute bottom-[-16rem] left-[-10rem] h-[30rem] w-[30rem] rounded-full bg-indigo-500/8 blur-[120px]" /></div>
       <div className="relative mx-auto max-w-[1480px] px-5 py-6 sm:px-8 lg:px-10">
         <header className="mb-8 flex flex-col gap-6 border-b border-white/8 pb-7 lg:flex-row lg:items-end lg:justify-between">
@@ -291,7 +312,7 @@ export default function EvolutionAdmin() {
 
         {view === "crm" && <section className="space-y-5">
           <div className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[.025] p-6 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">CRM por instância</p><h2 className="mt-1 font-['Space_Grotesk'] text-2xl font-light text-white">Pipeline comercial</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Arraste um contato entre as etapas. A movimentação fica registrada no Supabase Evolution e nunca mistura contatos de instâncias fora do filtro atual.</p></div><div className="rounded-xl border border-cyan-300/15 bg-cyan-400/5 px-4 py-3 text-xs text-cyan-100"><strong className="font-medium">{scopedLeads.length}</strong> contato(s) no escopo atual</div></div>
-          <div className="grid gap-4 overflow-x-auto pb-2 xl:grid-cols-7">{crmStages.map((stage) => { const leads = scopedLeads.filter((lead) => lead.crmStage === stage.value); return <article key={stage.value} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("application/evolution-lead"); const lead = scopedLeads.find((item) => item.id === id); if (lead) void moveCrmLead(lead, stage.value); }} className={`min-h-[340px] min-w-[245px] rounded-2xl border p-3 ${stage.color}`}><div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-medium text-zinc-100">{stage.label}</h3><span className="rounded-full border border-white/10 bg-black/15 px-2 py-0.5 text-[10px] text-zinc-400">{leads.length}</span></div><div className="space-y-2">{leads.length === 0 ? <p className="rounded-xl border border-dashed border-white/10 px-3 py-6 text-center text-xs text-zinc-600">Arraste contatos para cá</p> : leads.map((lead) => { const attr = attributionByLead.get(lead.id); return <button draggable key={lead.id} onDragStart={(event) => event.dataTransfer.setData("application/evolution-lead", lead.id)} onClick={() => void openCrmDetail(lead)} className="w-full cursor-grab rounded-xl border border-white/10 bg-[#101214]/95 p-3 text-left shadow-lg shadow-black/10 transition hover:border-cyan-300/40 hover:bg-[#14181a] active:cursor-grabbing"><p className="truncate text-sm text-zinc-100">{lead.contactName || "Contato sem nome"}</p><p className="mt-1 flex items-center gap-1 text-[11px] text-zinc-500"><Phone className="h-3 w-3" />{formatAdminPhone(lead)}</p><p className="mt-2 text-[10px] text-zinc-600">{lead.instanceName} · {lead.messagesReceived} recebidas / {lead.messagesSent} enviadas</p>{attr?.campaignName ? <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-cyan-200">{attr.campaignName}</p> : <p className="mt-2 text-[10px] text-zinc-600">{originLabel(lead.originPlatform)}</p>}{movingCrmLead === lead.id && <p className="mt-2 text-[10px] text-cyan-300">Movendo…</p>}</button>; })}</div></article>; })}</div>
+          <DndContext sensors={dndSensors} onDragStart={(event) => setActiveCrmLeadId(String(event.active.id))} onDragCancel={() => setActiveCrmLeadId(null)} onDragEnd={handleCrmDragEnd}><div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{crmStages.map((stage) => <CrmStageColumn key={stage.value} stage={stage} leads={scopedLeads.filter((lead) => lead.crmStage === stage.value)} attributions={attributionByLead} movingLeadId={movingCrmLead} onOpen={openCrmDetail} />)}</div><DragOverlay dropAnimation={null}>{activeCrmLead ? <div className="w-[250px] rounded-xl border border-cyan-300/50 bg-[#151a1c] p-3 shadow-2xl shadow-black/50"><p className="truncate text-sm text-zinc-100">{activeCrmLead.contactName || "Contato sem nome"}</p><p className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400"><Phone className="h-3 w-3" />{formatAdminPhone(activeCrmLead)}</p></div> : null}</DragOverlay></DndContext>
           {crmDetailLead && <aside className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Detalhes do lead"><div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-white/10 bg-[#101214] shadow-2xl shadow-black/60"><header className="flex items-start justify-between gap-4 border-b border-white/8 p-6"><div><p className="text-xs uppercase tracking-[.18em] text-cyan-300">Detalhe do contato</p><h3 className="mt-1 font-['Space_Grotesk'] text-2xl font-light text-white">{crmDetailLead.contactName || "Contato sem nome"}</h3><p className="mt-2 text-sm text-zinc-400">{formatAdminPhone(crmDetailLead)} · {crmDetailLead.instanceName}</p></div><button onClick={() => setCrmDetailLeadId(null)} className="rounded-xl border border-white/10 p-2 text-zinc-400 hover:bg-white/[.06] hover:text-white" aria-label="Fechar detalhes"><X className="h-4 w-4" /></button></header><div className="grid gap-6 p-6 lg:grid-cols-[1fr_1.2fr]"><div className="space-y-5"><section className="rounded-xl border border-white/8 bg-black/15 p-4"><p className="text-[10px] uppercase tracking-[.16em] text-zinc-600">Origem e atribuição</p><div className="mt-3"><OriginPill platform={crmDetailLead.originPlatform} evidence={crmDetailLead.originEvidence} /></div><dl className="mt-4 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-zinc-600">Campanha</dt><dd className="text-right text-zinc-200">{attributionByLead.get(crmDetailLead.id)?.campaignName || "Não identificada"}</dd></div><div className="flex justify-between gap-3"><dt className="text-zinc-600">Conjunto</dt><dd className="text-right text-zinc-200">{attributionByLead.get(crmDetailLead.id)?.adsetName || "—"}</dd></div><div className="flex justify-between gap-3"><dt className="text-zinc-600">Criativo</dt><dd className="text-right text-zinc-200">{attributionByLead.get(crmDetailLead.id)?.creativeName || attributionByLead.get(crmDetailLead.id)?.adName || "—"}</dd></div></dl></section><section className="rounded-xl border border-white/8 bg-black/15 p-4"><p className="text-[10px] uppercase tracking-[.16em] text-zinc-600">Histórico comercial</p><div className="mt-3 space-y-3">{crmHistory.length === 0 ? <p className="text-xs text-zinc-600">Nenhuma movimentação registrada ainda.</p> : crmHistory.map((item) => <div key={item.id} className="border-l border-cyan-300/30 pl-3 text-xs"><p className="text-zinc-300">{crmStages.find((stage) => stage.value === item.fromStage)?.label || "Entrada"} <ChevronRight className="inline h-3 w-3 text-zinc-600" /> {crmStages.find((stage) => stage.value === item.toStage)?.label}</p><p className="mt-1 text-zinc-600">{formatDate(item.changedAt)} · {item.changedBy || "Sistema"}</p></div>)}</div></section></div><section className="rounded-xl border border-white/8 bg-black/15 p-4"><p className="text-[10px] uppercase tracking-[.16em] text-zinc-600">Mensagens</p><div className="mt-3 max-h-[420px] space-y-3 overflow-y-auto pr-1">{conversationLoading ? <RefreshCw className="mx-auto my-10 h-5 w-5 animate-spin text-zinc-500" /> : conversation.length === 0 ? <p className="py-10 text-center text-xs text-zinc-600">Não há mensagens textuais registradas.</p> : conversation.map((message) => <div key={message.id} className={`flex ${message.direction === "outgoing" ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm ${message.direction === "outgoing" ? "bg-cyan-300 text-[#082124]" : "bg-white/[.07] text-zinc-200"}`}><p className="whitespace-pre-wrap break-words">{message.bodyText}</p><p className={`mt-1 text-[10px] ${message.direction === "outgoing" ? "text-[#164044]" : "text-zinc-600"}`}>{message.direction === "outgoing" ? "Enviada pela unidade" : "Recebida do contato"} · {formatDate(message.sentAt)}</p></div></div>)}</div></section></div></div></aside>}
         </section>}
 

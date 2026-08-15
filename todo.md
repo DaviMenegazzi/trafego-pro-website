@@ -195,9 +195,10 @@
 
 - [x] Revisar a hierarquia atual de informação, espaçamentos e contraste da dashboard
 - [x] Reorganizar cabeçalho, indicadores e cartões para leitura mais rápida
-- [ ] Melhorar estados de carregamento, vazio e filtros de unidade
-- [ ] Ajustar responsividade da dashboard para desktop e telemóvel
-- [ ] Validar visualmente, executar testes e salvar checkpoint
+- [x] Melhorar estados de carregamento, vazio e filtros de unidade
+- [x] Ajustar responsividade da dashboard para desktop e telemóvel
+- [x] Validar visualmente, executar testes
+- [x] Salvar checkpoint final da melhoria visual
 
 ## Consistência de dados da dashboard
 
@@ -205,14 +206,20 @@
 
 ## Validação adicional da dashboard reorganizada
 
-- [ ] Adicionar estados vazios dedicados para ausência de unidade e ausência de métricas no período
-- [ ] Validar a dashboard com sessão autenticada em desktop e viewport móvel real
-- [ ] Salvar checkpoint após a validação visual autenticada
+- [x] Adicionar estados vazios dedicados para ausência de unidade e ausência de métricas no período
+- [x] Validar a dashboard com sessão autenticada em desktop e viewport móvel real
+- [x] Salvar checkpoint após a validação visual autenticada
 
 ## Correção de layout móvel da dashboard
 
-- [ ] Corrigir o deslocamento horizontal da área principal quando a sidebar está recolhida em telemóvel
+- [x] Corrigir o deslocamento horizontal da área principal quando a sidebar está recolhida em telemóvel
+- [x] Garantir viewport móvel nativa para que os breakpoints responsivos sejam aplicados corretamente
 
 ## Renovação de sessão publicada
 
-- [ ] Renovar o login Supabase no domínio publicado para obter o cookie HTTP-only de dados
+- [x] Renovar o login Supabase no domínio publicado para obter o cookie HTTP-only de dados
+
+## Checkpoint posterior à validação visual final
+
+- [ ] Salvar um novo checkpoint após as validações autenticadas em desktop e viewport móvel
+- [ ] Confirmar no checkpoint final a versão validada no domínio publicado

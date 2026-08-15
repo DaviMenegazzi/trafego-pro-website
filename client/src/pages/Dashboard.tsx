@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { DashboardState } from "@/components/DashboardState";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
+import { CUSTOM_PERIOD, formatDashboardDateRange, getPresetDashboardDateRange, isValidDashboardDateRange } from "@/lib/dashboardDateRange";
 import { calculateResponseRate } from "@/lib/dashboardPresentation";
 import { MetricsSessionError, readMetricsResponse } from "@/lib/metricsResponse";
 import { createRequestGate } from "@/lib/requestGate";
@@ -21,7 +23,7 @@ const CHART = {
   red: "#EF4444",     // custo / alerta
   blue: "#38BDF8",    // apoio
 };
-import { RefreshCw, ChevronDown } from "lucide-react";
+import { RefreshCw, ChevronDown, CalendarRange } from "lucide-react";
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
@@ -84,13 +86,11 @@ const STATUS_CLS: Record<string, string> = {
   Crítico: "bg-[color:var(--color-destructive)]/15 text-[color:var(--color-destructive)]",
 };
 
-function ymd(d: Date) { return d.toISOString().slice(0, 10); }
-function rangeFor(period: string): { start: string; end: string } {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - (parseInt(period, 10) || 30));
-  return { start: ymd(start), end: ymd(end) };
-}
+const PERIOD_SHORTCUTS = [
+  { value: "7", label: "Últimos 7 dias" },
+  { value: "30", label: "Últimos 30 dias" },
+  { value: "90", label: "Últimos 90 dias" },
+];
 
 function Panel({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
@@ -110,6 +110,11 @@ export default function DashboardPage() {
   useEffect(() => { document.title = "Tráfego Pro — Dashboard"; }, []);
 
   const [period, setPeriod] = useState("30");
+  const [customRange, setCustomRange] = useState(() => getPresetDashboardDateRange("30"));
+  const [draftStart, setDraftStart] = useState(customRange.start);
+  const [draftEnd, setDraftEnd] = useState(customRange.end);
+  const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
+  const [customRangeError, setCustomRangeError] = useState<string | null>(null);
   const [daily, setDaily] = useState<DailyRow[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
@@ -122,6 +127,40 @@ export default function DashboardPage() {
 
   const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+  const activeRange = useMemo(
+    () => period === CUSTOM_PERIOD ? customRange : getPresetDashboardDateRange(period),
+    [customRange, period],
+  );
+  const periodLabel = period === CUSTOM_PERIOD
+    ? `Personalizado · ${formatDashboardDateRange(activeRange)}`
+    : (PERIOD_SHORTCUTS.find((item) => item.value === period)?.label ?? "Últimos 30 dias");
+
+  const selectPresetPeriod = (value: string) => {
+    setPeriod(value);
+    setCustomRangeError(null);
+    setPeriodMenuOpen(false);
+  };
+
+  const applyCustomRange = () => {
+    const nextRange = { start: draftStart, end: draftEnd };
+    if (!isValidDashboardDateRange(nextRange)) {
+      setCustomRangeError("Escolha uma data inicial e uma data final válidas.");
+      return;
+    }
+    setCustomRange(nextRange);
+    setPeriod(CUSTOM_PERIOD);
+    setCustomRangeError(null);
+    setPeriodMenuOpen(false);
+  };
+
+  const handlePeriodMenu = (open: boolean) => {
+    setPeriodMenuOpen(open);
+    if (open) {
+      setDraftStart(activeRange.start);
+      setDraftEnd(activeRange.end);
+      setCustomRangeError(null);
+    }
+  };
 
   // Carrega métricas ao mudar período/cliente
   useEffect(() => {
@@ -135,7 +174,7 @@ export default function DashboardPage() {
       setLoading(false);
       return () => controller.abort();
     }
-    const { start, end } = rangeFor(period);
+    const { start, end } = activeRange;
     const qs = buildClientMetricsQuery(start, end, selectedClientId);
     if (!qs) return () => controller.abort();
     setLoading(true); setError(null);
@@ -170,7 +209,7 @@ export default function DashboardPage() {
       });
 
     return () => controller.abort();
-  }, [token, period, selectedClientId, refreshIndex, setLocation]);
+  }, [activeRange, token, selectedClientId, refreshIndex, setLocation]);
 
   // ─── Agregações (mesma lógica da dashboard antiga) ──────────────────────────
   const kpi = useMemo(() => {
@@ -260,15 +299,53 @@ export default function DashboardPage() {
         <section className="rounded-3xl border border-border bg-surface/35 p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <label className="space-y-1.5 text-xs font-medium text-muted-foreground"><span>Período</span><div className="relative">
-            <select value={period} onChange={(e) => setPeriod(e.target.value)}
-              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              <option value="7">Últimos 7 dias</option>
-              <option value="30">Últimos 30 dias</option>
-              <option value="90">Últimos 90 dias</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              </div></label>
+              <div className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                <span>Período</span>
+                <Popover open={periodMenuOpen} onOpenChange={handlePeriodMenu}>
+                  <PopoverTrigger asChild>
+                    <button type="button" aria-label="Selecionar período das métricas"
+                      className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-surface focus:outline-none focus:ring-1 focus:ring-ring">
+                      <CalendarRange className="size-4 text-emerald-300" />
+                      <span className="max-w-52 truncate">{periodLabel}</span>
+                      <ChevronDown className="size-4 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border-border bg-[color:var(--color-surface)] p-0 text-foreground shadow-2xl">
+                    <div className="border-b border-border px-4 py-4">
+                      <p className="font-display text-base font-semibold">Período de análise</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Selecione um intervalo rápido ou defina as datas da sua análise.</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 px-4 pt-4">
+                      {PERIOD_SHORTCUTS.map((item) => (
+                        <button key={item.value} type="button" onClick={() => selectPresetPeriod(item.value)}
+                          className={`rounded-xl border px-2 py-2 text-xs font-medium transition-colors ${period === item.value ? "border-emerald-300/60 bg-emerald-300/10 text-emerald-200" : "border-border bg-background/40 text-muted-foreground hover:bg-surface-2 hover:text-foreground"}`}>
+                          {item.value} dias
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mx-4 mt-4 border-t border-border pt-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Personalizado</p>
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="space-y-1.5 text-xs text-muted-foreground">
+                          <span>Data inicial</span>
+                          <input type="date" value={draftStart} max={draftEnd || undefined} onChange={(event) => setDraftStart(event.target.value)}
+                            className="h-10 w-full rounded-xl border border-border bg-background/60 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                        </label>
+                        <label className="space-y-1.5 text-xs text-muted-foreground">
+                          <span>Data final</span>
+                          <input type="date" value={draftEnd} min={draftStart || undefined} onChange={(event) => setDraftEnd(event.target.value)}
+                            className="h-10 w-full rounded-xl border border-border bg-background/60 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                        </label>
+                      </div>
+                      {customRangeError && <p role="alert" className="mt-3 text-xs text-red-300">{customRangeError}</p>}
+                    </div>
+                    <div className="mt-4 flex items-center justify-end gap-2 border-t border-border bg-background/20 px-4 py-3">
+                      <button type="button" onClick={() => setPeriodMenuOpen(false)} className="rounded-full px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">Cancelar</button>
+                      <button type="button" onClick={applyCustomRange} className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90">Aplicar período</button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
               <label className="space-y-1.5 text-xs font-medium text-muted-foreground"><span>Unidade</span><div className="relative">
             <select value={clientId} onChange={(e) => setSelectedClientId(e.target.value)} disabled={clientsLoading || clientOpts.length === 0}
               className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60">

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import crypto from "crypto";
 
 // ─── Replicate the JWT logic from server/index.ts ────────────────────────────
-const JWT_SECRET = "REDACTED_TEST_SECRET";
+const JWT_SECRET = "test-fixture-signing-key";
 
 function signToken(payload: object): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
@@ -25,15 +25,15 @@ function verifyToken(token: string): Record<string, unknown> | null {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 describe("JWT auth helpers", () => {
   it("signs and verifies a valid token", () => {
-    const token = signToken({ email: "redacted@example.test", role: "admin" });
+    const token = signToken({ email: "admin@example.test", role: "admin" });
     const payload = verifyToken(token);
     expect(payload).not.toBeNull();
-    expect(payload?.email).toBe("redacted@example.test");
+    expect(payload?.email).toBe("admin@example.test");
     expect(payload?.role).toBe("admin");
   });
 
   it("returns null for a tampered token", () => {
-    const token = signToken({ email: "redacted@example.test", role: "admin" });
+    const token = signToken({ email: "admin@example.test", role: "admin" });
     const tampered = token.slice(0, -4) + "xxxx";
     expect(verifyToken(tampered)).toBeNull();
   });
@@ -46,22 +46,5 @@ describe("JWT auth helpers", () => {
     const token = signToken({ email: "user@example.com", role: "user" });
     const payload = verifyToken(token);
     expect(payload?.role).not.toBe("admin");
-  });
-});
-
-describe("Admin credentials check", () => {
-  const ADMIN_EMAIL = "redacted@example.test";
-  const ADMIN_PASSWORD = "REDACTED_TEST_PASSWORD";
-
-  it("accepts correct credentials", () => {
-    expect(ADMIN_EMAIL === "redacted@example.test" && ADMIN_PASSWORD === "REDACTED_TEST_PASSWORD").toBe(true);
-  });
-
-  it("rejects wrong password", () => {
-    expect(ADMIN_EMAIL === "redacted@example.test" && "wrongpassword" === ADMIN_PASSWORD).toBe(false);
-  });
-
-  it("rejects wrong email", () => {
-    expect("other@email.com" === ADMIN_EMAIL && ADMIN_PASSWORD === "REDACTED_TEST_PASSWORD").toBe(false);
   });
 });

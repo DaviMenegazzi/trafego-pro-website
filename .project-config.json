@@ -26,6 +26,8 @@
   "secrets": {
     "BUILT_IN_FORGE_API_KEY": "QqhX4sSfaEUg9MRuP6S4UU",
     "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
+    "EVOLUTION_SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wcHN2d3FqbWx2Z3Nha3F0cGl3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjgxNjAyNSwiZXhwIjoyMTAyMzkyMDI1fQ.PNBtPzK2-jJNTC018IWYeUfZ4M-5SwFk601i3NgckBQ",
+    "EVOLUTION_SUPABASE_URL": "https://mppsvwqjmlvgsakqtpiw.supabase.co",
     "EVOLUTION_WEBHOOK_SECRET": "segredo@123",
     "JWT_SECRET": "V7acck2whE2FeVpB5kScab",
     "OAUTH_SERVER_URL": "https://api.manus.im",

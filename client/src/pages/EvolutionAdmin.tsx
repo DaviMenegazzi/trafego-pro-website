@@ -7,8 +7,8 @@ type Summary = { totalLeads: number; pendingLeads: number; qualifiedLeads: numbe
 type Instance = { instanceName: string; displayName: string | null; unitName: string | null; connectionStatus: string; lastEventAt: string | null; lastMessageAt: string | null };
 type OriginPlatform = "meta" | "google_ads" | "mixed" | "unknown";
 type OriginEvidence = "verified" | "observed" | "none";
-type EventItem = { id: number; instanceName: string; eventType: string; direction: string; messageType: string | null; messagePreview: string | null; occurredAt: string | null; receivedAt: string; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; metaSourceId: string | null; metaSourceType: string | null; googleClickId: string | null; attributionPayload: Record<string, string> | null };
-type Lead = { id: number; instanceName: string; phoneLast4: string | null; contactName: string | null; classification: "pendente" | "lead" | "nao_lead"; funnelStage: "novo" | "qualificado" | "negociacao" | "perdido" | "fechado"; classificationNote: string | null; firstContactAt: string; lastMessageAt: string; messagesReceived: number; messagesSent: number; classifiedByEmail: string | null; classifiedAt: string | null; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; googleClickId: string | null; originDetectedAt: string | null };
+type EventItem = { id: string; instanceName: string; eventType: string; direction: string; messageType: string | null; messagePreview: string | null; occurredAt: string | null; receivedAt: string; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; metaSourceId: string | null; metaSourceType: string | null; googleClickId: string | null; attributionPayload: Record<string, string> | null };
+type Lead = { id: string; instanceName: string; phoneLast4: string | null; contactName: string | null; classification: "pendente" | "lead" | "nao_lead"; funnelStage: "novo" | "qualificado" | "negociacao" | "perdido" | "fechado"; classificationNote: string | null; firstContactAt: string; lastMessageAt: string; messagesReceived: number; messagesSent: number; classifiedByEmail: string | null; classifiedAt: string | null; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; googleClickId: string | null; originDetectedAt: string | null };
 type Overview = { summary: Summary; instances: Instance[]; events: EventItem[]; leads: Lead[] };
 type View = "operacao" | "origem" | "auditoria";
 
@@ -58,7 +58,7 @@ export default function EvolutionAdmin() {
   const [view, setView] = useState<View>("operacao");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [updatingLead, setUpdatingLead] = useState<number | null>(null);
+  const [updatingLead, setUpdatingLead] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const token = useMemo(() => localStorage.getItem("tp_token"), []);

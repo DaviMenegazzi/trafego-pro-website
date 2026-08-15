@@ -227,8 +227,8 @@
 ## Correção do primeiro carregamento de métricas
 
 - [ ] Reproduzir login seguido de abertura da dashboard sem recarregar
-- [ ] Diagnosticar a sincronização entre cookie Supabase e consultas de unidades/métricas
-- [ ] Corrigir a atualização inicial das métricas após o login
+- [x] Diagnosticar a sincronização entre cookie Supabase e consultas de unidades/métricas
+- [x] Corrigir a atualização inicial das métricas após o login
 - [x] Adicionar testes para o primeiro carregamento autenticado
 - [ ] Validar no navegador e salvar checkpoint da correção
 
@@ -236,8 +236,16 @@
 
 - [ ] Limpar a sessão local e o cookie Supabase de forma controlada para testar o primeiro login
 - [ ] Confirmar que as primeiras consultas de unidades e métricas recebem a sessão Supabase
-- [ ] Acionar um refetch explícito após login se a sessão ainda não estiver pronta na primeira navegação
+- [x] Acionar um refetch explícito após login se a sessão ainda não estiver pronta na primeira navegação
 
 ## Propagação assíncrona da sessão Supabase
 
-- [ ] Persistir um marcador pós-login para o dashboard repetir a consulta de unidades após a propagação do cookie
+- [x] Persistir um marcador pós-login para o dashboard repetir a consulta de unidades após a propagação do cookie
+
+## Correção de 401 ao trocar unidade
+
+- [ ] Reproduzir a troca de unidade que retorna 401 no endpoint de métricas
+- [x] Tratar respostas não JSON e sessão expirada sem expor erro de parsing
+- [ ] Corrigir a atualização de métricas após selecionar uma nova unidade
+- [ ] Adicionar testes e validar a troca de unidade no navegador
+- [ ] Salvar checkpoint da correção de sessão e métricas

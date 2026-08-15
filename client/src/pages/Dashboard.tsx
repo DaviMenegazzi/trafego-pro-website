@@ -5,6 +5,7 @@ import { DashboardState } from "@/components/DashboardState";
 import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
 import { calculateResponseRate } from "@/lib/dashboardPresentation";
+import { MetricsSessionError, readMetricsResponse } from "@/lib/metricsResponse";
 import { createRequestGate } from "@/lib/requestGate";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -105,6 +106,7 @@ function Panel({ title, note, children }: { title: string; note?: string; childr
 
 export default function DashboardPage() {
   useAuthGuard();
+  const [, setLocation] = useLocation();
   useEffect(() => { document.title = "Tráfego Pro — Dashboard"; }, []);
 
   const [period, setPeriod] = useState("30");
@@ -139,17 +141,9 @@ export default function DashboardPage() {
     setLoading(true); setError(null);
     Promise.all([
       fetch(`/api/metrics/daily?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
-        .then(async (response) => {
-          const payload = await response.json();
-          if (!response.ok) throw new Error(payload.error || "Não foi possível carregar as métricas diárias");
-          return payload;
-        }),
+        .then((response) => readMetricsResponse<{ configured?: boolean; rows?: DailyRow[]; error?: string }>(response, "Não foi possível carregar as métricas diárias")),
       fetch(`/api/metrics/campaigns?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
-        .then(async (response) => {
-          const payload = await response.json();
-          if (!response.ok) throw new Error(payload.error || "Não foi possível carregar as campanhas");
-          return payload;
-        }),
+        .then((response) => readMetricsResponse<{ rows?: CampaignRow[]; error?: string }>(response, "Não foi possível carregar as campanhas")),
     ])
       .then(([d, c]) => {
         if (!isCurrentRequest()) return;
@@ -158,10 +152,17 @@ export default function DashboardPage() {
         if (ok && Array.isArray(d.rows) && d.rows.length > 0) setDaily(d.rows);
         else if (ok) setDaily([]);
         if (ok && Array.isArray(c.rows)) setCampaigns(c.rows);
-        if (d.error || c.error) setError(d.error || c.error);
+        if (d.error || c.error) setError(d.error ?? c.error ?? "Não foi possível carregar as métricas.");
       })
       .catch((e) => {
         if (controller.signal.aborted || !isCurrentRequest()) return;
+        if (e instanceof MetricsSessionError) {
+          localStorage.removeItem("tp_token");
+          localStorage.removeItem("tp_user");
+          void fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+          setLocation("/login?reason=session-expired");
+          return;
+        }
         setError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => {
@@ -169,7 +170,7 @@ export default function DashboardPage() {
       });
 
     return () => controller.abort();
-  }, [token, period, selectedClientId, refreshIndex]);
+  }, [token, period, selectedClientId, refreshIndex, setLocation]);
 
   // ─── Agregações (mesma lógica da dashboard antiga) ──────────────────────────
   const kpi = useMemo(() => {

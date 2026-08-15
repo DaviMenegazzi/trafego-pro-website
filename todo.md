@@ -404,7 +404,7 @@
 - [x] Carregar no histórico as mensagens enviadas e recebidas, incluindo registros já existentes quando possível
 - [x] Cobrir em testes mensagens de entrada, saída e nomes de contato
 - [x] Validar a correção no painel administrativo
-- [ ] Salvar checkpoint da correção de contatos e conversas
+- [x] Salvar checkpoint da correção de contatos e conversas
 
 ## Evolution multi-instância por unidade
 
@@ -414,4 +414,10 @@
 - [x] Exibir consolidados de leads e métricas para todas as instâncias ou apenas a seleção atual
 - [x] Cobrir em testes a segregação e a agregação de múltiplas instâncias
 - [x] Validar no navegador os filtros e o cadastro multi-instância
-- [ ] Salvar checkpoint da expansão multi-instância
+- [x] Salvar checkpoint da expansão multi-instância
+
+## Documentação do projeto
+
+- [x] Atualizar README com arquitetura, autenticação Supabase, fontes de dados e rotas
+- [x] Documentar o módulo Evolution isolado, Supabase dedicado, webhook e operação multi-instância
+- [ ] Validar e salvar checkpoint da documentação atualizada

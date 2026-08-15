@@ -9,6 +9,15 @@ import { getSupabase, getSupabaseForAccessToken, isSupabaseConfigured } from "./
 import { groupClientAccessByUser, uniqueGrantedClientIds } from "./clientAccess.js";
 import { validateMetricsClientSelection } from "./metricsAccess.js";
 import { createFeedbackLeadSql, listAllFeedbackLeadsForExportSql, listFeedbackLeadsSql } from "./feedbackSql.js";
+import { normalizeEvolutionWebhook, webhookSecretMatches } from "./evolutionWebhook.js";
+import {
+  getEvolutionSummarySql,
+  listEvolutionEventsSql,
+  listEvolutionInstancesSql,
+  listEvolutionLeadsSql,
+  recordEvolutionEventSql,
+  updateEvolutionLeadSql,
+} from "./evolutionSql.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -280,6 +289,24 @@ function getSupabaseForRequest(req: express.Request) {
   return getSupabaseForAccessToken(readCookie(req, SUPABASE_ACCESS_COOKIE));
 }
 
+async function requireSupabaseAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!req.claims || !isAdminRole(req.claims.role)) {
+    res.status(403).json({ error: "Acesso restrito a administradores" });
+    return;
+  }
+  const sb = getSupabaseForRequest(req);
+  if (!sb) {
+    res.status(401).json({ error: "Sessão Supabase expirada" });
+    return;
+  }
+  const { data, error } = await sb.auth.getUser();
+  if (error || !data.user || data.user.id !== req.claims.id) {
+    res.status(401).json({ error: "Sessão Supabase expirada" });
+    return;
+  }
+  next();
+}
+
 export async function startServer({ listen = true }: { listen?: boolean } = {}) {
   const app = express();
   const server = createServer(app);
@@ -365,6 +392,72 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.post("/api/auth/logout", requireAuth, (_req, res) => {
     res.clearCookie(SUPABASE_ACCESS_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
     res.status(204).end();
+  });
+
+  // ─── Evolution — módulo isolado de rastreio ───────────────────────────────
+  // Este endpoint é público apenas para a Evolution, autenticada por um segredo
+  // exclusivo. Não compartilha dados, rotas ou persistência das métricas atuais.
+  app.post("/api/evolution/webhook", async (req, res) => {
+    const authorization = req.headers.authorization;
+    const receivedSecret = authorization?.startsWith("Bearer ") ? authorization.slice(7) : undefined;
+    if (!webhookSecretMatches(receivedSecret, process.env.EVOLUTION_WEBHOOK_SECRET)) {
+      res.status(401).json({ error: "Webhook Evolution não autorizado" });
+      return;
+    }
+
+    const event = normalizeEvolutionWebhook(req.body);
+    if (!event) {
+      res.status(400).json({ error: "Evento Evolution inválido" });
+      return;
+    }
+
+    try {
+      const result = await recordEvolutionEventSql(event);
+      res.status(202).json({ accepted: true, duplicate: result.duplicate });
+    } catch (error) {
+      console.error("[evolution] Falha ao processar webhook:", error);
+      res.status(503).json({ error: "Não foi possível processar o evento Evolution" });
+    }
+  });
+
+  app.get("/api/evolution/overview", requireAuth, requireSupabaseAdmin, async (_req, res) => {
+    try {
+      const [summary, instances, events, leads] = await Promise.all([
+        getEvolutionSummarySql(), listEvolutionInstancesSql(), listEvolutionEventsSql(), listEvolutionLeadsSql(),
+      ]);
+      res.json({ summary, instances, events, leads });
+    } catch (error) {
+      console.error("[evolution] Falha ao carregar painel:", error);
+      res.status(503).json({ error: "Não foi possível carregar o painel Evolution" });
+    }
+  });
+
+  app.put("/api/evolution/leads/:id", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    const id = Number(req.params.id);
+    const body = req.body as { classification?: string; funnelStage?: string; note?: string };
+    const classifications = ["pendente", "lead", "nao_lead"];
+    const stages = ["novo", "qualificado", "negociacao", "perdido", "fechado"];
+    const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
+    if (!Number.isInteger(id) || id <= 0 || !classifications.includes(body.classification ?? "") || !stages.includes(body.funnelStage ?? "")) {
+      res.status(400).json({ error: "Classificação ou etapa inválida" });
+      return;
+    }
+    try {
+      const lead = await updateEvolutionLeadSql(id, {
+        classification: body.classification as "pendente" | "lead" | "nao_lead",
+        funnelStage: body.funnelStage as "novo" | "qualificado" | "negociacao" | "perdido" | "fechado",
+        note,
+        classifiedByEmail: req.claims!.email,
+      });
+      if (!lead) {
+        res.status(404).json({ error: "Lead não encontrado" });
+        return;
+      }
+      res.json(lead);
+    } catch (error) {
+      console.error("[evolution] Falha ao atualizar lead:", error);
+      res.status(503).json({ error: "Não foi possível atualizar o lead" });
+    }
   });
 
   // ─── User Profiles (admin only) via Supabase ─────────────────────────────

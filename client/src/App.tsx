@@ -17,8 +17,9 @@ import DashboardAnuncios from "./pages/DashboardAnuncios";
 import DashboardFeedbackLeads, { StandaloneFeedbackLeads } from "./pages/DashboardFeedbackLeads";
 import DashboardFeedbackLeadsList from "./pages/DashboardFeedbackLeadsList";
 import DashboardUsuarios from "./pages/DashboardUsuarios";
+import EvolutionAdmin from "./pages/EvolutionAdmin";
 
-function Router() {
+function ExistingSiteRoutes() {
   return (
     <Switch>
       <Route path={"/"} component={TrafegoProHome} />
@@ -51,16 +52,22 @@ function Router() {
   );
 }
 
+function ExistingSiteWithClientProvider() {
+  return <ClientProvider><ExistingSiteRoutes /></ClientProvider>;
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
-        <ClientProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </ClientProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Switch>
+            <Route path={"/evolution"} component={EvolutionAdmin} />
+            <Route path={"/evolution/"} component={EvolutionAdmin} />
+            <Route component={ExistingSiteWithClientProvider} />
+          </Switch>
+        </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

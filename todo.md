@@ -276,4 +276,42 @@
 
 - [x] Remover os rótulos visuais de período e unidade junto aos seletores
 - [x] Validar TypeScript, testes e build após o refinamento
-- [ ] Salvar checkpoint da simplificação dos filtros
+- [x] Salvar checkpoint da simplificação dos filtros
+
+## Análise de evolução do produto — sem implementação
+
+- [x] Avaliar dashboard, feedbacks, login e controles de segurança
+- [x] Mapear lacunas de integrações de mídia, incluindo Google Ads
+- [x] Apresentar possibilidades priorizadas para decisão antes de qualquer alteração
+
+## Avaliação de atribuição e contabilidade de leads — sem implementação
+
+- [x] Mapear a captura de origem dos leads nas landing pages e rotas próprias
+- [x] Comparar acompanhamento por CRM, WhatsApp e atualização manual de etapas comerciais
+- [x] Apresentar arquitetura e decisões necessárias antes de implementar
+
+## Avaliação de mensagens via Evolution API — sem implementação
+
+- [x] Verificar eventos e webhooks disponíveis para mensagens recebidas
+- [x] Avaliar classificação de contatos em lead e não lead com privacidade adequada
+- [x] Apresentar limites e arquitetura recomendada antes de integrar
+
+## Avaliação de atribuição direta Meta + WhatsApp — sem implementação
+
+- [x] Verificar dados de campanhas de mensagem e eventos de conversão da Meta
+- [x] Definir como correlacionar a origem Meta ao contato recebido pela Evolution API
+- [x] Apresentar arquitetura e limites antes de integrar
+
+## Módulo isolado Evolution — administrativo
+
+- [x] Criar uma rota e um layout próprios, sem alterar os fluxos da dashboard existente
+- [x] Criar as tabelas isoladas de instância, eventos, contatos e classificação de leads
+- [x] Validar a sessão Supabase ativa e o papel admin em todas as rotas administrativas do módulo
+- [x] Cobrir a rejeição de JWT sem sessão Supabase no módulo Evolution
+- [x] Criar o endpoint de webhook Evolution com segredo, validação e idempotência
+- [x] Exibir painel administrativo de saúde das instâncias, eventos recentes e leads classificados
+- [x] Adicionar testes de isolamento, autorização e deduplicação de webhook
+- [x] Validar que a rota isolada redireciona visitantes sem sessão para o login
+- [x] Validar TypeScript, testes e build, além da rota isolada sem sessão no navegador
+- [x] Validar no navegador o painel `/evolution` com sessão admin ativa e os estados de visão geral
+- [ ] Salvar checkpoint do módulo Evolution administrativo

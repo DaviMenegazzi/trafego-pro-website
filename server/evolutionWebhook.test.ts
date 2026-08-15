@@ -1,0 +1,100 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { signToken, startServer } from "./index.js";
+import { normalizeEvolutionWebhook } from "./evolutionWebhook.js";
+import { deleteEvolutionWebhookTestRows, recordEvolutionEventSql } from "./evolutionSql.js";
+
+let server: Awaited<ReturnType<typeof startServer>>["server"] | undefined;
+let baseUrl = "";
+const webhookTestRows: Array<{ instanceName: string; contactKey: string | null; fingerprint: string }> = [];
+
+beforeAll(async () => {
+  const started = await startServer({ listen: false });
+  server = started.server;
+  await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Servidor de teste indisponível");
+  baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+afterAll(async () => {
+  await Promise.all(webhookTestRows.map(deleteEvolutionWebhookTestRows));
+  if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
+});
+
+describe("Evolution webhook secret", () => {
+  it("aceita a chamada autenticada com o segredo configurado antes de validar o evento", async () => {
+    const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
+    expect(secret).toBeTruthy();
+    const response = await fetch(`${baseUrl}/api/evolution/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Evento Evolution inválido" });
+  });
+
+  it("rejeita chamadas sem o segredo do webhook", async () => {
+    const response = await fetch(`${baseUrl}/api/evolution/webhook`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    expect(response.status).toBe(401);
+  });
+
+  it("mantém a consulta do painel restrita a administradores", async () => {
+    const viewerToken = signToken({ email: "viewer@trafego.pro", name: "Viewer", role: "viewer", id: "viewer", allowedClientIds: ["unit-1"] });
+    const response = await fetch(`${baseUrl}/api/evolution/overview`, { headers: { Authorization: `Bearer ${viewerToken}` } });
+    expect(response.status).toBe(403);
+  });
+
+  it("rejeita um JWT administrativo sem a sessão Supabase ativa", async () => {
+    const adminToken = signToken({ email: "admin@trafego.pro", name: "Admin", role: "admin", id: "admin", allowedClientIds: ["*"] });
+    const response = await fetch(`${baseUrl}/api/evolution/overview`, { headers: { Authorization: `Bearer ${adminToken}` } });
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Sessão Supabase expirada" });
+  });
+});
+
+describe("Evolution webhook normalization", () => {
+  it("normaliza mensagem recebida direta em um contato rastreável", () => {
+    const event = normalizeEvolutionWebhook({
+      event: "messages.upsert",
+      instance: "vida-card-ijui",
+      data: {
+        key: { id: "message-123", remoteJid: "5599999999999@s.whatsapp.net", fromMe: false },
+        message: { conversation: "  Olá, quero  saber mais  " },
+        messageType: "conversation",
+        messageTimestamp: 1_700_000_000,
+        pushName: "Ana",
+      },
+    });
+    expect(event).toMatchObject({
+      instanceName: "vida-card-ijui", eventType: "MESSAGES_UPSERT", direction: "incoming",
+      messageId: "message-123", messagePreview: "Olá, quero saber mais", phoneLast4: "9999", contactName: "Ana",
+    });
+    expect(event?.contactKey).toHaveLength(64);
+    expect(event?.fingerprint).toHaveLength(64);
+  });
+
+  it("não transforma eventos de grupos em contatos classificáveis", () => {
+    const event = normalizeEvolutionWebhook({
+      event: "MESSAGES_UPSERT",
+      instance: "vida-card-ijui",
+      data: { key: { id: "group-message", remoteJid: "12345-67890@g.us", fromMe: false }, message: { conversation: "Mensagem de grupo" } },
+    });
+    expect(event?.contactKey).toBeNull();
+    expect(event?.phoneLast4).toBeNull();
+  });
+
+  it("ignora uma nova entrega do mesmo evento sem duplicar contato ou evento", async () => {
+    const instanceName = `__evolution_test_${Date.now()}`;
+    const event = normalizeEvolutionWebhook({
+      event: "MESSAGES_UPSERT",
+      instance: instanceName,
+      data: { key: { id: "dedupe-message", remoteJid: "5599999999999@s.whatsapp.net", fromMe: false }, message: { conversation: "Teste isolado" }, messageTimestamp: 1_700_000_001 },
+    });
+    if (!event) throw new Error("Evento de teste não foi normalizado");
+    webhookTestRows.push({ instanceName: event.instanceName, contactKey: event.contactKey, fingerprint: event.fingerprint });
+
+    await expect(recordEvolutionEventSql(event)).resolves.toEqual({ duplicate: false });
+    await expect(recordEvolutionEventSql(event)).resolves.toEqual({ duplicate: true });
+  });
+});

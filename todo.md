@@ -248,4 +248,12 @@
 - [x] Tratar respostas não JSON e sessão expirada sem expor erro de parsing
 - [ ] Corrigir a atualização de métricas após selecionar uma nova unidade
 - [ ] Adicionar testes e validar a troca de unidade no navegador
-- [ ] Salvar checkpoint da correção de sessão e métricas
+- [x] Salvar checkpoint da correção de sessão e métricas
+
+## Período personalizado na dashboard
+
+- [x] Adicionar a opção de período personalizado ao filtro de métricas
+- [x] Criar seleção de data inicial e final consistente com o visual da dashboard
+- [x] Aplicar o intervalo escolhido às consultas de métricas e validar as datas
+- [x] Cobrir a lógica de intervalo personalizado em testes e validar build
+- [ ] Salvar checkpoint da melhoria de filtro de período

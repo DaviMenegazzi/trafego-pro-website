@@ -327,7 +327,7 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-3 gap-2 px-4 pt-4">
                       {PERIOD_SHORTCUTS.map((item) => (
                         <button key={item.value} type="button" onClick={() => selectPresetPeriod(item.value)}
-                          className={`rounded-xl border px-2 py-2 text-xs font-medium transition-colors ${period === item.value ? "border-emerald-300/60 bg-emerald-300/10 text-emerald-200" : "border-border bg-background/40 text-muted-foreground hover:bg-surface-2 hover:text-foreground"}`}>
+                          className={`rounded-xl border px-2 py-2 text-xs font-semibold transition-colors ${period === item.value ? "border-emerald-300 bg-emerald-300 text-emerald-950 shadow-sm" : "border-border bg-background/40 text-muted-foreground hover:bg-surface-2 hover:text-foreground"}`}>
                           {item.value} dias
                         </button>
                       ))}
@@ -383,9 +383,9 @@ export default function DashboardPage() {
                           const selected = client.id === selectedClientId;
                           return (
                             <button key={client.id} type="button" onClick={() => selectUnit(client.id)}
-                              className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition-colors ${selected ? "bg-sky-300/10 text-sky-100" : "text-foreground hover:bg-surface-2"}`}>
+                              className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition-colors ${selected ? "bg-sky-300 text-slate-950 shadow-sm" : "text-foreground hover:bg-surface-2"}`}>
                               <span className="truncate font-medium">{client.name}</span>
-                              {selected && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-300">Selecionada</span>}
+                              {selected && <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-800">Selecionada</span>}
                             </button>
                           );
                         })}

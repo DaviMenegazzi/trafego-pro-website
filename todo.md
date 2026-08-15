@@ -263,4 +263,11 @@
 - [x] Substituir o dropdown nativo de unidade por um menu visual consistente
 - [x] Manter os estados de carregamento, ausência e unidades autorizadas no novo seletor
 - [x] Cobrir a seleção de unidade autorizada e validar TypeScript, testes e build
-- [ ] Salvar checkpoint da melhoria do seletor de unidade
+- [x] Salvar checkpoint da melhoria do seletor de unidade
+
+## Contraste dos filtros da dashboard
+
+- [x] Ajustar as cores dos estados selecionados nos menus de período e unidade
+- [x] Validar TypeScript, testes e build
+- [ ] Validar no navegador a legibilidade dos estados selecionados
+- [ ] Salvar checkpoint da correção de contraste

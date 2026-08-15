@@ -100,6 +100,64 @@ describe("Evolution webhook normalization", () => {
     expect(event?.fingerprint).toHaveLength(64);
   });
 
+  it("não usa o pushName da própria instância como nome do contato em mensagem enviada", () => {
+    const event = normalizeEvolutionWebhook({
+      event: "messages.upsert",
+      instance: "vida-card-ijui",
+      data: {
+        key: { id: "message-outgoing", remoteJid: "5599999999999@s.whatsapp.net", fromMe: true },
+        message: { conversation: "Olá, como posso ajudar?" },
+        pushName: "Davi Menegazzi",
+      },
+    });
+    expect(event).toMatchObject({ direction: "outgoing", contactName: null, phoneLast4: "9999" });
+  });
+
+  it("normaliza CONTACTS_UPSERT como atualização segura do nome do contato", () => {
+    const event = normalizeEvolutionWebhook({
+      event: "contacts.upsert",
+      instance: "vida-card-ijui",
+      data: { id: "5511988887777@s.whatsapp.net", pushName: "Contato Atualizado" },
+    });
+    expect(event).toMatchObject({ eventType: "CONTACTS_UPSERT", direction: "system" });
+    expect(event?.contactUpdate).toMatchObject({ contactName: "Contato Atualizado" });
+    expect(event?.contactUpdate?.contactKey).toHaveLength(64);
+  });
+
+  it("persiste uma conversa com mensagens dos dois lados e substitui o nome pelo contato recebido", async () => {
+    const instanceName = `__evolution_conversation_${Date.now()}`;
+    const outgoing = normalizeEvolutionWebhook({
+      event: "messages.upsert", instance: instanceName,
+      data: {
+        key: { id: "outgoing-conversation", remoteJid: "5511988887777@s.whatsapp.net", fromMe: true },
+        message: { conversation: "Olá, como posso ajudar?" }, pushName: "Nome da instância", messageTimestamp: 1_700_000_101,
+      },
+    });
+    const incoming = normalizeEvolutionWebhook({
+      event: "messages.upsert", instance: instanceName,
+      data: {
+        key: { id: "incoming-conversation", remoteJid: "5511988887777@s.whatsapp.net", fromMe: false },
+        message: { conversation: "Quero conhecer o cartão" }, pushName: "Contato Real", messageTimestamp: 1_700_000_102,
+      },
+    });
+    if (!outgoing || !incoming || !outgoing.contactKey) throw new Error("Eventos de conversa inválidos");
+    webhookTestRows.push(
+      { instanceName, contactKey: outgoing.contactKey, fingerprint: outgoing.fingerprint },
+      { instanceName, contactKey: incoming.contactKey, fingerprint: incoming.fingerprint },
+    );
+
+    await expect(recordEvolutionEventSupabase(outgoing)).resolves.toMatchObject({ duplicate: false });
+    await expect(recordEvolutionEventSupabase(incoming)).resolves.toMatchObject({ duplicate: false });
+
+    const lead = (await listEvolutionLeadsSupabase()).find((item) => item.instanceName === instanceName);
+    expect(lead).toMatchObject({ contactName: "Contato Real", messagesReceived: 1, messagesSent: 1 });
+    if (!lead) throw new Error("Contato da conversa não encontrado");
+    await expect(listEvolutionMessagesSupabase(lead.id)).resolves.toEqual([
+      expect.objectContaining({ direction: "outgoing", bodyText: "Olá, como posso ajudar?" }),
+      expect.objectContaining({ direction: "incoming", bodyText: "Quero conhecer o cartão" }),
+    ]);
+  });
+
   it("preserva no evento os sinais de origem que chegam no payload Evolution", () => {
     const event = normalizeEvolutionWebhook({
       event: "messages.upsert",

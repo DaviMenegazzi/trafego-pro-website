@@ -20,6 +20,8 @@ import {
   listEvolutionMetaAttributionsSupabase,
   recordEvolutionEventSupabase,
   upsertEvolutionMetaAttributionSupabase,
+  updateEvolutionContactNameSupabase,
+  updateEvolutionInstanceProfileSupabase,
   updateEvolutionLeadSupabase,
 } from "./evolutionSupabaseStore.js";
 import { resolveEvolutionMetaAttribution, type MetaOfferRow } from "./evolutionMetaAttribution.js";
@@ -443,6 +445,10 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     try {
       const result = await recordEvolutionEventSupabase(event);
       if (!result.duplicate) {
+        if (event.contactUpdate) {
+          try { await updateEvolutionContactNameSupabase(event.instanceName, event.contactUpdate.contactKey, event.contactUpdate.contactName); }
+          catch (contactError) { console.warn("[evolution] Falha ao atualizar nome do contato:", contactError); }
+        }
         try { await persistEvolutionMetaAttribution(event, result.eventId); }
         catch (attributionError) { console.warn("[evolution] Falha na atribuição Meta:", attributionError); }
       }
@@ -479,6 +485,23 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     catch (error) {
       console.error("[evolution] Falha ao carregar conversas:", error);
       res.status(503).json({ error: "Não foi possível carregar conversas" });
+    }
+  });
+
+  app.put("/api/evolution/instances/:instanceName", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    const instanceName = req.params.instanceName;
+    const body = req.body as { displayName?: string; unitName?: string };
+    const displayName = body.displayName;
+    const unitName = body.unitName;
+    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(instanceName)) { res.status(400).json({ error: "Instância inválida" }); return; }
+    if (typeof displayName !== "string" || typeof unitName !== "string") { res.status(400).json({ error: "Identificação da instância inválida" }); return; }
+    try {
+      const instance = await updateEvolutionInstanceProfileSupabase(instanceName, { displayName, unitName });
+      if (!instance) { res.status(404).json({ error: "Instância não encontrada" }); return; }
+      res.json(instance);
+    } catch (error) {
+      console.error("[evolution] Falha ao atualizar instância:", error);
+      res.status(503).json({ error: "Não foi possível atualizar a instância" });
     }
   });
 

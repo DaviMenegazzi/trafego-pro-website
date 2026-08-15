@@ -190,3 +190,21 @@
 ## Resolução de unidades por acesso Supabase
 
 - [x] Derivar unidades de administradores e clientes pela relação `user_client_access` no Supabase
+
+## Melhoria de visualização da dashboard
+
+- [x] Revisar a hierarquia atual de informação, espaçamentos e contraste da dashboard
+- [x] Reorganizar cabeçalho, indicadores e cartões para leitura mais rápida
+- [ ] Melhorar estados de carregamento, vazio e filtros de unidade
+- [ ] Ajustar responsividade da dashboard para desktop e telemóvel
+- [ ] Validar visualmente, executar testes e salvar checkpoint
+
+## Consistência de dados da dashboard
+
+- [x] Remover dados ilustrativos da tela para apresentar somente métricas provenientes do Supabase
+
+## Validação adicional da dashboard reorganizada
+
+- [ ] Adicionar estados vazios dedicados para ausência de unidade e ausência de métricas no período
+- [ ] Validar a dashboard com sessão autenticada em desktop e viewport móvel real
+- [ ] Salvar checkpoint após a validação visual autenticada

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
+import { DashboardState } from "@/components/DashboardState";
 import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
+import { calculateResponseRate } from "@/lib/dashboardPresentation";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
@@ -17,7 +19,7 @@ const CHART = {
   red: "#EF4444",     // custo / alerta
   blue: "#38BDF8",    // apoio
 };
-import { Download, RefreshCw, ChevronDown } from "lucide-react";
+import { RefreshCw, ChevronDown } from "lucide-react";
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
@@ -62,19 +64,6 @@ const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigi
 const pct = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 const num = (v: number | null | undefined) => Number(v ?? 0);
 
-// ─── Fallback ilustrativo (usado só enquanto o Supabase não está configurado) ──
-const FALLBACK_DAILY: DailyRow[] = [
-  { date_start: "2026-06-30", total_spend: 42, total_conversas_iniciadas: 4, total_messaging_connections: 4, total_primeiras_respostas: 3, total_conversas_respondidas: 3, total_leads_meta: 0, total_impressions: 7200, total_clicks: 78, custo_por_conversa: 10.5, avg_cpc: 0.78, avg_cpm: 8.4, avg_ctr: 1.1, avg_frequency: 1.68 },
-  { date_start: "2026-07-04", total_spend: 66, total_conversas_iniciadas: 15, total_messaging_connections: 15, total_primeiras_respostas: 9, total_conversas_respondidas: 9, total_leads_meta: 0, total_impressions: 9800, total_clicks: 110, custo_por_conversa: 4.4, avg_cpc: 0.6, avg_cpm: 6.2, avg_ctr: 1.0, avg_frequency: 1.68 },
-  { date_start: "2026-07-10", total_spend: 96, total_conversas_iniciadas: 22, total_messaging_connections: 22, total_primeiras_respostas: 14, total_conversas_respondidas: 14, total_leads_meta: 1, total_impressions: 12400, total_clicks: 140, custo_por_conversa: 4.4, avg_cpc: 0.62, avg_cpm: 6.4, avg_ctr: 1.2, avg_frequency: 1.68 },
-  { date_start: "2026-07-16", total_spend: 49, total_conversas_iniciadas: 9, total_messaging_connections: 9, total_primeiras_respostas: 6, total_conversas_respondidas: 6, total_leads_meta: 0, total_impressions: 8100, total_clicks: 90, custo_por_conversa: 5.4, avg_cpc: 0.72, avg_cpm: 7.1, avg_ctr: 1.05, avg_frequency: 1.68 },
-  { date_start: "2026-07-23", total_spend: 40, total_conversas_iniciadas: 6, total_messaging_connections: 6, total_primeiras_respostas: 4, total_conversas_respondidas: 4, total_leads_meta: 0, total_impressions: 6900, total_clicks: 74, custo_por_conversa: 6.7, avg_cpc: 0.79, avg_cpm: 8.4, avg_ctr: 1.1, avg_frequency: 1.68 },
-];
-const FALLBACK_CAMPAIGNS: CampaignRow[] = [
-  { campaign_name: "[TP] - [ENG] - [WHATS] - [CARTÃO] - [MAIO/26]", total_spend: 1117.77, total_conversas_iniciadas: 212, custo_por_conversa: 5.27, total_leads_meta: 0, total_impressions: 179701, total_clicks: 1804, avg_ctr: 1.0, avg_cpc: 0.62, avg_cpm: 6.22 },
-  { campaign_name: "[TP] - [ENG] - [WHATS] - [EMPRESARIAL] - [JUNHO/26]", total_spend: 285.81, total_conversas_iniciadas: 18, custo_por_conversa: 15.88, total_leads_meta: 1, total_impressions: 25755, total_clicks: 312, avg_ctr: 1.21, avg_cpc: 0.92, avg_cpm: 11.1 },
-];
-
 const tooltipStyle: React.CSSProperties = {
   background: "var(--color-popover)", border: "1px solid var(--color-border)",
   borderRadius: 14, fontSize: 12, color: "var(--color-foreground)",
@@ -118,11 +107,12 @@ export default function DashboardPage() {
   useEffect(() => { document.title = "Tráfego Pro — Dashboard"; }, []);
 
   const [period, setPeriod] = useState("30");
-  const [daily, setDaily] = useState<DailyRow[]>(FALLBACK_DAILY);
-  const [campaigns, setCampaigns] = useState<CampaignRow[]>(FALLBACK_CAMPAIGNS);
+  const [daily, setDaily] = useState<DailyRow[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshIndex, setRefreshIndex] = useState(0);
   const { clients: clientOpts, selectedClientId, selectedClient, setSelectedClientId, loading: clientsLoading } = useClientContext();
   const clientId = selectedClientId ?? "";
 
@@ -155,7 +145,7 @@ export default function DashboardPage() {
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [token, period, selectedClientId]);
+  }, [token, period, selectedClientId, refreshIndex]);
 
   // ─── Agregações (mesma lógica da dashboard antiga) ──────────────────────────
   const kpi = useMemo(() => {
@@ -180,10 +170,14 @@ export default function DashboardPage() {
     };
   }, [daily]);
 
-  const KPIS = [
-    { label: "Investimento total", value: brl(kpi.spend) },
-    { label: "Conversas iniciadas", value: n(kpi.conv) },
-    { label: "Custo por conversa", value: brl(kpi.custoConversa) },
+  const responseRate = calculateResponseRate(kpi.respondidas, kpi.connections);
+  const primaryKpis = [
+    { label: "Investimento", value: brl(kpi.spend), note: "no período selecionado", accent: "text-orange-300" },
+    { label: "Conversas iniciadas", value: n(kpi.conv), note: "pelo WhatsApp", accent: "text-emerald-300" },
+    { label: "Custo por conversa", value: brl(kpi.custoConversa), note: "média do período", accent: "text-sky-300" },
+    { label: "Taxa de resposta", value: pct(responseRate), note: "conversas respondidas", accent: "text-teal-300" },
+  ];
+  const supportingKpis = [
     { label: "Primeiras respostas", value: n(kpi.primeiras) },
     { label: "Leads Meta", value: n(kpi.leads) },
     { label: "Impressões", value: n(kpi.impressions) },
@@ -210,22 +204,38 @@ export default function DashboardPage() {
   })), [daily]);
 
   const notSynced = configured === false;
+  const hasMetrics = daily.length > 0 || campaigns.length > 0;
+  const dashboardState = clientsLoading || loading
+    ? { title: "Atualizando indicadores", description: "Estamos consultando as métricas mais recentes no Supabase.", loading: true }
+    : !selectedClientId
+      ? { title: "Selecione uma unidade", description: "Escolha uma unidade no filtro para analisar os indicadores de mídia e atendimento." }
+      : error
+        ? { title: "Não foi possível carregar as métricas", description: "Revise a conexão com o Supabase ou atualize os dados para tentar novamente." }
+        : !hasMetrics
+          ? { title: "Sem dados para este período", description: "Não há métricas sincronizadas para a unidade e o período selecionados. Tente ampliar o intervalo de datas." }
+          : null;
 
   return (
     <AppLayout>
-      <div className="p-6 md:p-10 space-y-8 max-w-[1400px]">
-        {/* Header */}
-        <div className="flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-            {selectedClient?.name ?? "Selecione uma unidade"}
-          </p>
-          <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-[-0.02em]">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Visão geral da performance de mídia.</p>
+      <div className="mx-auto max-w-[1440px] space-y-6 p-4 sm:p-6 lg:p-10">
+        <div className="flex flex-col gap-5 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-emerald-300/80">
+              <span className="h-2 w-2 rounded-full bg-emerald-300" /> Visão de performance
+            </div>
+            <h1 className="font-display text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">Dashboard</h1>
+            <p className="max-w-xl text-sm leading-6 text-muted-foreground">Acompanhe os indicadores mais importantes da unidade sem perder contexto sobre campanhas e atendimento.</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface/50 px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Unidade selecionada</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{selectedClient?.name ?? "Selecione uma unidade"}</p>
+          </div>
         </div>
 
-        {/* Filtros */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
+        <section className="rounded-3xl border border-border bg-surface/35 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="space-y-1.5 text-xs font-medium text-muted-foreground"><span>Período</span><div className="relative">
             <select value={period} onChange={(e) => setPeriod(e.target.value)}
               className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
               <option value="7">Últimos 7 dias</option>
@@ -233,26 +243,25 @@ export default function DashboardPage() {
               <option value="90">Últimos 90 dias</option>
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          </div>
-          <div className="relative">
+              </div></label>
+              <label className="space-y-1.5 text-xs font-medium text-muted-foreground"><span>Unidade</span><div className="relative">
             <select value={clientId} onChange={(e) => setSelectedClientId(e.target.value)} disabled={clientsLoading || clientOpts.length === 0}
               className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60">
               {!clientId && <option value="">Selecione uma unidade</option>}
               {clientOpts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          </div>
-          <button className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-surface transition-colors">
-            <Download className="size-4" /> Baixar dados
-          </button>
-          <button onClick={() => setPeriod((p) => p)} disabled={loading}
-            className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+              </div></label>
+            </div>
+            <button onClick={() => setRefreshIndex((value) => value + 1)} disabled={loading || clientsLoading || !selectedClientId}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Atualizar dados
-          </button>
-          <span className="text-xs text-muted-foreground">
-            {clientsLoading || loading ? "Carregando…" : !selectedClientId ? "Selecione uma unidade para ver as métricas" : notSynced ? "Supabase não configurado — exibindo dados de exemplo" : "Dados sincronizados do Supabase"}
-          </span>
-        </div>
+            </button>
+          </div>
+          <p className="mt-4 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+            {clientsLoading || loading ? "Atualizando métricas do Supabase…" : !selectedClientId ? "Selecione uma unidade para visualizar as métricas." : notSynced ? "Não há dados sincronizados no Supabase para este período." : "Dados carregados diretamente do Supabase."}
+          </p>
+        </section>
 
         {error && (
           <div className="rounded-2xl border border-[color:var(--color-destructive)]/30 bg-[color:var(--color-destructive)]/10 px-4 py-3 text-sm text-[color:var(--color-destructive)]">
@@ -260,16 +269,28 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-px bg-border border border-border rounded-3xl overflow-hidden">
-          {KPIS.map((k) => (
-            <div key={k.label} className="bg-background p-5">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{k.label}</div>
-              <div className="mt-3 font-display text-2xl md:text-[1.7rem] font-semibold tracking-[-0.02em]">{k.value}</div>
-              <div className="mt-1 text-xs text-muted-foreground/60">Sem período anterior</div>
+        {dashboardState ? <DashboardState {...dashboardState} /> : <>
+        <section className="overflow-hidden rounded-3xl border border-border bg-surface/25">
+          <div className="flex flex-col gap-1 border-b border-border/70 px-5 py-4 sm:px-6">
+            <h2 className="font-display text-lg font-semibold">Resumo operacional</h2>
+            <p className="text-sm text-muted-foreground">Quatro indicadores para orientar a leitura da semana.</p>
+          </div>
+          <div className="grid grid-cols-1 divide-y divide-border/70 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+            {primaryKpis.map((k) => (
+              <div key={k.label} className="min-h-35 bg-background/75 p-5 sm:p-6">
+                <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{k.label}</div>
+                <div className={`mt-3 font-display text-3xl font-semibold tracking-[-0.03em] ${k.accent}`}>{k.value}</div>
+                <div className="mt-2 text-xs text-muted-foreground">{k.note}</div>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-border/70 bg-background/45 px-5 py-4 sm:px-6">
+            <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Métricas complementares</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 xl:grid-cols-8">
+              {supportingKpis.map((k) => <div key={k.label}><p className="text-xs text-muted-foreground">{k.label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{k.value}</p></div>)}
             </div>
-          ))}
-        </div>
+          </div>
+        </section>
 
         {/* Gráficos linha 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -400,6 +421,7 @@ export default function DashboardPage() {
             </table>
           </div>
         </Panel>
+        </>}
       </div>
     </AppLayout>
   );

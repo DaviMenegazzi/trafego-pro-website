@@ -7,6 +7,8 @@ Data da validação: 15 de agosto de 2026.
 - O detalhe do contato apresenta o mesmo telefone completo, além das mensagens e da atribuição disponível.
 - As demais telas operacionais continuam usando somente os últimos quatro dígitos do telefone.
 - A suíte automatizada confirmou a persistência do campo `contact_phone` pela RPC `record_evolution_event` e a movimentação de etapas no Supabase Evolution isolado.
+- O painel Evolution autenticado carrega o estado da automação com os leads e as instâncias; a aba CRM exibe o bloqueio durante a análise e, após uma decisão aplicada, identificará a última movimentação feita pela IA.
+- Na validação autenticada inicial, o pipeline apresentou o aviso de que ainda não havia atualização automática aplicada, quatro cartões renderizados e nenhuma rolagem horizontal global. O bloqueio visual será acionado no primeiro processamento diário com status `running`.
 
 ## Correção de usabilidade do pipeline
 

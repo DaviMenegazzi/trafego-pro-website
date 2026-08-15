@@ -12,6 +12,7 @@ import { createFeedbackLeadSql, listAllFeedbackLeadsForExportSql, listFeedbackLe
 import { normalizeEvolutionWebhook, webhookSecretMatches } from "./evolutionWebhook.js";
 import {
   findEvolutionLeadIdSupabase,
+  getEvolutionAiAutomationSettingsSupabase,
   getEvolutionSummarySupabase,
   listEvolutionEventsSupabase,
   listEvolutionInstancesSupabase,
@@ -21,12 +22,16 @@ import {
   listEvolutionMetaAttributionsSupabase,
   moveEvolutionLeadCrmStageSupabase,
   recordEvolutionEventSupabase,
+  updateEvolutionAiAutomationStatusSupabase,
   upsertEvolutionMetaAttributionSupabase,
   updateEvolutionContactNameSupabase,
   updateEvolutionInstanceProfileSupabase,
   updateEvolutionLeadSupabase,
 } from "./evolutionSupabaseStore.js";
 import { resolveEvolutionMetaAttribution, type MetaOfferRow } from "./evolutionMetaAttribution.js";
+import { runDailyEvolutionAiAutomation } from "./evolutionAiAutomation.js";
+import { authenticateScheduledTask } from "./manusScheduleAuth.js";
+import { isEvolutionAiAutomationRunning } from "../shared/evolutionAiPolicy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -461,12 +466,39 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     }
   });
 
+  app.post("/api/scheduled/evolution-ai-daily", async (req, res) => {
+    let taskUid: string | undefined;
+    try {
+      taskUid = await authenticateScheduledTask(req);
+      const settings = await getEvolutionAiAutomationSettingsSupabase();
+      if (settings.scheduleCronTaskUid && settings.scheduleCronTaskUid !== taskUid) {
+        res.status(403).json({ error: "Tarefa agendada não autorizada" });
+        return;
+      }
+      if (!settings.scheduleCronTaskUid) {
+        await updateEvolutionAiAutomationStatusSupabase({ scheduleCronTaskUid: taskUid, status: "scheduled" });
+      }
+      const summary = await runDailyEvolutionAiAutomation();
+      res.json({ ok: true, summary });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[evolution-ai] Falha na rotina diária:", message);
+      const status = message.includes("autorizado") || message.includes("task_uid") ? 403 : 500;
+      res.status(status).json({
+        error: message,
+        context: { path: req.path, taskUid: taskUid ?? null },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   app.get("/api/evolution/overview", requireAuth, requireSupabaseAdmin, async (_req, res) => {
     try {
-      const [summary, instances, events, leads] = await Promise.all([
+      const [summary, instances, events, leads, automation] = await Promise.all([
         getEvolutionSummarySupabase(), listEvolutionInstancesSupabase(), listEvolutionEventsSupabase(), listEvolutionLeadsSupabase(),
+        getEvolutionAiAutomationSettingsSupabase(),
       ]);
-      res.json({ summary, instances, events, leads });
+      res.json({ summary, instances, events, leads, automation });
     } catch (error) {
       console.error("[evolution] Falha ao carregar painel:", error);
       res.status(503).json({ error: "Não foi possível carregar o painel Evolution" });
@@ -508,6 +540,10 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       return;
     }
     try {
+      if (isEvolutionAiAutomationRunning(await getEvolutionAiAutomationSettingsSupabase())) {
+        res.status(409).json({ error: "A IA da Tráfego Pro está atualizando o CRM. Aguarde a conclusão para mover contatos manualmente." });
+        return;
+      }
       const moved = await moveEvolutionLeadCrmStageSupabase({
         leadId: id,
         instanceName: body.instanceName,
@@ -550,6 +586,10 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       return;
     }
     try {
+      if (isEvolutionAiAutomationRunning(await getEvolutionAiAutomationSettingsSupabase())) {
+        res.status(409).json({ error: "A IA da Tráfego Pro está atualizando o CRM. Aguarde a conclusão para alterar classificações manualmente." });
+        return;
+      }
       const lead = await updateEvolutionLeadSupabase(id, {
         classification: body.classification as "pendente" | "lead" | "nao_lead",
         funnelStage: body.funnelStage as "novo" | "qualificado" | "negociacao" | "perdido" | "fechado",

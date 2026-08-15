@@ -99,6 +99,31 @@ export type EvolutionInstance = {
   lastMessageAt: string | null;
 };
 
+export type EvolutionAiAutomationSettings = {
+  enabled: boolean;
+  minConfidence: number;
+  scheduleCronTaskUid: string | null;
+  lastRunStatus: string | null;
+  lastStartedAt: string | null;
+  lastCompletedAt: string | null;
+};
+
+export type EvolutionAiClassificationRunInput = {
+  leadId: string;
+  instanceName: string;
+  sourceLastMessageAt: string;
+  sourceMessageCount: number;
+  model: string;
+  previousStage: EvolutionCrmStage;
+  proposedStage: EvolutionCrmStage | null;
+  appliedStage: EvolutionCrmStage | null;
+  confidence: number | null;
+  rationale: string | null;
+  status: "applied" | "unchanged" | "review" | "skipped" | "failed";
+  errorMessage?: string | null;
+  executionKey: string;
+};
+
 type Row = Record<string, unknown>;
 let client: SupabaseClient | null = null;
 
@@ -254,6 +279,77 @@ export async function listEvolutionLeadsSupabase(): Promise<EvolutionLead[]> {
   const { data, error } = await getEvolutionSupabase().from("evolution_leads").select("id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by").order("last_message_at", { ascending: false }).limit(200);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => asLead(row));
+}
+
+export async function listEvolutionLeadsForAiClassificationSupabase(): Promise<EvolutionLead[]> {
+  const sb = getEvolutionSupabase();
+  const select = "id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by";
+  const pageSize = 500;
+  const rows: Row[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await sb.from("evolution_leads").select(select).order("last_message_at", { ascending: false }).range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as Row[]));
+    if ((data ?? []).length < pageSize) break;
+  }
+  return rows.map(asLead);
+}
+
+export async function getEvolutionAiAutomationSettingsSupabase(): Promise<EvolutionAiAutomationSettings> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_ai_automation_settings")
+    .select("enabled, min_confidence, schedule_cron_task_uid, last_run_status, last_started_at, last_completed_at").eq("automation_key", "daily_lead_stage").maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Configuração da automação diária não encontrada");
+  return {
+    enabled: data.enabled !== false,
+    minConfidence: Number(data.min_confidence ?? 0.8),
+    scheduleCronTaskUid: text(data.schedule_cron_task_uid),
+    lastRunStatus: text(data.last_run_status),
+    lastStartedAt: iso(data.last_started_at),
+    lastCompletedAt: iso(data.last_completed_at),
+  };
+}
+
+export async function updateEvolutionAiAutomationStatusSupabase(input: {
+  scheduleCronTaskUid?: string;
+  status: string;
+  summary?: Record<string, number | string | boolean>;
+  startedAt?: string;
+  completedAt?: string;
+}): Promise<void> {
+  const patch: Record<string, unknown> = { last_run_status: input.status, updated_at: new Date().toISOString() };
+  if (input.scheduleCronTaskUid) patch.schedule_cron_task_uid = input.scheduleCronTaskUid;
+  if (input.summary) patch.last_run_summary = input.summary;
+  if (input.startedAt) patch.last_started_at = input.startedAt;
+  if (input.completedAt) patch.last_completed_at = input.completedAt;
+  const { error } = await getEvolutionSupabase().from("evolution_ai_automation_settings").update(patch).eq("automation_key", "daily_lead_stage");
+  if (error) throw new Error(error.message);
+}
+
+export async function listEvolutionAiCompletedSourceKeysSupabase(): Promise<Set<string>> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_ai_classification_runs")
+    .select("lead_id, source_last_message_at, status").in("status", ["applied", "unchanged", "review", "skipped"]).limit(10000);
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((row) => `${row.lead_id}:${new Date(row.source_last_message_at).toISOString()}`));
+}
+
+export async function recordEvolutionAiClassificationRunSupabase(input: EvolutionAiClassificationRunInput): Promise<void> {
+  const { error } = await getEvolutionSupabase().from("evolution_ai_classification_runs").insert({
+    lead_id: input.leadId,
+    instance_name: input.instanceName,
+    source_last_message_at: input.sourceLastMessageAt,
+    source_message_count: input.sourceMessageCount,
+    model: input.model,
+    previous_stage: input.previousStage,
+    proposed_stage: input.proposedStage,
+    applied_stage: input.appliedStage,
+    confidence: input.confidence,
+    rationale: input.rationale?.slice(0, 240) ?? null,
+    status: input.status,
+    error_message: input.errorMessage?.slice(0, 500) ?? null,
+    execution_key: input.executionKey,
+  });
+  if (error && error.code !== "23505") throw new Error(error.message);
 }
 
 export async function listEvolutionCrmStageHistorySupabase(leadId: string): Promise<EvolutionCrmStageHistory[]> {

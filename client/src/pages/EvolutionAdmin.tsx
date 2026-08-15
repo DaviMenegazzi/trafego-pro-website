@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Activity, ArrowLeft, BadgeCheck, Bot, CheckCircle2, ChevronRight, CircleAlert, Clock3, Database, FileJson, RefreshCw, ShieldCheck, Signal, Tag, UsersRound, Webhook } from "lucide-react";
+import { Activity, ArrowLeft, BadgeCheck, Bot, CheckCircle2, ChevronRight, CircleAlert, Clock3, Database, FileJson, MessageCircleMore, MousePointerClick, RefreshCw, ShieldCheck, Signal, Tag, UsersRound, Webhook } from "lucide-react";
 import { canAccessEvolutionPanel } from "@/lib/evolutionAdminPolicy";
 
 type Summary = { totalLeads: number; pendingLeads: number; qualifiedLeads: number; closedLeads: number; eventsToday: number };
@@ -10,7 +10,9 @@ type OriginEvidence = "verified" | "observed" | "none";
 type EventItem = { id: string; instanceName: string; eventType: string; direction: string; messageType: string | null; messagePreview: string | null; occurredAt: string | null; receivedAt: string; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; metaSourceId: string | null; metaSourceType: string | null; googleClickId: string | null; attributionPayload: Record<string, string> | null };
 type Lead = { id: string; instanceName: string; phoneLast4: string | null; contactName: string | null; classification: "pendente" | "lead" | "nao_lead"; funnelStage: "novo" | "qualificado" | "negociacao" | "perdido" | "fechado"; classificationNote: string | null; firstContactAt: string; lastMessageAt: string; messagesReceived: number; messagesSent: number; classifiedByEmail: string | null; classifiedAt: string | null; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; googleClickId: string | null; originDetectedAt: string | null };
 type Overview = { summary: Summary; instances: Instance[]; events: EventItem[]; leads: Lead[] };
-type View = "operacao" | "origem" | "auditoria";
+type MetaAttribution = { leadId: string; sourceEventId: string | null; clientId: string | null; accountId: string | null; campaignId: string | null; campaignName: string | null; adsetId: string | null; adsetName: string | null; adId: string | null; adName: string | null; creativeId: string | null; creativeName: string | null; matchedBy: string; matchStatus: "matched" | "unresolved"; matchedAt: string };
+type ConversationMessage = { id: string; leadId: string; instanceName: string; direction: "incoming" | "outgoing"; messageType: string | null; bodyText: string; sentAt: string };
+type View = "operacao" | "origem" | "auditoria" | "atribuicao" | "conversas";
 
 const stages: Array<{ value: Lead["funnelStage"]; label: string }> = [
   { value: "novo", label: "Novo" }, { value: "qualificado", label: "Qualificado" },
@@ -24,6 +26,14 @@ const emptyOverview: Overview = {
 function formatDate(value: string | null): string {
   if (!value) return "—";
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+async function readEvolutionJson<T extends { error?: string }>(response: Response, fallback: string): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(response.status === 404 ? "A rota Evolution ainda não está disponível no servidor." : fallback);
+  }
+  return response.json() as Promise<T>;
 }
 
 function statusClass(status: string): string {
@@ -59,6 +69,10 @@ export default function EvolutionAdmin() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingLead, setUpdatingLead] = useState<string | null>(null);
+  const [attributions, setAttributions] = useState<MetaAttribution[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
+  const [conversationLoading, setConversationLoading] = useState(false);
   const [error, setError] = useState("");
 
   const token = useMemo(() => localStorage.getItem("tp_token"), []);
@@ -73,6 +87,8 @@ export default function EvolutionAdmin() {
   }), [overview.leads]);
 
   const originEvents = useMemo(() => overview.events.filter((event) => event.originEvidence !== "none"), [overview.events]);
+  const selectedLead = useMemo(() => overview.leads.find((lead) => lead.id === selectedLeadId) ?? overview.leads[0] ?? null, [overview.leads, selectedLeadId]);
+  const attributionByLead = useMemo(() => new Map(attributions.map((item) => [item.leadId, item])), [attributions]);
 
   const loadOverview = useCallback(async (background = false) => {
     if (background) setRefreshing(true); else setLoading(true);
@@ -96,6 +112,26 @@ export default function EvolutionAdmin() {
     }
   }, [navigate, requestHeaders]);
 
+  const loadAttributions = useCallback(async () => {
+    try {
+      const response = await fetch("/api/evolution/attributions", { headers: requestHeaders() });
+      const data = await readEvolutionJson<{ rows?: MetaAttribution[]; error?: string }>(response, "Não foi possível carregar atribuições Meta");
+      if (!response.ok) throw new Error(data.error ?? "Não foi possível carregar atribuições Meta");
+      setAttributions(data.rows ?? []);
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar atribuições Meta"); }
+  }, [requestHeaders]);
+
+  const loadConversation = useCallback(async (leadId: string) => {
+    setConversationLoading(true);
+    try {
+      const response = await fetch(`/api/evolution/leads/${leadId}/messages`, { headers: requestHeaders() });
+      const data = await readEvolutionJson<{ rows?: ConversationMessage[]; error?: string }>(response, "Não foi possível carregar conversa");
+      if (!response.ok) throw new Error(data.error ?? "Não foi possível carregar conversa");
+      setConversation(data.rows ?? []);
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar conversa"); }
+    finally { setConversationLoading(false); }
+  }, [requestHeaders]);
+
   useEffect(() => {
     const storedUser = localStorage.getItem("tp_user");
     if (!canAccessEvolutionPanel(token, storedUser)) {
@@ -104,6 +140,9 @@ export default function EvolutionAdmin() {
     }
     loadOverview();
   }, [loadOverview, navigate, token]);
+
+  useEffect(() => { if (view === "atribuicao") void loadAttributions(); }, [loadAttributions, view]);
+  useEffect(() => { if (view === "conversas" && selectedLead) void loadConversation(selectedLead.id); }, [loadConversation, selectedLead, view]);
 
   async function updateLead(lead: Lead, classification: Lead["classification"], funnelStage: Lead["funnelStage"]) {
     setUpdatingLead(lead.id);
@@ -146,7 +185,7 @@ export default function EvolutionAdmin() {
         {error && <div role="alert" className="mb-6 rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
 
         <nav aria-label="Áreas do Evolution Monitor" className="mb-8 flex flex-wrap gap-2 border-b border-white/8 pb-4">
-          {([ ["operacao", "Operação", Activity], ["origem", "Origem & tags", Tag], ["auditoria", "Auditoria", FileJson] ] as const).map(([id, label, Icon]) => <button key={id} onClick={() => setView(id)} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs transition ${view === id ? "bg-cyan-300 text-[#082124] font-medium" : "border border-white/10 bg-white/[.025] text-zinc-400 hover:bg-white/[.06] hover:text-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
+          {([ ["operacao", "Operação", Activity], ["atribuicao", "Atribuição Meta", MousePointerClick], ["conversas", "Conversas", MessageCircleMore], ["origem", "Origem & tags", Tag], ["auditoria", "Auditoria", FileJson] ] as const).map(([id, label, Icon]) => <button key={id} onClick={() => setView(id)} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs transition ${view === id ? "bg-cyan-300 text-[#082124] font-medium" : "border border-white/10 bg-white/[.025] text-zinc-400 hover:bg-white/[.06] hover:text-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
         </nav>
 
         {view === "operacao" && <>
@@ -154,6 +193,10 @@ export default function EvolutionAdmin() {
           <section className="mb-8 grid gap-5 xl:grid-cols-[1.5fr_.9fr]"><article className="rounded-2xl border border-white/8 bg-white/[.025] p-6"><div className="mb-6 flex items-center justify-between"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Conexões</p><h2 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">Instâncias monitoradas</h2></div><Database className="h-5 w-5 text-zinc-600" /></div>{overview.instances.length === 0 ? <div className="rounded-xl border border-dashed border-white/10 px-5 py-9 text-center"><Signal className="mx-auto mb-3 h-5 w-5 text-zinc-600" /><p className="text-sm text-zinc-400">Nenhuma instância enviou eventos ainda.</p><p className="mt-1 text-xs text-zinc-600">A primeira chamada autenticada do webhook criará a instância aqui.</p></div> : <div className="divide-y divide-white/7">{overview.instances.map((instance) => <div key={instance.instanceName} className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"><div><p className="text-sm text-zinc-100">{instance.displayName || instance.instanceName}</p><p className="mt-1 text-xs text-zinc-600">{instance.unitName || instance.instanceName} · última mensagem {formatDate(instance.lastMessageAt)}</p></div><span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[.14em] ${statusClass(instance.connectionStatus)}`}>{instance.connectionStatus}</span></div>)}</div>}</article><aside className="rounded-2xl border border-cyan-300/12 bg-gradient-to-br from-cyan-400/[.10] to-indigo-500/[.06] p-6"><div className="mb-5 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-300 text-[#082124]"><Webhook className="h-4 w-4" /></span><div><p className="text-xs uppercase tracking-[.18em] text-cyan-200/70">Conexão segura</p><h2 className="font-['Space_Grotesk'] text-lg font-light text-white">Endpoint do webhook</h2></div></div><code className="block break-all rounded-xl border border-white/10 bg-black/25 p-3 text-xs leading-5 text-cyan-100">{webhookUrl}</code><div className="mt-4 space-y-2 text-xs leading-5 text-zinc-400"><p className="flex gap-2"><ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-300" />O endpoint aceita somente chamadas Bearer com o segredo do projeto.</p><p className="flex gap-2"><Bot className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-300" />Ative inicialmente <code className="text-zinc-200">MESSAGES_UPSERT</code> e <code className="text-zinc-200">CONNECTION_UPDATE</code>.</p></div></aside></section>
           <section className="mb-8 rounded-2xl border border-white/8 bg-white/[.025] p-6"><div className="mb-6 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Triagem comercial</p><h2 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">Contatos recebidos</h2></div><span className="text-xs text-zinc-600">Apenas dados mínimos para classificar o contato</span></div>{overview.leads.length === 0 ? <div className="rounded-xl border border-dashed border-white/10 px-5 py-10 text-center"><UsersRound className="mx-auto mb-3 h-5 w-5 text-zinc-600" /><p className="text-sm text-zinc-400">Os contatos aparecerão após a primeira mensagem recebida.</p></div> : <div className="overflow-x-auto"><table className="min-w-[920px] w-full text-left"><thead className="border-b border-white/8 text-[10px] uppercase tracking-[.16em] text-zinc-600"><tr><th className="pb-3 font-medium">Contato</th><th className="pb-3 font-medium">Instância</th><th className="pb-3 font-medium">Mensagens</th><th className="pb-3 font-medium">Classificação</th><th className="pb-3 font-medium">Etapa</th><th className="pb-3 text-right font-medium">Ação</th></tr></thead><tbody className="divide-y divide-white/7">{overview.leads.map((lead) => <tr key={lead.id}><td className="py-4"><p className="text-sm text-zinc-100">{lead.contactName || "Contato sem nome"}</p><p className="mt-1 text-xs text-zinc-600">•••• {lead.phoneLast4 || "—"} · {formatDate(lead.lastMessageAt)}</p></td><td className="py-4 text-xs text-zinc-400">{lead.instanceName}</td><td className="py-4 text-xs text-zinc-400"><span className="text-cyan-200">{lead.messagesReceived} recebidas</span><span className="mx-1 text-zinc-700">/</span>{lead.messagesSent} enviadas</td><td className="py-4"><span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[.12em] ${lead.classification === "lead" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : lead.classification === "nao_lead" ? "border-zinc-500/20 bg-zinc-400/10 text-zinc-400" : "border-amber-400/20 bg-amber-400/10 text-amber-300"}`}>{classificationLabel(lead.classification)}</span></td><td className="py-4"><select aria-label={`Etapa de ${lead.contactName || "contato"}`} value={lead.funnelStage} onChange={(event) => updateLead(lead, lead.classification, event.target.value as Lead["funnelStage"])} disabled={updatingLead === lead.id} className="rounded-lg border border-white/10 bg-[#101214] px-2.5 py-1.5 text-xs text-zinc-300 outline-none focus:border-cyan-300/50 disabled:opacity-60">{stages.map((stage) => <option key={stage.value} value={stage.value}>{stage.label}</option>)}</select></td><td className="py-4 text-right"><div className="inline-flex overflow-hidden rounded-lg border border-white/10"><button onClick={() => updateLead(lead, "lead", lead.funnelStage === "novo" ? "qualificado" : lead.funnelStage)} disabled={updatingLead === lead.id} className="border-r border-white/10 px-2.5 py-1.5 text-xs text-emerald-300 transition hover:bg-emerald-400/10 disabled:opacity-60">É lead</button><button onClick={() => updateLead(lead, "nao_lead", "perdido")} disabled={updatingLead === lead.id} className="px-2.5 py-1.5 text-xs text-zinc-400 transition hover:bg-white/5 disabled:opacity-60">Não lead</button></div></td></tr>)}</tbody></table></div>}</section>
         </>}
+
+        {view === "atribuicao" && <section className="rounded-2xl border border-white/8 bg-white/[.025] p-6"><div className="mb-6 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Atribuição de campanha</p><h2 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">Meta Ads por contato</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">O vínculo só é exibido quando a Evolution entrega um identificador Meta e ele corresponde a campanha, conjunto, anúncio ou criativo na fonte de métricas. Sem essa chave, a origem permanece não resolvida.</p></div><button onClick={() => loadAttributions()} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs text-zinc-300 hover:bg-white/[.07]"><RefreshCw className="h-3.5 w-3.5" />Atualizar atribuições</button></div>{attributions.length === 0 ? <div className="rounded-xl border border-dashed border-white/10 px-5 py-10 text-center"><MousePointerClick className="mx-auto mb-3 h-5 w-5 text-zinc-600" /><p className="text-sm text-zinc-400">Ainda não há atribuições Meta disponíveis.</p><p className="mt-1 text-xs text-zinc-600">Quando um evento trouxer uma referência Meta correspondente, a campanha e o criativo aparecerão aqui.</p></div> : <div className="overflow-x-auto"><table className="min-w-[1100px] w-full text-left"><thead className="border-b border-white/8 text-[10px] uppercase tracking-[.16em] text-zinc-600"><tr><th className="pb-3 font-medium">Contato</th><th className="pb-3 font-medium">Campanha</th><th className="pb-3 font-medium">Conjunto</th><th className="pb-3 font-medium">Criativo / anúncio</th><th className="pb-3 font-medium">Método</th><th className="pb-3 text-right font-medium">Status</th></tr></thead><tbody className="divide-y divide-white/7">{attributions.map((item) => { const lead = overview.leads.find((candidate) => candidate.id === item.leadId); return <tr key={item.leadId}><td className="py-4"><p className="text-sm text-zinc-100">{lead?.contactName || "Contato sem nome"}</p><p className="mt-1 text-xs text-zinc-600">•••• {lead?.phoneLast4 || "—"}</p></td><td className="py-4"><p className="text-xs text-zinc-200">{item.campaignName || "Não identificado"}</p><code className="mt-1 block text-[10px] text-zinc-600">{item.campaignId || "—"}</code></td><td className="py-4"><p className="text-xs text-zinc-300">{item.adsetName || "—"}</p><code className="mt-1 block text-[10px] text-zinc-600">{item.adsetId || "—"}</code></td><td className="py-4"><p className="text-xs text-zinc-300">{item.creativeName || item.adName || "—"}</p><code className="mt-1 block text-[10px] text-zinc-600">{item.creativeId || item.adId || "—"}</code></td><td className="py-4 text-xs text-zinc-500">{item.matchedBy}</td><td className="py-4 text-right"><span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[.12em] ${item.matchStatus === "matched" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-amber-400/20 bg-amber-400/10 text-amber-300"}`}>{item.matchStatus === "matched" ? "Correspondência confirmada" : "Não resolvida"}</span></td></tr>; })}</tbody></table></div>}</section>}
+
+        {view === "conversas" && <section className="grid min-h-[590px] overflow-hidden rounded-2xl border border-white/8 bg-white/[.025] lg:grid-cols-[340px_1fr]"><aside className="border-b border-white/8 lg:border-b-0 lg:border-r"><div className="border-b border-white/8 px-5 py-5"><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Conversas</p><h2 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">Contatos e histórico</h2><p className="mt-2 text-xs leading-5 text-zinc-500">Mensagens recebidas e enviadas registradas pelo webhook.</p></div><div className="max-h-[520px] overflow-y-auto p-2">{overview.leads.length === 0 ? <p className="px-4 py-8 text-center text-sm text-zinc-500">Nenhum contato disponível.</p> : overview.leads.map((lead) => <button key={lead.id} onClick={() => setSelectedLeadId(lead.id)} className={`w-full rounded-xl px-4 py-3 text-left transition ${selectedLead?.id === lead.id ? "bg-cyan-300 text-[#082124]" : "hover:bg-white/[.05]"}`}><div className="flex items-center justify-between gap-3"><p className={`truncate text-sm ${selectedLead?.id === lead.id ? "text-[#082124]" : "text-zinc-200"}`}>{lead.contactName || "Contato sem nome"}</p><span className={`text-[10px] ${selectedLead?.id === lead.id ? "text-[#164044]" : "text-zinc-600"}`}>•••• {lead.phoneLast4 || "—"}</span></div><p className={`mt-1 truncate text-xs ${selectedLead?.id === lead.id ? "text-[#164044]" : "text-zinc-600"}`}>{lead.messagesReceived} recebidas · {lead.messagesSent} enviadas</p></button>)}</div></aside><div className="flex min-h-[520px] flex-col"><div className="border-b border-white/8 px-6 py-5"><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Linha do tempo</p><h3 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">{selectedLead?.contactName || "Selecione um contato"}</h3></div><div className="flex-1 space-y-3 overflow-y-auto p-6">{!selectedLead ? <p className="py-16 text-center text-sm text-zinc-500">Selecione um contato à esquerda para visualizar a conversa.</p> : conversationLoading ? <div className="grid h-full place-items-center text-zinc-500"><RefreshCw className="h-5 w-5 animate-spin" /></div> : conversation.length === 0 ? <div className="py-16 text-center"><MessageCircleMore className="mx-auto mb-3 h-5 w-5 text-zinc-600" /><p className="text-sm text-zinc-400">Não há mensagens textuais registradas para este contato.</p><p className="mt-1 text-xs text-zinc-600">Novas mensagens recebidas pelo webhook aparecerão aqui.</p></div> : conversation.map((message) => <article key={message.id} className={`flex ${message.direction === "outgoing" ? "justify-end" : "justify-start"}`}><div className={`max-w-[82%] rounded-2xl px-4 py-3 ${message.direction === "outgoing" ? "bg-cyan-300 text-[#082124]" : "border border-white/10 bg-white/[.045] text-zinc-200"}`}><p className="whitespace-pre-wrap break-words text-sm leading-6">{message.bodyText}</p><div className={`mt-2 flex items-center justify-between gap-4 text-[10px] ${message.direction === "outgoing" ? "text-[#164044]" : "text-zinc-600"}`}><span>{message.direction === "outgoing" ? "Enviada pela unidade" : "Recebida do contato"}</span><time>{formatDate(message.sentAt)}</time></div></div></article>)}</div></div></section>}
 
         {view === "origem" && <>
           <section className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[

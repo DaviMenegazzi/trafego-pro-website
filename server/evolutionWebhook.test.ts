@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { signToken, startServer } from "./index.js";
 import { normalizeEvolutionWebhook } from "./evolutionWebhook.js";
-import { deleteEvolutionSupabaseTestRows, listEvolutionEventsSupabase, recordEvolutionEventSupabase } from "./evolutionSupabaseStore.js";
+import { deleteEvolutionSupabaseTestRows, listEvolutionEventsSupabase, listEvolutionLeadsSupabase, listEvolutionMessagesSupabase, recordEvolutionEventSupabase } from "./evolutionSupabaseStore.js";
 
 let server: Awaited<ReturnType<typeof startServer>>["server"] | undefined;
 let baseUrl = "";
@@ -94,7 +94,7 @@ describe("Evolution webhook normalization", () => {
     });
     expect(event).toMatchObject({
       instanceName: "vida-card-ijui", eventType: "MESSAGES_UPSERT", direction: "incoming",
-      messageId: "message-123", messagePreview: "Olá, quero saber mais", phoneLast4: "9999", contactName: "Ana",
+      messageId: "message-123", messagePreview: "Olá, quero saber mais", messageBody: "Olá, quero  saber mais", phoneLast4: "9999", contactName: "Ana",
     });
     expect(event?.contactKey).toHaveLength(64);
     expect(event?.fingerprint).toHaveLength(64);
@@ -136,8 +136,8 @@ describe("Evolution webhook normalization", () => {
     if (!event) throw new Error("Evento de teste não foi normalizado");
     webhookTestRows.push({ instanceName: event.instanceName, contactKey: event.contactKey, fingerprint: event.fingerprint });
 
-    await expect(recordEvolutionEventSupabase(event)).resolves.toEqual({ duplicate: false });
-    await expect(recordEvolutionEventSupabase(event)).resolves.toEqual({ duplicate: true });
+    await expect(recordEvolutionEventSupabase(event)).resolves.toMatchObject({ duplicate: false });
+    await expect(recordEvolutionEventSupabase(event)).resolves.toMatchObject({ duplicate: true });
   });
 
   it("persiste somente as tags de origem permitidas para auditoria administrativa", async () => {
@@ -159,7 +159,7 @@ describe("Evolution webhook normalization", () => {
     if (!event) throw new Error("Evento de origem não foi normalizado");
     webhookTestRows.push({ instanceName: event.instanceName, contactKey: event.contactKey, fingerprint: event.fingerprint });
 
-    await expect(recordEvolutionEventSupabase(event)).resolves.toEqual({ duplicate: false });
+    await expect(recordEvolutionEventSupabase(event)).resolves.toMatchObject({ duplicate: false });
     const saved = (await listEvolutionEventsSupabase(100)).find((item) => item.instanceName === instanceName);
     expect(saved).toMatchObject({
       originPlatform: "meta", originEvidence: "verified", metaCtwaClid: "ctwa-persisted-123",
@@ -168,5 +168,10 @@ describe("Evolution webhook normalization", () => {
     expect(saved?.attributionPayload).toMatchObject({
       ctwa_clid: "ctwa-persisted-123", source_url: "https://trafego.pro/contato", utm_source: "facebook",
     });
+
+    const lead = (await listEvolutionLeadsSupabase()).find((item) => item.instanceName === instanceName);
+    expect(lead).toBeDefined();
+    if (!lead) throw new Error("Lead de teste não encontrado");
+    await expect(listEvolutionMessagesSupabase(lead.id)).resolves.toEqual([expect.objectContaining({ direction: "incoming", bodyText: "Mensagem de teste para auditoria" })]);
   });
 });

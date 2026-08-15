@@ -43,6 +43,36 @@ export type EvolutionEvent = {
   attributionPayload: Record<string, string> | null;
 };
 
+export type EvolutionMessage = {
+  id: string;
+  leadId: string;
+  instanceName: string;
+  direction: "incoming" | "outgoing";
+  messageType: string | null;
+  bodyText: string;
+  sentAt: string;
+};
+
+export type EvolutionMetaAttribution = {
+  leadId: string;
+  sourceEventId: string | null;
+  clientId: string | null;
+  accountId: string | null;
+  campaignId: string | null;
+  campaignName: string | null;
+  adsetId: string | null;
+  adsetName: string | null;
+  adId: string | null;
+  adName: string | null;
+  creativeId: string | null;
+  creativeName: string | null;
+  matchedBy: string;
+  matchStatus: "matched" | "unresolved";
+  matchedAt: string;
+};
+
+export type EvolutionMetaAttributionInput = Omit<EvolutionMetaAttribution, "matchedAt">;
+
 export type EvolutionInstance = {
   instanceName: string;
   displayName: string | null;
@@ -112,7 +142,24 @@ function asEvent(row: Row): EvolutionEvent {
   };
 }
 
-export async function recordEvolutionEventSupabase(event: NormalizedEvolutionEvent): Promise<{ duplicate: boolean }> {
+function asMessage(row: Row): EvolutionMessage {
+  return {
+    id: String(row.id), leadId: String(row.lead_id), instanceName: String(row.instance_name),
+    direction: row.direction === "outgoing" ? "outgoing" : "incoming", messageType: text(row.message_type),
+    bodyText: String(row.body_text ?? ""), sentAt: iso(row.sent_at)!,
+  };
+}
+
+function asAttribution(row: Row): EvolutionMetaAttribution {
+  return {
+    leadId: String(row.lead_id), sourceEventId: text(row.source_event_id), clientId: text(row.client_id), accountId: text(row.account_id),
+    campaignId: text(row.campaign_id), campaignName: text(row.campaign_name), adsetId: text(row.adset_id), adsetName: text(row.adset_name),
+    adId: text(row.ad_id), adName: text(row.ad_name), creativeId: text(row.creative_id), creativeName: text(row.creative_name),
+    matchedBy: String(row.matched_by), matchStatus: row.match_status === "matched" ? "matched" : "unresolved", matchedAt: iso(row.matched_at)!,
+  };
+}
+
+export async function recordEvolutionEventSupabase(event: NormalizedEvolutionEvent): Promise<{ eventId: string; duplicate: boolean }> {
   const { data, error } = await getEvolutionSupabase().rpc("record_evolution_event", {
     p_event_fingerprint: event.fingerprint,
     p_instance_name: event.instanceName,
@@ -122,6 +169,7 @@ export async function recordEvolutionEventSupabase(event: NormalizedEvolutionEve
     p_direction: event.direction,
     p_message_type: event.messageType,
     p_message_preview: event.messagePreview,
+    p_message_body: event.messageBody,
     p_connection_status: event.connectionStatus,
     p_contact_key: event.contactKey,
     p_phone_last4: event.phoneLast4,
@@ -138,7 +186,7 @@ export async function recordEvolutionEventSupabase(event: NormalizedEvolutionEve
   if (error) throw new Error(error.message);
   const result = Array.isArray(data) ? data[0] : data;
   if (!result || typeof result !== "object" || typeof (result as Row).duplicate !== "boolean") throw new Error("Resposta inválida do Supabase Evolution");
-  return { duplicate: Boolean((result as Row).duplicate) };
+  return { eventId: String((result as Row).event_id), duplicate: Boolean((result as Row).duplicate) };
 }
 
 export async function listEvolutionInstancesSupabase(): Promise<EvolutionInstance[]> {
@@ -158,6 +206,34 @@ export async function listEvolutionLeadsSupabase(): Promise<EvolutionLead[]> {
   const { data, error } = await getEvolutionSupabase().from("evolution_leads").select("id, instance_name, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at").order("last_message_at", { ascending: false }).limit(200);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => asLead(row));
+}
+
+export async function listEvolutionMessagesSupabase(leadId: string): Promise<EvolutionMessage[]> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_messages").select("id, lead_id, instance_name, direction, message_type, body_text, sent_at").eq("lead_id", leadId).order("sent_at", { ascending: true }).limit(500);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => asMessage(row));
+}
+
+export async function listEvolutionMetaAttributionsSupabase(): Promise<EvolutionMetaAttribution[]> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_meta_attributions").select("lead_id, source_event_id, client_id, account_id, campaign_id, campaign_name, adset_id, adset_name, ad_id, ad_name, creative_id, creative_name, matched_by, match_status, matched_at").order("matched_at", { ascending: false }).limit(200);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => asAttribution(row));
+}
+
+export async function findEvolutionLeadIdSupabase(instanceName: string, contactKey: string): Promise<string | null> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_leads").select("id").eq("instance_name", instanceName).eq("contact_key", contactKey).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.id ?? null;
+}
+
+export async function upsertEvolutionMetaAttributionSupabase(input: EvolutionMetaAttributionInput): Promise<void> {
+  const { error } = await getEvolutionSupabase().from("evolution_meta_attributions").upsert({
+    lead_id: input.leadId, source_event_id: input.sourceEventId, client_id: input.clientId, account_id: input.accountId,
+    campaign_id: input.campaignId, campaign_name: input.campaignName, adset_id: input.adsetId, adset_name: input.adsetName,
+    ad_id: input.adId, ad_name: input.adName, creative_id: input.creativeId, creative_name: input.creativeName,
+    matched_by: input.matchedBy, match_status: input.matchStatus, updated_at: new Date().toISOString(),
+  }, { onConflict: "lead_id" });
+  if (error) throw new Error(error.message);
 }
 
 export async function getEvolutionSummarySupabase(): Promise<{ totalLeads: number; pendingLeads: number; qualifiedLeads: number; closedLeads: number; eventsToday: number }> {

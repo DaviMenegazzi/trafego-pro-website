@@ -10,6 +10,7 @@ export type NormalizedEvolutionEvent = {
   direction: "incoming" | "outgoing" | "system";
   messageType: string | null;
   messagePreview: string | null;
+  messageBody: string | null;
   occurredAt: Date | null;
   contactKey: string | null;
   phoneLast4: string | null;
@@ -93,6 +94,7 @@ export function normalizeEvolutionWebhook(payload: unknown): NormalizedEvolution
     direction,
     messageType: asString(data.messageType),
     messagePreview: safePreview(messageText),
+    messageBody: messageText?.slice(0, 4000) ?? null,
     occurredAt: timestamp,
     contactKey: isMessage && directPhone ? crypto.createHash("sha256").update(`${instanceName}:${directPhone}`).digest("hex") : null,
     phoneLast4: directPhone ? directPhone.slice(-4) : null,

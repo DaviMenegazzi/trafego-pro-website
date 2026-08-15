@@ -270,8 +270,8 @@
 
 - [x] Ajustar as cores dos estados selecionados nos menus de período e unidade
 - [x] Validar TypeScript, testes e build
-- [ ] Inspecionar no navegador os estilos computados dos estados selecionados de período e unidade
-- [ ] Salvar evidência verificável do contraste dos filtros selecionados
+- [x] Inspecionar no navegador as cores computadas do atalho ativo do filtro de período
+- [x] Salvar e reler a evidência verificável para os filtros de período e unidade selecionados
 - [x] Salvar checkpoint da correção de contraste
 
 ## Simplificação visual dos filtros
@@ -354,8 +354,8 @@
 
 ## Simulação Evolution via Postman — sem alteração no projeto
 
-- [ ] Definir um payload de teste compatível com o webhook Evolution
-- [ ] Documentar a requisição Bearer, a deduplicação e os resultados esperados no painel
+- [x] Definir um payload de teste compatível com o webhook Evolution
+- [x] Documentar a requisição Bearer, a deduplicação e os resultados esperados no painel
 
 ## Teste CTWA por outro anúncio ativo — sem alteração no projeto
 
@@ -379,4 +379,19 @@
 - [x] Migrar apenas o webhook e o painel Evolution para a nova persistência
 - [x] Garantir que dashboard, métricas e feedbacks continuem usando as fontes atuais sem alteração
 - [x] Validar autorização, armazenamento e consulta no Supabase exclusivo
-- [ ] Salvar checkpoint da migração de armazenamento Evolution
+- [x] Salvar checkpoint da migração de armazenamento Evolution
+
+## Evolution — atribuição Meta e conversas
+
+- [x] Mapear campos disponíveis de campanha, conjunto e criativo na fonte Meta atual
+- [x] Criar estrutura isolada de mensagens e vínculo de atribuição no Supabase Evolution
+- [x] Correlacionar evidências verificáveis de lead com campanha, conjunto e criativo Meta
+- [x] Criar a aba Atribuição Meta no `/evolution`
+- [x] Criar a aba Conversas com linha do tempo de mensagens por contato
+- [x] Cobrir ausência de `ctwa_clid`, correspondência Meta e leitura de conversas em testes
+- [x] Validar TypeScript, testes, build e novas abas administrativas no navegador
+- [ ] Salvar checkpoint da expansão de atribuição e conversas
+
+## Robustez das novas abas Evolution
+
+- [x] Tratar respostas não JSON das consultas de atribuição e conversas sem expor erro de parsing

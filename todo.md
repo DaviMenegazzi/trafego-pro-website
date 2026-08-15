@@ -229,5 +229,11 @@
 - [ ] Reproduzir login seguido de abertura da dashboard sem recarregar
 - [ ] Diagnosticar a sincronização entre cookie Supabase e consultas de unidades/métricas
 - [ ] Corrigir a atualização inicial das métricas após o login
-- [ ] Adicionar testes para o primeiro carregamento autenticado
+- [x] Adicionar testes para o primeiro carregamento autenticado
 - [ ] Validar no navegador e salvar checkpoint da correção
+
+## Validação em sessão limpa
+
+- [ ] Limpar a sessão local e o cookie Supabase de forma controlada para testar o primeiro login
+- [ ] Confirmar que as primeiras consultas de unidades e métricas recebem a sessão Supabase
+- [ ] Acionar um refetch explícito após login se a sessão ainda não estiver pronta na primeira navegação

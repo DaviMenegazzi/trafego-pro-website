@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { DASHBOARD_AUTHENTICATED_EVENT } from "@/lib/dashboardAuthSignal";
 
 export type Client = {
   id: string;
@@ -78,7 +79,12 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  useEffect(() => { fetchClients(); }, []);
+  useEffect(() => {
+    void fetchClients();
+    const refetchAfterLogin = () => { void fetchClients(); };
+    window.addEventListener(DASHBOARD_AUTHENTICATED_EVENT, refetchAfterLogin);
+    return () => window.removeEventListener(DASHBOARD_AUTHENTICATED_EVENT, refetchAfterLogin);
+  }, []);
 
   useEffect(() => {
     if (selectedClientId) {

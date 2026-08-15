@@ -448,11 +448,11 @@
 - [x] Atualizar automaticamente apenas classificações com confiança adequada e preservar a auditoria
 - [x] Registrar cada execução, decisão e erro para consulta administrativa
 - [x] Cobrir cenários de classificação, falha do provedor e idempotência em testes
-- [ ] Validar o agendamento diário e salvar checkpoint da automação
+- [x] Validar o agendamento diário e salvar checkpoint da automação
 
 ## Proteção do CRM durante classificação por IA
 
 - [x] Bloquear no servidor as mudanças manuais de etapa enquanto a rotina de IA estiver em execução
 - [x] Desabilitar visualmente o arrastar e soltar durante a classificação automática
 - [x] Exibir o label “Última atualização feita pela IA da Tráfego Pro” com data e etapa aplicadas
-- [ ] Cobrir o bloqueio e os estados visuais em testes, validar e salvar checkpoint
+- [x] Cobrir o bloqueio e os estados visuais em testes, validar e salvar checkpoint

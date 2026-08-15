@@ -439,3 +439,20 @@
 - [x] Corrigir a movimentação por arrastar e soltar entre as etapas do pipeline
 - [x] Adicionar cobertura automatizada para a interação de mudança de etapa
 - [x] Validar visualmente o pipeline e salvar checkpoint da correção
+
+## Classificação automática diária de leads por IA
+
+- [x] Confirmar o provedor, as credenciais e a disponibilidade de crédito antes da integração
+- [x] Criar processamento diário que analise as dez últimas mensagens de cada lead por instância
+- [x] Definir saída estruturada com etapa, confiança e justificativa da classificação
+- [x] Atualizar automaticamente apenas classificações com confiança adequada e preservar a auditoria
+- [x] Registrar cada execução, decisão e erro para consulta administrativa
+- [x] Cobrir cenários de classificação, falha do provedor e idempotência em testes
+- [ ] Validar o agendamento diário e salvar checkpoint da automação
+
+## Proteção do CRM durante classificação por IA
+
+- [x] Bloquear no servidor as mudanças manuais de etapa enquanto a rotina de IA estiver em execução
+- [x] Desabilitar visualmente o arrastar e soltar durante a classificação automática
+- [x] Exibir o label “Última atualização feita pela IA da Tráfego Pro” com data e etapa aplicadas
+- [ ] Cobrir o bloqueio e os estados visuais em testes, validar e salvar checkpoint

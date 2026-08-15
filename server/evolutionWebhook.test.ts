@@ -65,6 +65,12 @@ describe("Evolution webhook secret", () => {
     expect(response.status).toBe(401);
   });
 
+  it("rejeita a rotina diária sem uma sessão cron válida", async () => {
+    const response = await fetch(`${baseUrl}/api/scheduled/evolution-ai-daily`, { method: "POST" });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: "Callback agendado não autorizado" });
+  });
+
   it("mantém a consulta do painel restrita a administradores", async () => {
     const viewerToken = signToken({ email: "viewer@trafego.pro", name: "Viewer", role: "viewer", id: "viewer", allowedClientIds: ["unit-1"] });
     const response = await fetch(`${baseUrl}/api/evolution/overview`, { headers: { Authorization: `Bearer ${viewerToken}` } });

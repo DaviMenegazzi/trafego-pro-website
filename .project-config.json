@@ -14,10 +14,10 @@
   "experiments": null,
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663655133524/HCdtznE9dNy8ZoAnjMwrWj",
-    "access_key_id": "ASIAZV3A2ECZH235HS42",
-    "secret_access_key": "y34sdLrYgpVGcR3d9iA7rPG57PGgWGYlR9uHISen",
-    "session_token": "IQoJb3JpZ2luX2VjEE8aCXVzLWVhc3QtMSJGMEQCIEFbzTI5TXaZ/xE8Lpz0u0/Lth1ra9KvuSU+rxBTioKkAiBpCsG4jJgS+7/WcgoGpec4n1tvBYUiBCiWlxpYRzlPIir2AwgYEAQaDDY2NTM4NjA5ODg2NiIM1hHPoeqLoGb4JBynKtMD/2h7iySytbxpyH1dLrx7CvbThHDTgh1IsMlhnc9sVId0vafSMTUnLmvVsObFe+Mj1xILpXahrQX9xit7t1Bt7Cvmkd5Vi0twSzZG7GbHiNaqUmfa0vraOAFWDGsPpgYdpNpsLkaxX11lkry4VV2kD6JS2TjA0a/KLPOZk5ZO1moZJ6Zl+lvI85fbjjb2TnDG19XUPSNbHitbs8vHv8IG9gQA2p97uz56jc65/VfWY/euRH8ip171nbrk+o/LAFZIvFdd9VNUdUkL99XfxD4NT19TBS2v9eCP5lrL5E713qHvE6z2dJ8dobm7fWNqHAiDQCWVhO7PXmW76ICc5BUkHJ2FZnkKHqYDkS3Tg3wESPWJdBcu14EFLYvxdAsaNkmodyAq7E8BczWmXAJBTmQ40KpmMO1+eb2dgu6CqNL/X8XCutBzal1Ep+ehKsVJGjwyHg83G5vXd6oG6I3F2kG055nnOpSEz7o3DfZFqxi80t0U4hUevH+3dpnXuVq5HePwxWcGbYgUrRqGT8Pxp0r+2Y5HfNKDcgcIY6SjxKNvf2uDpl7cAalatjvsWRckWS1+NPeku+AXDFvzcXLuwKOfRtNbtNdMniOHTkUCXr5HOoikzXAwgf2B1AY6ngHo85DuvMXBY8PElQrVt9neiiXnb547mgdWmjsfcjJ3RMMZdbHINjfDyR4quW+Mm0Rs98DKpxTbwffTRLPEqFsXJqVWYcPlyDNwKij5a54Ol5/lPngpPoSJgeaZApTSROEavbhobSPcKTiuWkrD96JniFW0w7A/uULBJ5CK2PPm/U2pKiU56QAikuqh22pgfD3cAQE4CwcRDvJ/SZQvMg==",
-    "expiration": "2026-08-16T02:58:09.000Z",
+    "access_key_id": "ASIAZV3A2ECZNXATJXGD",
+    "secret_access_key": "i6G7hHth740OS7t0MVWY+R+iZVGFzVfZMzKMnXeX",
+    "session_token": "IQoJb3JpZ2luX2VjEFUaCXVzLWVhc3QtMSJHMEUCIQDtYCp1nJF5S6f5A76mU99m2IQ3Nk0raXK64wN9PR4NdwIgAPkbnRA9CxVhSaGu5MZo2egOxvxNSRBZc8UQrNBCl9sq9gMIHhAEGgw2NjUzODYwOTg4NjYiDEx6LjCWEaKoy/mHNirTAzcarJPXyPWEKE81TsoY4wje5Aac2x8wwTgtcVsLz9EiOVLwhVcyBsfCCP5o6MEo/mHsMhPgYqy+pUXKYG13leGVmregIb1qaV0c5bzClhxP51FMFhiFgigQy69egYg8Kw3xTceXF4PXv6V6EBngua1iVSSWFS+/ccDsqKM+xwdOiUuDdurVcgnqu+udBXl6xvg2jwM1YHXk1+Fk2NfL5Obr6ylr1GKxsDoJHs5kOHUR1lHylJAMLvhr664fcw5aFDvrNcNu/tz+65cAO7ucyRAsgF4si9ytmNOIA0E6WViEoZkPBXH/yjqlMWbtIX8sG5IYiKxpHCQd0M4J1UbJCQCflpq/O7SCelRI39IjumJdgwxADfRnZa5u5ff8A5KaSH9QvLR5frlXKkzepdy0aPDsAncXNOfp+iiSYmgb0jhwh7LThzKhSnq0ydtIJIZYMAZtSCqDwMXjZssQFn1opgKCkQpWI4cRqtKc1kGuWYlpcCi0DQF6z8yr8IWhxwKPhDSEEMLgRtg3jBYrbVz9veW7M3EO+bwTRtVMMgms7h97OqSjLFz0cWh+JyJJEKAq5m7i05cp2Gl+7Ni8tQ9bZi+PiyRVxiGa3J5M4b2KTJqrZadtMKeng9QGOp0BCRLSUm6dmJOIZwtWuWNxlWgE/cIOAh+XztW2ZOlbHYyVODBV2XcckY6jgWzFPQX89rJhi/pBLfEiN+N8b4t24N1xwSoqmNf69DTWnI4/Tfg8LN/TI7SHcvDiG8u5xJVe6PtQhyKZ+ZgmX0RATfvv3grBbPb81pbrqL4x8GuKjY92X+B6hWjrB1Wdt+zeCHFOu6BTN0BDVlmiokMCyw==",
+    "expiration": "2026-08-16T09:01:27.000Z",
     "backend": "GIT_BACKEND_S3"
   },
   "name": "vidacard-tupan-lp",
@@ -31,6 +31,7 @@
     "EVOLUTION_WEBHOOK_SECRET": "segredo@123",
     "JWT_SECRET": "V7acck2whE2FeVpB5kScab",
     "OAUTH_SERVER_URL": "https://api.manus.im",
+    "OPENAI_API_KEY": "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",
     "OWNER_NAME": "Davi",
     "OWNER_OPEN_ID": "aedygS7YmRoTGS3ZjtZzMr",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_4xypWjUcSIw1rJbnyDSfvA_txE5Sivo",

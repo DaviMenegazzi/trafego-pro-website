@@ -237,3 +237,7 @@
 - [ ] Limpar a sessão local e o cookie Supabase de forma controlada para testar o primeiro login
 - [ ] Confirmar que as primeiras consultas de unidades e métricas recebem a sessão Supabase
 - [ ] Acionar um refetch explícito após login se a sessão ainda não estiver pronta na primeira navegação
+
+## Propagação assíncrona da sessão Supabase
+
+- [ ] Persistir um marcador pós-login para o dashboard repetir a consulta de unidades após a propagação do cookie

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { DashboardState } from "@/components/DashboardState";
 import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
 import { calculateResponseRate } from "@/lib/dashboardPresentation";
+import { createRequestGate } from "@/lib/requestGate";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
@@ -114,6 +115,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const { clients: clientOpts, selectedClientId, selectedClient, setSelectedClientId, loading: clientsLoading } = useClientContext();
+  const metricsRequestGate = useRef(createRequestGate());
   const clientId = selectedClientId ?? "";
 
   const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
@@ -121,21 +123,36 @@ export default function DashboardPage() {
 
   // Carrega métricas ao mudar período/cliente
   useEffect(() => {
+    const requestId = metricsRequestGate.current.begin();
+    const controller = new AbortController();
+    const isCurrentRequest = () => metricsRequestGate.current.isLatest(requestId);
+
     if (!authHeaders || !selectedClientId) {
       setDaily([]);
       setCampaigns([]);
       setLoading(false);
-      return;
+      return () => controller.abort();
     }
     const { start, end } = rangeFor(period);
     const qs = buildClientMetricsQuery(start, end, selectedClientId);
-    if (!qs) return;
+    if (!qs) return () => controller.abort();
     setLoading(true); setError(null);
     Promise.all([
-      fetch(`/api/metrics/daily?${qs}`, { headers: authHeaders }).then((r) => r.json()),
-      fetch(`/api/metrics/campaigns?${qs}`, { headers: authHeaders }).then((r) => r.json()),
+      fetch(`/api/metrics/daily?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
+        .then(async (response) => {
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || "Não foi possível carregar as métricas diárias");
+          return payload;
+        }),
+      fetch(`/api/metrics/campaigns?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
+        .then(async (response) => {
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || "Não foi possível carregar as campanhas");
+          return payload;
+        }),
     ])
       .then(([d, c]) => {
+        if (!isCurrentRequest()) return;
         const ok = d.configured !== false;
         setConfigured(ok);
         if (ok && Array.isArray(d.rows) && d.rows.length > 0) setDaily(d.rows);
@@ -143,8 +160,15 @@ export default function DashboardPage() {
         if (ok && Array.isArray(c.rows)) setCampaigns(c.rows);
         if (d.error || c.error) setError(d.error || c.error);
       })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (controller.signal.aborted || !isCurrentRequest()) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (isCurrentRequest()) setLoading(false);
+      });
+
+    return () => controller.abort();
   }, [token, period, selectedClientId, refreshIndex]);
 
   // ─── Agregações (mesma lógica da dashboard antiga) ──────────────────────────

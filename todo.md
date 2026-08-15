@@ -223,3 +223,11 @@
 
 - [x] Salvar um novo checkpoint após as validações autenticadas em desktop e viewport móvel
 - [x] Confirmar no checkpoint final a versão validada no domínio publicado
+
+## Correção do primeiro carregamento de métricas
+
+- [ ] Reproduzir login seguido de abertura da dashboard sem recarregar
+- [ ] Diagnosticar a sincronização entre cookie Supabase e consultas de unidades/métricas
+- [ ] Corrigir a atualização inicial das métricas após o login
+- [ ] Adicionar testes para o primeiro carregamento autenticado
+- [ ] Validar no navegador e salvar checkpoint da correção

@@ -125,7 +125,6 @@ export default function DashboardPage() {
   const [refreshIndex, setRefreshIndex] = useState(0);
   const { clients: clientOpts, selectedClientId, selectedClient, setSelectedClientId, loading: clientsLoading } = useClientContext();
   const metricsRequestGate = useRef(createRequestGate());
-  const clientId = selectedClientId ?? "";
 
   const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -308,8 +307,7 @@ export default function DashboardPage() {
         <section className="rounded-3xl border border-border bg-surface/35 p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="space-y-1.5 text-xs font-medium text-muted-foreground">
-                <span>Período</span>
+              <div className="text-xs font-medium text-muted-foreground">
                 <Popover open={periodMenuOpen} onOpenChange={handlePeriodMenu}>
                   <PopoverTrigger asChild>
                     <button type="button" aria-label="Selecionar período das métricas"
@@ -355,8 +353,7 @@ export default function DashboardPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <div className="space-y-1.5 text-xs font-medium text-muted-foreground">
-                <span>Unidade</span>
+              <div className="text-xs font-medium text-muted-foreground">
                 <Popover open={unitMenuOpen} onOpenChange={setUnitMenuOpen}>
                   <PopoverTrigger asChild>
                     <button type="button" aria-label="Selecionar unidade das métricas" disabled={!unitMenu.canOpen}

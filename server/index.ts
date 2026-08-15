@@ -5,19 +5,24 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import * as XLSX from "xlsx";
-import { getSupabase, getSupabaseForAccessToken, isSupabaseConfigured } from "./supabase.js";
+import { getAuthedSupabase, getSupabase, getSupabaseForAccessToken, isSupabaseConfigured } from "./supabase.js";
 import { groupClientAccessByUser, uniqueGrantedClientIds } from "./clientAccess.js";
 import { validateMetricsClientSelection } from "./metricsAccess.js";
 import { createFeedbackLeadSql, listAllFeedbackLeadsForExportSql, listFeedbackLeadsSql } from "./feedbackSql.js";
 import { normalizeEvolutionWebhook, webhookSecretMatches } from "./evolutionWebhook.js";
 import {
+  findEvolutionLeadIdSupabase,
   getEvolutionSummarySupabase,
   listEvolutionEventsSupabase,
   listEvolutionInstancesSupabase,
   listEvolutionLeadsSupabase,
+  listEvolutionMessagesSupabase,
+  listEvolutionMetaAttributionsSupabase,
   recordEvolutionEventSupabase,
+  upsertEvolutionMetaAttributionSupabase,
   updateEvolutionLeadSupabase,
 } from "./evolutionSupabaseStore.js";
+import { resolveEvolutionMetaAttribution, type MetaOfferRow } from "./evolutionMetaAttribution.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -307,6 +312,30 @@ async function requireSupabaseAdmin(req: express.Request, res: express.Response,
   next();
 }
 
+async function persistEvolutionMetaAttribution(event: NonNullable<ReturnType<typeof normalizeEvolutionWebhook>>, eventId: string): Promise<void> {
+  if (!event.contactKey || event.origin.platform !== "meta") return;
+  const leadId = await findEvolutionLeadIdSupabase(event.instanceName, event.contactKey);
+  if (!leadId) return;
+
+  const sourceId = event.origin.metaSourceId;
+  let offers: MetaOfferRow[] = [];
+  const meta = await getAuthedSupabase();
+  if (meta && sourceId) {
+    let query = meta.from("vw_meta_ads_offer_ads").select("client_id, account_id, campaign_id, campaign_name, adset_id, adset_name, ad_id, ad_name, creative_id, creative_name").limit(50);
+    const sourceType = event.origin.metaSourceType?.toLowerCase();
+    if (sourceType === "campaign") query = query.eq("campaign_id", sourceId);
+    else if (sourceType === "adset") query = query.eq("adset_id", sourceId);
+    else if (sourceType === "creative") query = query.eq("creative_id", sourceId);
+    else query = query.eq("ad_id", sourceId);
+    const { data, error } = await query;
+    if (error) console.warn("[evolution] Não foi possível consultar a referência Meta:", error.message);
+    else offers = (data ?? []) as MetaOfferRow[];
+  }
+
+  const attribution = resolveEvolutionMetaAttribution(event, leadId, eventId, offers);
+  if (attribution) await upsertEvolutionMetaAttributionSupabase(attribution);
+}
+
 export async function startServer({ listen = true }: { listen?: boolean } = {}) {
   const app = express();
   const server = createServer(app);
@@ -413,6 +442,10 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
     try {
       const result = await recordEvolutionEventSupabase(event);
+      if (!result.duplicate) {
+        try { await persistEvolutionMetaAttribution(event, result.eventId); }
+        catch (attributionError) { console.warn("[evolution] Falha na atribuição Meta:", attributionError); }
+      }
       res.status(202).json({ accepted: true, duplicate: result.duplicate });
     } catch (error) {
       console.error("[evolution] Falha ao processar webhook:", error);
@@ -429,6 +462,23 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     } catch (error) {
       console.error("[evolution] Falha ao carregar painel:", error);
       res.status(503).json({ error: "Não foi possível carregar o painel Evolution" });
+    }
+  });
+
+  app.get("/api/evolution/attributions", requireAuth, requireSupabaseAdmin, async (_req, res) => {
+    try { res.json({ rows: await listEvolutionMetaAttributionsSupabase() }); }
+    catch (error) {
+      console.error("[evolution] Falha ao carregar atribuições Meta:", error);
+      res.status(503).json({ error: "Não foi possível carregar atribuições Meta" });
+    }
+  });
+
+  app.get("/api/evolution/leads/:id/messages", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(400).json({ error: "Lead inválido" }); return; }
+    try { res.json({ rows: await listEvolutionMessagesSupabase(req.params.id) }); }
+    catch (error) {
+      console.error("[evolution] Falha ao carregar conversas:", error);
+      res.status(503).json({ error: "Não foi possível carregar conversas" });
     }
   });
 

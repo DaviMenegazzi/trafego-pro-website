@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { signToken, startServer } from "./index.js";
 import { normalizeEvolutionWebhook } from "./evolutionWebhook.js";
-import { deleteEvolutionWebhookTestRows, listEvolutionEventsSql, recordEvolutionEventSql } from "./evolutionSql.js";
+import { deleteEvolutionSupabaseTestRows, listEvolutionEventsSupabase, recordEvolutionEventSupabase } from "./evolutionSupabaseStore.js";
 
 let server: Awaited<ReturnType<typeof startServer>>["server"] | undefined;
 let baseUrl = "";
@@ -17,7 +17,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await Promise.all(webhookTestRows.map(deleteEvolutionWebhookTestRows));
+  await Promise.all(webhookTestRows.map(deleteEvolutionSupabaseTestRows));
   if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
 });
 
@@ -32,6 +32,32 @@ describe("Evolution webhook secret", () => {
     });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Evento Evolution inválido" });
+  });
+
+  it("grava um evento autenticado no Supabase exclusivo do Evolution", async () => {
+    const instanceName = `__evolution_endpoint_${Date.now()}`;
+    const body = {
+      event: "messages.upsert",
+      instance: instanceName,
+      data: {
+        key: { id: "endpoint-supabase", remoteJid: "5511999999999@s.whatsapp.net", fromMe: false },
+        message: { conversation: "Teste de ponta a ponta" },
+        messageTimestamp: 1_700_000_002,
+      },
+    };
+    const event = normalizeEvolutionWebhook(body);
+    if (!event) throw new Error("Evento de teste não foi normalizado");
+    webhookTestRows.push({ instanceName: event.instanceName, contactKey: event.contactKey, fingerprint: event.fingerprint });
+
+    const response = await fetch(`${baseUrl}/api/evolution/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.EVOLUTION_WEBHOOK_SECRET}` },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual({ accepted: true, duplicate: false });
+    expect((await listEvolutionEventsSupabase(100)).some((item) => item.instanceName === instanceName)).toBe(true);
   });
 
   it("rejeita chamadas sem o segredo do webhook", async () => {
@@ -110,8 +136,8 @@ describe("Evolution webhook normalization", () => {
     if (!event) throw new Error("Evento de teste não foi normalizado");
     webhookTestRows.push({ instanceName: event.instanceName, contactKey: event.contactKey, fingerprint: event.fingerprint });
 
-    await expect(recordEvolutionEventSql(event)).resolves.toEqual({ duplicate: false });
-    await expect(recordEvolutionEventSql(event)).resolves.toEqual({ duplicate: true });
+    await expect(recordEvolutionEventSupabase(event)).resolves.toEqual({ duplicate: false });
+    await expect(recordEvolutionEventSupabase(event)).resolves.toEqual({ duplicate: true });
   });
 
   it("persiste somente as tags de origem permitidas para auditoria administrativa", async () => {
@@ -133,8 +159,8 @@ describe("Evolution webhook normalization", () => {
     if (!event) throw new Error("Evento de origem não foi normalizado");
     webhookTestRows.push({ instanceName: event.instanceName, contactKey: event.contactKey, fingerprint: event.fingerprint });
 
-    await expect(recordEvolutionEventSql(event)).resolves.toEqual({ duplicate: false });
-    const saved = (await listEvolutionEventsSql(100)).find((item) => item.instanceName === instanceName);
+    await expect(recordEvolutionEventSupabase(event)).resolves.toEqual({ duplicate: false });
+    const saved = (await listEvolutionEventsSupabase(100)).find((item) => item.instanceName === instanceName);
     expect(saved).toMatchObject({
       originPlatform: "meta", originEvidence: "verified", metaCtwaClid: "ctwa-persisted-123",
       metaSourceId: "ad-persisted-456",

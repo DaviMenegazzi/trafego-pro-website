@@ -11,13 +11,13 @@ import { validateMetricsClientSelection } from "./metricsAccess.js";
 import { createFeedbackLeadSql, listAllFeedbackLeadsForExportSql, listFeedbackLeadsSql } from "./feedbackSql.js";
 import { normalizeEvolutionWebhook, webhookSecretMatches } from "./evolutionWebhook.js";
 import {
-  getEvolutionSummarySql,
-  listEvolutionEventsSql,
-  listEvolutionInstancesSql,
-  listEvolutionLeadsSql,
-  recordEvolutionEventSql,
-  updateEvolutionLeadSql,
-} from "./evolutionSql.js";
+  getEvolutionSummarySupabase,
+  listEvolutionEventsSupabase,
+  listEvolutionInstancesSupabase,
+  listEvolutionLeadsSupabase,
+  recordEvolutionEventSupabase,
+  updateEvolutionLeadSupabase,
+} from "./evolutionSupabaseStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -412,7 +412,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     }
 
     try {
-      const result = await recordEvolutionEventSql(event);
+      const result = await recordEvolutionEventSupabase(event);
       res.status(202).json({ accepted: true, duplicate: result.duplicate });
     } catch (error) {
       console.error("[evolution] Falha ao processar webhook:", error);
@@ -423,7 +423,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.get("/api/evolution/overview", requireAuth, requireSupabaseAdmin, async (_req, res) => {
     try {
       const [summary, instances, events, leads] = await Promise.all([
-        getEvolutionSummarySql(), listEvolutionInstancesSql(), listEvolutionEventsSql(), listEvolutionLeadsSql(),
+        getEvolutionSummarySupabase(), listEvolutionInstancesSupabase(), listEvolutionEventsSupabase(), listEvolutionLeadsSupabase(),
       ]);
       res.json({ summary, instances, events, leads });
     } catch (error) {
@@ -433,17 +433,17 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   });
 
   app.put("/api/evolution/leads/:id", requireAuth, requireSupabaseAdmin, async (req, res) => {
-    const id = Number(req.params.id);
+    const id = req.params.id;
     const body = req.body as { classification?: string; funnelStage?: string; note?: string };
     const classifications = ["pendente", "lead", "nao_lead"];
     const stages = ["novo", "qualificado", "negociacao", "perdido", "fechado"];
     const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
-    if (!Number.isInteger(id) || id <= 0 || !classifications.includes(body.classification ?? "") || !stages.includes(body.funnelStage ?? "")) {
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !classifications.includes(body.classification ?? "") || !stages.includes(body.funnelStage ?? "")) {
       res.status(400).json({ error: "Classificação ou etapa inválida" });
       return;
     }
     try {
-      const lead = await updateEvolutionLeadSql(id, {
+      const lead = await updateEvolutionLeadSupabase(id, {
         classification: body.classification as "pendente" | "lead" | "nao_lead",
         funnelStage: body.funnelStage as "novo" | "qualificado" | "negociacao" | "perdido" | "fechado",
         note,

@@ -231,7 +231,7 @@
 - [x] Corrigir a atualização inicial das métricas após o login
 - [x] Adicionar testes para o primeiro carregamento autenticado
 - [x] Validar no navegador a correção do primeiro carregamento autenticado
-- [ ] Salvar checkpoint após a validação autenticada do primeiro carregamento
+- [ ] Salvar um checkpoint específico após a validação autenticada do primeiro carregamento
 
 ## Validação em sessão limpa
 
@@ -270,7 +270,8 @@
 
 - [x] Ajustar as cores dos estados selecionados nos menus de período e unidade
 - [x] Validar TypeScript, testes e build
-- [ ] Validar no navegador a legibilidade dos estados selecionados com evidência objetiva
+- [ ] Inspecionar no navegador os estilos computados dos estados selecionados de período e unidade
+- [ ] Salvar evidência verificável do contraste dos filtros selecionados
 - [x] Salvar checkpoint da correção de contraste
 
 ## Simplificação visual dos filtros
@@ -369,4 +370,13 @@
 - [x] Criar abas isoladas para eventos brutos seguros, origem e auditoria de leads
 - [x] Cobrir payloads Meta, Google Ads, ausência de sinal e autorização administrativa em testes
 - [x] Validar TypeScript, testes, build e abas administrativas no navegador
-- [ ] Salvar checkpoint da evolução de origem do módulo Evolution
+- [x] Salvar checkpoint da evolução de origem do módulo Evolution
+
+## Armazenamento Evolution em Supabase separado
+
+- [x] Configurar uma conexão Supabase exclusiva para os dados do módulo Evolution
+- [x] Criar esquema isolado de instâncias, eventos, leads e evidências de origem no novo projeto
+- [x] Migrar apenas o webhook e o painel Evolution para a nova persistência
+- [x] Garantir que dashboard, métricas e feedbacks continuem usando as fontes atuais sem alteração
+- [x] Validar autorização, armazenamento e consulta no Supabase exclusivo
+- [ ] Salvar checkpoint da migração de armazenamento Evolution

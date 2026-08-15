@@ -7,6 +7,7 @@ import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
 import { CUSTOM_PERIOD, formatDashboardDateRange, getPresetDashboardDateRange, isValidDashboardDateRange } from "@/lib/dashboardDateRange";
 import { calculateResponseRate } from "@/lib/dashboardPresentation";
+import { getDashboardUnitMenuState, selectAuthorizedDashboardUnit } from "@/lib/dashboardUnitMenu";
 import { MetricsSessionError, readMetricsResponse } from "@/lib/metricsResponse";
 import { createRequestGate } from "@/lib/requestGate";
 import {
@@ -23,7 +24,7 @@ const CHART = {
   red: "#EF4444",     // custo / alerta
   blue: "#38BDF8",    // apoio
 };
-import { RefreshCw, ChevronDown, CalendarRange } from "lucide-react";
+import { RefreshCw, ChevronDown, CalendarRange, Building2 } from "lucide-react";
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
@@ -114,6 +115,7 @@ export default function DashboardPage() {
   const [draftStart, setDraftStart] = useState(customRange.start);
   const [draftEnd, setDraftEnd] = useState(customRange.end);
   const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
+  const [unitMenuOpen, setUnitMenuOpen] = useState(false);
   const [customRangeError, setCustomRangeError] = useState<string | null>(null);
   const [daily, setDaily] = useState<DailyRow[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
@@ -134,6 +136,7 @@ export default function DashboardPage() {
   const periodLabel = period === CUSTOM_PERIOD
     ? `Personalizado · ${formatDashboardDateRange(activeRange)}`
     : (PERIOD_SHORTCUTS.find((item) => item.value === period)?.label ?? "Últimos 30 dias");
+  const unitMenu = getDashboardUnitMenuState(clientOpts, selectedClientId, clientsLoading);
 
   const selectPresetPeriod = (value: string) => {
     setPeriod(value);
@@ -159,6 +162,12 @@ export default function DashboardPage() {
       setDraftStart(activeRange.start);
       setDraftEnd(activeRange.end);
       setCustomRangeError(null);
+    }
+  };
+
+  const selectUnit = (clientId: string) => {
+    if (selectAuthorizedDashboardUnit(clientOpts, clientId, setSelectedClientId)) {
+      setUnitMenuOpen(false);
     }
   };
 
@@ -346,14 +355,45 @@ export default function DashboardPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <label className="space-y-1.5 text-xs font-medium text-muted-foreground"><span>Unidade</span><div className="relative">
-            <select value={clientId} onChange={(e) => setSelectedClientId(e.target.value)} disabled={clientsLoading || clientOpts.length === 0}
-              className="appearance-none text-sm rounded-full border border-border bg-surface/60 px-4 py-2.5 pr-9 text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60">
-              {!clientId && <option value="">Selecione uma unidade</option>}
-              {clientOpts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              </div></label>
+              <div className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                <span>Unidade</span>
+                <Popover open={unitMenuOpen} onOpenChange={setUnitMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <button type="button" aria-label="Selecionar unidade das métricas" disabled={!unitMenu.canOpen}
+                      className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-surface focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60">
+                      <Building2 className="size-4 text-sky-300" />
+                      <span className="max-w-52 truncate">{unitMenu.label}</span>
+                      <ChevronDown className="size-4 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border-border bg-[color:var(--color-surface)] p-0 text-foreground shadow-2xl">
+                    <div className="border-b border-border px-4 py-4">
+                      <p className="font-display text-base font-semibold">Unidades disponíveis</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Selecione a unidade para consultar as métricas do período.</p>
+                    </div>
+                    {clientsLoading ? (
+                      <div className="flex items-center gap-3 px-4 py-6 text-sm text-muted-foreground" aria-live="polite">
+                        <RefreshCw className="size-4 animate-spin text-sky-300" /> Carregando unidades autorizadas…
+                      </div>
+                    ) : clientOpts.length === 0 ? (
+                      <p className="px-4 py-6 text-sm leading-6 text-muted-foreground">{unitMenu.emptyMessage}</p>
+                    ) : (
+                      <div className="max-h-64 overflow-y-auto p-2">
+                        {clientOpts.map((client) => {
+                          const selected = client.id === selectedClientId;
+                          return (
+                            <button key={client.id} type="button" onClick={() => selectUnit(client.id)}
+                              className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition-colors ${selected ? "bg-sky-300/10 text-sky-100" : "text-foreground hover:bg-surface-2"}`}>
+                              <span className="truncate font-medium">{client.name}</span>
+                              {selected && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-300">Selecionada</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
             <button onClick={() => setRefreshIndex((value) => value + 1)} disabled={loading || clientsLoading || !selectedClientId}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">

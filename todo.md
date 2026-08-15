@@ -256,4 +256,11 @@
 - [x] Criar seleção de data inicial e final consistente com o visual da dashboard
 - [x] Aplicar o intervalo escolhido às consultas de métricas e validar as datas
 - [x] Cobrir a lógica de intervalo personalizado em testes e validar build
-- [ ] Salvar checkpoint da melhoria de filtro de período
+- [x] Salvar checkpoint da melhoria de filtro de período
+
+## Seletor de unidade no padrão da dashboard
+
+- [x] Substituir o dropdown nativo de unidade por um menu visual consistente
+- [x] Manter os estados de carregamento, ausência e unidades autorizadas no novo seletor
+- [x] Cobrir a seleção de unidade autorizada e validar TypeScript, testes e build
+- [ ] Salvar checkpoint da melhoria do seletor de unidade

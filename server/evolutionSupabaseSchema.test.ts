@@ -7,7 +7,7 @@ describe("Esquema Supabase exclusivo do Evolution", () => {
     const headers = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` };
 
     const results = await Promise.all(
-      ["evolution_instances", "evolution_events", "evolution_leads", "evolution_messages", "evolution_meta_attributions"].map(async (table) => {
+      ["evolution_instances", "evolution_events", "evolution_leads", "evolution_messages", "evolution_meta_attributions", "evolution_crm_stage_history"].map(async (table) => {
         const response = await fetch(`${projectUrl}/rest/v1/${table}?select=*&limit=1`, { headers });
         return { table, status: response.status };
       }),
@@ -19,6 +19,7 @@ describe("Esquema Supabase exclusivo do Evolution", () => {
       { table: "evolution_leads", status: 200 },
       { table: "evolution_messages", status: 200 },
       { table: "evolution_meta_attributions", status: 200 },
+      { table: "evolution_crm_stage_history", status: 200 },
     ]);
   });
 });

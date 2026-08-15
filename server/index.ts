@@ -15,9 +15,11 @@ import {
   getEvolutionSummarySupabase,
   listEvolutionEventsSupabase,
   listEvolutionInstancesSupabase,
+  listEvolutionCrmStageHistorySupabase,
   listEvolutionLeadsSupabase,
   listEvolutionMessagesSupabase,
   listEvolutionMetaAttributionsSupabase,
+  moveEvolutionLeadCrmStageSupabase,
   recordEvolutionEventSupabase,
   upsertEvolutionMetaAttributionSupabase,
   updateEvolutionContactNameSupabase,
@@ -485,6 +487,38 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     catch (error) {
       console.error("[evolution] Falha ao carregar conversas:", error);
       res.status(503).json({ error: "Não foi possível carregar conversas" });
+    }
+  });
+
+  app.get("/api/evolution/leads/:id/crm-history", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(400).json({ error: "Lead inválido" }); return; }
+    try { res.json({ rows: await listEvolutionCrmStageHistorySupabase(req.params.id) }); }
+    catch (error) {
+      console.error("[evolution] Falha ao carregar histórico CRM:", error);
+      res.status(503).json({ error: "Não foi possível carregar histórico CRM" });
+    }
+  });
+
+  app.put("/api/evolution/leads/:id/crm-stage", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    const id = req.params.id;
+    const body = req.body as { instanceName?: string; stage?: string; note?: string };
+    const stages = ["lead_not_responded", "lead_responded", "follow_up", "lead_replied", "negotiation", "closed_won", "closed_lost"];
+    if (!/^[0-9a-f-]{36}$/i.test(id) || typeof body.instanceName !== "string" || !/^[a-zA-Z0-9_-]{1,120}$/.test(body.instanceName) || !stages.includes(body.stage ?? "")) {
+      res.status(400).json({ error: "Movimentação CRM inválida" });
+      return;
+    }
+    try {
+      const moved = await moveEvolutionLeadCrmStageSupabase({
+        leadId: id,
+        instanceName: body.instanceName,
+        toStage: body.stage as "lead_not_responded" | "lead_responded" | "follow_up" | "lead_replied" | "negotiation" | "closed_won" | "closed_lost",
+        changedBy: req.claims!.email,
+        note: typeof body.note === "string" ? body.note.slice(0, 500) : undefined,
+      });
+      res.json(moved);
+    } catch (error) {
+      console.error("[evolution] Falha ao mover CRM:", error);
+      res.status(503).json({ error: "Não foi possível mover o lead no CRM" });
     }
   });
 

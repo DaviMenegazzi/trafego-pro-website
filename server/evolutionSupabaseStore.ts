@@ -3,10 +3,13 @@ import type { NormalizedEvolutionEvent } from "./evolutionWebhook.js";
 
 export type EvolutionLeadClassification = "pendente" | "lead" | "nao_lead";
 export type EvolutionLeadStage = "novo" | "qualificado" | "negociacao" | "perdido" | "fechado";
+export type EvolutionCrmStage = "lead_not_responded" | "lead_responded" | "follow_up" | "lead_replied" | "negotiation" | "closed_won" | "closed_lost";
 
 export type EvolutionLead = {
   id: string;
   instanceName: string;
+  contactKey: string;
+  contactPhone: string | null;
   phoneLast4: string | null;
   contactName: string | null;
   classification: EvolutionLeadClassification;
@@ -23,6 +26,20 @@ export type EvolutionLead = {
   metaCtwaClid: string | null;
   googleClickId: string | null;
   originDetectedAt: string | null;
+  crmStage: EvolutionCrmStage;
+  crmStageUpdatedAt: string | null;
+  crmStageUpdatedBy: string | null;
+};
+
+export type EvolutionCrmStageHistory = {
+  id: string;
+  leadId: string;
+  instanceName: string;
+  fromStage: EvolutionCrmStage | null;
+  toStage: EvolutionCrmStage;
+  changedBy: string | null;
+  changedAt: string;
+  note: string | null;
 };
 
 export type EvolutionEvent = {
@@ -122,13 +139,24 @@ function attributionPayload(value: unknown): Record<string, string> | null {
 
 function asLead(row: Row): EvolutionLead {
   return {
-    id: String(row.id), instanceName: String(row.instance_name), phoneLast4: text(row.phone_last4), contactName: text(row.contact_name),
+    id: String(row.id), instanceName: String(row.instance_name), contactKey: String(row.contact_key), contactPhone: text(row.contact_phone), phoneLast4: text(row.phone_last4), contactName: text(row.contact_name),
     classification: (text(row.classification) as EvolutionLeadClassification | null) ?? "pendente",
     funnelStage: (text(row.funnel_stage) as EvolutionLeadStage | null) ?? "novo",
     classificationNote: text(row.classification_note), firstContactAt: iso(row.first_contact_at)!, lastMessageAt: iso(row.last_message_at)!,
     messagesReceived: number(row.messages_received), messagesSent: number(row.messages_sent), classifiedByEmail: text(row.classified_by_email),
     classifiedAt: iso(row.classified_at), originPlatform: originPlatform(row.origin_platform), originEvidence: originEvidence(row.origin_evidence),
     metaCtwaClid: text(row.meta_ctwa_clid), googleClickId: text(row.google_click_id), originDetectedAt: iso(row.origin_detected_at),
+    crmStage: (text(row.crm_stage) as EvolutionCrmStage | null) ?? "lead_not_responded",
+    crmStageUpdatedAt: iso(row.crm_stage_updated_at), crmStageUpdatedBy: text(row.crm_stage_updated_by),
+  };
+}
+
+function asCrmHistory(row: Row): EvolutionCrmStageHistory {
+  return {
+    id: String(row.id), leadId: String(row.lead_id), instanceName: String(row.instance_name),
+    fromStage: text(row.from_stage) as EvolutionCrmStage | null,
+    toStage: String(row.to_stage) as EvolutionCrmStage, changedBy: text(row.changed_by),
+    changedAt: iso(row.changed_at)!, note: text(row.note),
   };
 }
 
@@ -223,9 +251,26 @@ export async function listEvolutionEventsSupabase(limit = 40): Promise<Evolution
 }
 
 export async function listEvolutionLeadsSupabase(): Promise<EvolutionLead[]> {
-  const { data, error } = await getEvolutionSupabase().from("evolution_leads").select("id, instance_name, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at").order("last_message_at", { ascending: false }).limit(200);
+  const { data, error } = await getEvolutionSupabase().from("evolution_leads").select("id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by").order("last_message_at", { ascending: false }).limit(200);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => asLead(row));
+}
+
+export async function listEvolutionCrmStageHistorySupabase(leadId: string): Promise<EvolutionCrmStageHistory[]> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_crm_stage_history").select("id, lead_id, instance_name, from_stage, to_stage, changed_by, changed_at, note").eq("lead_id", leadId).order("changed_at", { ascending: false }).limit(100);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => asCrmHistory(row));
+}
+
+export async function moveEvolutionLeadCrmStageSupabase(input: { leadId: string; instanceName: string; toStage: EvolutionCrmStage; changedBy: string; note?: string }): Promise<{ leadId: string; crmStage: EvolutionCrmStage; crmStageUpdatedAt: string }> {
+  const { data, error } = await getEvolutionSupabase().rpc("move_evolution_lead_stage", {
+    p_lead_id: input.leadId, p_instance_name: input.instanceName, p_to_stage: input.toStage,
+    p_changed_by: input.changedBy, p_note: input.note ?? null,
+  });
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("Resposta CRM inválida do Supabase Evolution");
+  return { leadId: String(row.lead_id), crmStage: String(row.crm_stage) as EvolutionCrmStage, crmStageUpdatedAt: iso(row.crm_stage_updated_at)! };
 }
 
 export async function listEvolutionMessagesSupabase(leadId: string): Promise<EvolutionMessage[]> {
@@ -283,7 +328,7 @@ export async function getEvolutionSummarySupabase(): Promise<{ totalLeads: numbe
 }
 
 export async function updateEvolutionLeadSupabase(id: string, input: { classification: EvolutionLeadClassification; funnelStage: EvolutionLeadStage; note: string; classifiedByEmail: string }): Promise<EvolutionLead | null> {
-  const { data, error } = await getEvolutionSupabase().from("evolution_leads").update({ classification: input.classification, funnel_stage: input.funnelStage, classification_note: input.note || null, classified_by_email: input.classifiedByEmail, classified_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", id).select("id, instance_name, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at").maybeSingle();
+  const { data, error } = await getEvolutionSupabase().from("evolution_leads").update({ classification: input.classification, funnel_stage: input.funnelStage, classification_note: input.note || null, classified_by_email: input.classifiedByEmail, classified_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", id).select("id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by").maybeSingle();
   if (error) throw new Error(error.message);
   return data ? asLead(data) : null;
 }

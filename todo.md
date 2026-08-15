@@ -226,16 +226,17 @@
 
 ## Correção do primeiro carregamento de métricas
 
-- [ ] Reproduzir login seguido de abertura da dashboard sem recarregar
+- [x] Reproduzir login seguido de abertura da dashboard sem recarregar
 - [x] Diagnosticar a sincronização entre cookie Supabase e consultas de unidades/métricas
 - [x] Corrigir a atualização inicial das métricas após o login
 - [x] Adicionar testes para o primeiro carregamento autenticado
-- [ ] Validar no navegador e salvar checkpoint da correção
+- [x] Validar no navegador a correção do primeiro carregamento autenticado
+- [ ] Salvar checkpoint após a validação autenticada do primeiro carregamento
 
 ## Validação em sessão limpa
 
-- [ ] Limpar a sessão local e o cookie Supabase de forma controlada para testar o primeiro login
-- [ ] Confirmar que as primeiras consultas de unidades e métricas recebem a sessão Supabase
+- [x] Limpar a sessão local e o cookie Supabase de forma controlada para testar o primeiro login
+- [x] Confirmar que as primeiras consultas de unidades e métricas recebem a sessão Supabase
 - [x] Acionar um refetch explícito após login se a sessão ainda não estiver pronta na primeira navegação
 
 ## Propagação assíncrona da sessão Supabase
@@ -244,10 +245,10 @@
 
 ## Correção de 401 ao trocar unidade
 
-- [ ] Reproduzir a troca de unidade que retorna 401 no endpoint de métricas
+- [x] Reproduzir de forma documentada a troca de unidade que retornava 401 no endpoint de métricas
 - [x] Tratar respostas não JSON e sessão expirada sem expor erro de parsing
-- [ ] Corrigir a atualização de métricas após selecionar uma nova unidade
-- [ ] Adicionar testes e validar a troca de unidade no navegador
+- [x] Corrigir a atualização de métricas após selecionar uma nova unidade
+- [x] Adicionar testes e validar a troca de unidade no navegador
 - [x] Salvar checkpoint da correção de sessão e métricas
 
 ## Período personalizado na dashboard
@@ -269,7 +270,7 @@
 
 - [x] Ajustar as cores dos estados selecionados nos menus de período e unidade
 - [x] Validar TypeScript, testes e build
-- [ ] Validar no navegador a legibilidade dos estados selecionados
+- [ ] Validar no navegador a legibilidade dos estados selecionados com evidência objetiva
 - [x] Salvar checkpoint da correção de contraste
 
 ## Simplificação visual dos filtros
@@ -314,4 +315,58 @@
 - [x] Validar que a rota isolada redireciona visitantes sem sessão para o login
 - [x] Validar TypeScript, testes e build, além da rota isolada sem sessão no navegador
 - [x] Validar no navegador o painel `/evolution` com sessão admin ativa e os estados de visão geral
-- [ ] Salvar checkpoint do módulo Evolution administrativo
+- [x] Salvar checkpoint do módulo Evolution administrativo
+
+## Guia de instalação Evolution no WSL — sem alteração no projeto
+
+- [x] Confirmar o método recomendado de instalação local e os requisitos de persistência
+- [x] Documentar conexão do WhatsApp e configuração de webhook Bearer para o módulo isolado
+- [x] Entregar roteiro de instalação e verificação operacional segura
+
+## Guia rápido Evolution sem Docker — sem alteração no projeto
+
+- [ ] Confirmar o modo local mínimo para teste e suas dependências
+- [ ] Documentar a criação da instância, QR e webhook Bearer sem Docker
+- [ ] Entregar comandos de teste temporário no WSL
+
+## Guia visual Evolution local — sem alteração no projeto
+
+- [x] Confirmar a interface local adequada para criar e conectar a instância
+- [x] Documentar a configuração visual do webhook Bearer para o Tráfego Pro
+- [x] Entregar o roteiro local com intervenção mínima no terminal
+
+## Diagnóstico PostgreSQL da Evolution no WSL — sem alteração no projeto
+
+- [ ] Confirmar a URL de banco usada pela Evolution e a existência do usuário local
+- [ ] Corrigir as credenciais PostgreSQL e validar a conexão antes da migração
+- [ ] Retestar a geração e a implantação do banco Evolution
+
+## Orientação de webhook no Evolution Manager — sem alteração no projeto
+
+- [x] Confirmar o caminho visual e os campos da integração de webhook na versão atual do Manager
+- [x] Corrigir a orientação do Bearer e entregar o passo a passo preciso
+
+## Teste de atribuição Meta Click-to-WhatsApp — sem alteração no projeto
+
+- [x] Confirmar o identificador de referência e os pré-requisitos de um anúncio de mensagem real
+- [x] Documentar a simulação controlada e a leitura dos resultados no módulo Evolution
+
+## Simulação Evolution via Postman — sem alteração no projeto
+
+- [ ] Definir um payload de teste compatível com o webhook Evolution
+- [ ] Documentar a requisição Bearer, a deduplicação e os resultados esperados no painel
+
+## Teste CTWA por outro anúncio ativo — sem alteração no projeto
+
+- [x] Confirmar a compatibilidade do número de destino e a presença de `ctwa_clid` no teste
+- [x] Documentar o procedimento e os limites atuais de validação
+
+## Evolução Evolution — evidências de origem e auditoria
+
+- [x] Preservar uma versão segura e limitada do payload de origem de cada evento Evolution
+- [x] Extrair `ctwa_clid`, referência Meta, UTM, `gclid` e demais sinais de atribuição disponíveis
+- [x] Criar status de evidência de origem, sem inferir Meta ou Google Ads quando não houver tag verificável
+- [x] Criar abas isoladas para eventos brutos seguros, origem e auditoria de leads
+- [x] Cobrir payloads Meta, Google Ads, ausência de sinal e autorização administrativa em testes
+- [x] Validar TypeScript, testes, build e abas administrativas no navegador
+- [ ] Salvar checkpoint da evolução de origem do módulo Evolution

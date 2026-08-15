@@ -18,6 +18,11 @@ export type EvolutionLead = {
   messagesSent: number;
   classifiedByEmail: string | null;
   classifiedAt: string | null;
+  originPlatform: string;
+  originEvidence: string;
+  metaCtwaClid: string | null;
+  googleClickId: string | null;
+  originDetectedAt: string | null;
 };
 
 export type EvolutionEvent = {
@@ -29,6 +34,13 @@ export type EvolutionEvent = {
   messagePreview: string | null;
   occurredAt: string | null;
   receivedAt: string;
+  originPlatform: string;
+  originEvidence: string;
+  metaCtwaClid: string | null;
+  metaSourceId: string | null;
+  metaSourceType: string | null;
+  googleClickId: string | null;
+  attributionPayload: Record<string, string> | null;
 };
 
 export type EvolutionInstance = {
@@ -60,6 +72,26 @@ function toDateTime(value: Date | null): Date {
   return value ?? new Date();
 }
 
+function parseAttributionPayload(value: unknown): Record<string, string> | null {
+  if (!value) return null;
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return Object.fromEntries(Object.entries(parsed as Record<string, unknown>)
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeOriginPlatform(value: unknown): string {
+  return value === "meta" || value === "google_ads" || value === "mixed" ? value : "unknown";
+}
+
+function normalizeOriginEvidence(value: unknown): string {
+  return value === "verified" || value === "observed" ? value : "none";
+}
+
 function asLead(row: RowDataPacket): EvolutionLead {
   return {
     id: Number(row.id), instanceName: row.instance_name, phoneLast4: row.phone_last4,
@@ -68,6 +100,9 @@ function asLead(row: RowDataPacket): EvolutionLead {
     firstContactAt: toIso(row.first_contact_at)!, lastMessageAt: toIso(row.last_message_at)!,
     messagesReceived: Number(row.messages_received), messagesSent: Number(row.messages_sent),
     classifiedByEmail: row.classified_by_email, classifiedAt: toIso(row.classified_at),
+    originPlatform: normalizeOriginPlatform(row.origin_platform), originEvidence: normalizeOriginEvidence(row.origin_evidence),
+    metaCtwaClid: row.meta_ctwa_clid, googleClickId: row.google_click_id,
+    originDetectedAt: toIso(row.origin_detected_at),
   };
 }
 
@@ -76,6 +111,10 @@ function asEvent(row: RowDataPacket): EvolutionEvent {
     id: Number(row.id), instanceName: row.instance_name, eventType: row.event_type,
     direction: row.direction, messageType: row.message_type, messagePreview: row.message_preview,
     occurredAt: toIso(row.occurred_at), receivedAt: toIso(row.received_at)!,
+    originPlatform: normalizeOriginPlatform(row.origin_platform), originEvidence: normalizeOriginEvidence(row.origin_evidence),
+    metaCtwaClid: row.meta_ctwa_clid, metaSourceId: row.meta_source_id,
+    metaSourceType: row.meta_source_type, googleClickId: row.google_click_id,
+    attributionPayload: parseAttributionPayload(row.attribution_payload_json),
   };
 }
 
@@ -85,10 +124,13 @@ export async function recordEvolutionEventSql(event: NormalizedEvolutionEvent): 
   const [insertResult] = await db.execute<ResultSetHeader>(
     `INSERT IGNORE INTO evolution_events (
       event_fingerprint, instance_name, event_type, message_id, remote_jid, direction,
-      message_type, message_preview, occurred_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      message_type, message_preview, origin_platform, origin_evidence, meta_ctwa_clid,
+      meta_source_id, meta_source_type, google_click_id, attribution_payload_json, occurred_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [event.fingerprint, event.instanceName, event.eventType, event.messageId, event.remoteJid,
-      event.direction, event.messageType, event.messagePreview, occurredAt],
+      event.direction, event.messageType, event.messagePreview, event.origin.platform, event.origin.evidence,
+      event.origin.metaCtwaClid, event.origin.metaSourceId, event.origin.metaSourceType, event.origin.googleClickId,
+      event.origin.payload ? JSON.stringify(event.origin.payload) : null, occurredAt],
   );
   if (insertResult.affectedRows === 0) return { duplicate: true };
 
@@ -110,17 +152,24 @@ export async function recordEvolutionEventSql(event: NormalizedEvolutionEvent): 
     await db.execute(
       `INSERT INTO evolution_leads (
         instance_name, contact_key, phone_last4, contact_name, first_contact_at, last_message_at,
-        messages_received, messages_sent, last_event_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        messages_received, messages_sent, last_event_id, origin_platform, origin_evidence,
+        meta_ctwa_clid, google_click_id, origin_detected_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         phone_last4 = COALESCE(VALUES(phone_last4), phone_last4),
         contact_name = COALESCE(VALUES(contact_name), contact_name),
         last_message_at = GREATEST(last_message_at, VALUES(last_message_at)),
         messages_received = messages_received + VALUES(messages_received),
         messages_sent = messages_sent + VALUES(messages_sent),
-        last_event_id = VALUES(last_event_id)`,
+        last_event_id = VALUES(last_event_id),
+        origin_platform = IF(VALUES(origin_evidence) = 'none', origin_platform, VALUES(origin_platform)),
+        origin_evidence = IF(VALUES(origin_evidence) = 'none', origin_evidence, VALUES(origin_evidence)),
+        meta_ctwa_clid = COALESCE(VALUES(meta_ctwa_clid), meta_ctwa_clid),
+        google_click_id = COALESCE(VALUES(google_click_id), google_click_id),
+        origin_detected_at = IF(VALUES(origin_evidence) = 'none', origin_detected_at, COALESCE(origin_detected_at, VALUES(origin_detected_at)))`,
       [event.instanceName, event.contactKey, event.phoneLast4, event.contactName, occurredAt, occurredAt,
-        receivedIncrement, sentIncrement, insertResult.insertId],
+        receivedIncrement, sentIncrement, insertResult.insertId, event.origin.platform, event.origin.evidence,
+        event.origin.metaCtwaClid, event.origin.googleClickId, event.origin.evidence === "none" ? null : occurredAt],
     );
   }
   return { duplicate: false };
@@ -139,7 +188,8 @@ export async function listEvolutionInstancesSql(): Promise<EvolutionInstance[]> 
 export async function listEvolutionEventsSql(limit = 40): Promise<EvolutionEvent[]> {
   const safeLimit = Math.max(1, Math.min(100, limit));
   const [rows] = await getPool().query<RowDataPacket[]>(
-    `SELECT id, instance_name, event_type, direction, message_type, message_preview, occurred_at, received_at
+    `SELECT id, instance_name, event_type, direction, message_type, message_preview, origin_platform, origin_evidence,
+      meta_ctwa_clid, meta_source_id, meta_source_type, google_click_id, attribution_payload_json, occurred_at, received_at
      FROM evolution_events ORDER BY received_at DESC LIMIT ${safeLimit}`,
   );
   return rows.map(asEvent);
@@ -148,7 +198,8 @@ export async function listEvolutionEventsSql(limit = 40): Promise<EvolutionEvent
 export async function listEvolutionLeadsSql(): Promise<EvolutionLead[]> {
   const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, instance_name, phone_last4, contact_name, classification, funnel_stage, classification_note,
-      first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at
+      first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at,
+      origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at
      FROM evolution_leads ORDER BY last_message_at DESC LIMIT 200`,
   );
   return rows.map(asLead);
@@ -185,7 +236,8 @@ export async function updateEvolutionLeadSql(
   );
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT id, instance_name, phone_last4, contact_name, classification, funnel_stage, classification_note,
-      first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at
+      first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at,
+      origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at
      FROM evolution_leads WHERE id = ? LIMIT 1`,
     [id],
   );

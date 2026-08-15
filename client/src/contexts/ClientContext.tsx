@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { DASHBOARD_AUTHENTICATED_EVENT } from "@/lib/dashboardAuthSignal";
+import {
+  consumeDashboardPostLoginRefresh,
+  DASHBOARD_AUTHENTICATED_EVENT,
+} from "@/lib/dashboardAuthSignal";
 
 export type Client = {
   id: string;
@@ -80,10 +83,17 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    void fetchClients();
+    const postLoginRefreshPending = consumeDashboardPostLoginRefresh();
+    const delayedPostLoginRefetch = postLoginRefreshPending
+      ? window.setTimeout(() => { void fetchClients(); }, 400)
+      : undefined;
+    if (!postLoginRefreshPending) void fetchClients();
     const refetchAfterLogin = () => { void fetchClients(); };
     window.addEventListener(DASHBOARD_AUTHENTICATED_EVENT, refetchAfterLogin);
-    return () => window.removeEventListener(DASHBOARD_AUTHENTICATED_EVENT, refetchAfterLogin);
+    return () => {
+      if (delayedPostLoginRefetch) window.clearTimeout(delayedPostLoginRefetch);
+      window.removeEventListener(DASHBOARD_AUTHENTICATED_EVENT, refetchAfterLogin);
+    };
   }, []);
 
   useEffect(() => {

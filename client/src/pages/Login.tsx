@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { notifyDashboardAuthenticated } from "@/lib/dashboardAuthSignal";
+import { markDashboardPostLoginRefresh } from "@/lib/dashboardAuthSignal";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -37,7 +37,7 @@ export default function Login() {
       }
       localStorage.setItem("tp_token", data.token);
       localStorage.setItem("tp_user", JSON.stringify(data.user));
-      notifyDashboardAuthenticated();
+      markDashboardPostLoginRefresh();
       navigate("/dashboard");
     } catch {
       setError("Erro de conexão. Tente novamente.");

@@ -459,9 +459,17 @@
 
 ## Incidente de segurança — segredos no Git
 
-- [ ] Auditar arquivos rastreados, incluindo a configuração do projeto, sem revelar valores de segredos
-- [ ] Remover qualquer valor sensível presente em arquivos versionados e manter somente referências a variáveis de ambiente
-- [ ] Adicionar proteção automatizada contra chaves e credenciais antes de novos commits
-- [ ] Verificar o histórico Git e listar as credenciais que exigem rotação
-- [ ] Validar a higienização e salvar checkpoint de segurança
+- [x] Auditar arquivos rastreados, incluindo a configuração do projeto, sem revelar valores de segredos
+- [x] Remover qualquer valor sensível presente em arquivos versionados e manter somente referências a variáveis de ambiente
+- [x] Adicionar proteção automatizada contra chaves e credenciais antes de novos commits
+- [x] Verificar o histórico Git e listar as credenciais que exigem rotação
+- [x] Validar a higienização e salvar checkpoint de segurança
 - [x] Pausar a automação diária de IA até a disponibilização de uma nova chave após a higienização
+
+## Incidente de segurança — branch ajustes-dashboard
+
+- [x] Reescrever o histórico de ajustes-dashboard removendo a configuração sensível e referências de credenciais
+- [x] Forçar a atualização segura da branch remota ajustes-dashboard no GitHub
+- [x] Verificar que nenhuma branch remota alcançável contém os padrões de credencial identificados
+- [x] Documentar a rotação obrigatória da senha TiDB e da senha administrativa legada
+- [x] Validar a contenção final e salvar checkpoint de segurança

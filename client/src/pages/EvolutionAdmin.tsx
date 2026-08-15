@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Activity, ArrowLeft, BadgeCheck, Bot, CheckCircle2, ChevronRight, CircleAlert, Clock3, Database, FileJson, MessageCircleMore, MousePointerClick, RefreshCw, ShieldCheck, Signal, Tag, UsersRound, Webhook } from "lucide-react";
+import { Activity, ArrowLeft, BadgeCheck, Bot, CheckCircle2, ChevronRight, CircleAlert, Clock3, Database, FileJson, MessageCircleMore, MousePointerClick, Phone, RefreshCw, ShieldCheck, Signal, Tag, UsersRound, Webhook, X } from "lucide-react";
 import { canAccessEvolutionPanel } from "@/lib/evolutionAdminPolicy";
 import { scopeEvolutionData } from "@/lib/evolutionScope";
 
@@ -9,15 +9,27 @@ type Instance = { instanceName: string; displayName: string | null; unitName: st
 type OriginPlatform = "meta" | "google_ads" | "mixed" | "unknown";
 type OriginEvidence = "verified" | "observed" | "none";
 type EventItem = { id: string; instanceName: string; eventType: string; direction: string; messageType: string | null; messagePreview: string | null; occurredAt: string | null; receivedAt: string; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; metaSourceId: string | null; metaSourceType: string | null; googleClickId: string | null; attributionPayload: Record<string, string> | null };
-type Lead = { id: string; instanceName: string; phoneLast4: string | null; contactName: string | null; classification: "pendente" | "lead" | "nao_lead"; funnelStage: "novo" | "qualificado" | "negociacao" | "perdido" | "fechado"; classificationNote: string | null; firstContactAt: string; lastMessageAt: string; messagesReceived: number; messagesSent: number; classifiedByEmail: string | null; classifiedAt: string | null; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; googleClickId: string | null; originDetectedAt: string | null };
+type CrmStage = "lead_not_responded" | "lead_responded" | "follow_up" | "lead_replied" | "negotiation" | "closed_won" | "closed_lost";
+type Lead = { id: string; instanceName: string; contactKey: string; contactPhone: string | null; phoneLast4: string | null; contactName: string | null; classification: "pendente" | "lead" | "nao_lead"; funnelStage: "novo" | "qualificado" | "negociacao" | "perdido" | "fechado"; classificationNote: string | null; firstContactAt: string; lastMessageAt: string; messagesReceived: number; messagesSent: number; classifiedByEmail: string | null; classifiedAt: string | null; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; googleClickId: string | null; originDetectedAt: string | null; crmStage: CrmStage; crmStageUpdatedAt: string | null; crmStageUpdatedBy: string | null };
 type Overview = { summary: Summary; instances: Instance[]; events: EventItem[]; leads: Lead[] };
 type MetaAttribution = { leadId: string; sourceEventId: string | null; clientId: string | null; accountId: string | null; campaignId: string | null; campaignName: string | null; adsetId: string | null; adsetName: string | null; adId: string | null; adName: string | null; creativeId: string | null; creativeName: string | null; matchedBy: string; matchStatus: "matched" | "unresolved"; matchedAt: string };
 type ConversationMessage = { id: string; leadId: string; instanceName: string; direction: "incoming" | "outgoing"; messageType: string | null; bodyText: string; sentAt: string };
-type View = "operacao" | "origem" | "auditoria" | "atribuicao" | "conversas";
+type CrmHistory = { id: string; leadId: string; instanceName: string; fromStage: CrmStage | null; toStage: CrmStage; changedBy: string | null; changedAt: string; note: string | null };
+type View = "operacao" | "crm" | "origem" | "auditoria" | "atribuicao" | "conversas";
 
 const stages: Array<{ value: Lead["funnelStage"]; label: string }> = [
   { value: "novo", label: "Novo" }, { value: "qualificado", label: "Qualificado" },
   { value: "negociacao", label: "Negociação" }, { value: "perdido", label: "Perdido" }, { value: "fechado", label: "Fechado" },
+];
+
+const crmStages: Array<{ value: CrmStage; label: string; color: string }> = [
+  { value: "lead_not_responded", label: "Lead não respondido", color: "border-zinc-500/25 bg-zinc-400/[.06]" },
+  { value: "lead_responded", label: "Lead respondido", color: "border-sky-400/25 bg-sky-400/[.07]" },
+  { value: "follow_up", label: "Follow up", color: "border-amber-400/25 bg-amber-400/[.07]" },
+  { value: "lead_replied", label: "Lead respondeu", color: "border-violet-400/25 bg-violet-400/[.07]" },
+  { value: "negotiation", label: "Negociação", color: "border-indigo-400/25 bg-indigo-400/[.07]" },
+  { value: "closed_won", label: "Lead fechou", color: "border-emerald-400/25 bg-emerald-400/[.07]" },
+  { value: "closed_lost", label: "Lead perdido", color: "border-rose-400/25 bg-rose-400/[.07]" },
 ];
 
 const emptyOverview: Overview = {
@@ -27,6 +39,11 @@ const emptyOverview: Overview = {
 function formatDate(value: string | null): string {
   if (!value) return "—";
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+function formatAdminPhone(lead: Pick<Lead, "contactPhone" | "phoneLast4">): string {
+  const digits = lead.contactPhone?.replace(/\D/g, "") ?? "";
+  return digits ? `+${digits}` : lead.phoneLast4 ? `•••• ${lead.phoneLast4}` : "Número não disponível";
 }
 
 async function readEvolutionJson<T extends { error?: string }>(response: Response, fallback: string): Promise<T> {
@@ -74,6 +91,9 @@ export default function EvolutionAdmin() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [conversationLoading, setConversationLoading] = useState(false);
+  const [crmHistory, setCrmHistory] = useState<CrmHistory[]>([]);
+  const [crmDetailLeadId, setCrmDetailLeadId] = useState<string | null>(null);
+  const [movingCrmLead, setMovingCrmLead] = useState<string | null>(null);
   const [unitScope, setUnitScope] = useState("all");
   const [instanceScope, setInstanceScope] = useState("all");
   const [savingInstance, setSavingInstance] = useState<string | null>(null);
@@ -107,6 +127,7 @@ export default function EvolutionAdmin() {
 
   const originEvents = useMemo(() => scopedEvents.filter((event) => event.originEvidence !== "none"), [scopedEvents]);
   const selectedLead = useMemo(() => scopedLeads.find((lead) => lead.id === selectedLeadId) ?? scopedLeads[0] ?? null, [scopedLeads, selectedLeadId]);
+  const crmDetailLead = useMemo(() => scopedLeads.find((lead) => lead.id === crmDetailLeadId) ?? null, [crmDetailLeadId, scopedLeads]);
   const attributionByLead = useMemo(() => new Map(attributions.map((item) => [item.leadId, item])), [attributions]);
 
   const loadOverview = useCallback(async (background = false) => {
@@ -149,6 +170,15 @@ export default function EvolutionAdmin() {
       setConversation(data.rows ?? []);
     } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar conversa"); }
     finally { setConversationLoading(false); }
+  }, [requestHeaders]);
+
+  const loadCrmHistory = useCallback(async (leadId: string) => {
+    try {
+      const response = await fetch(`/api/evolution/leads/${leadId}/crm-history`, { headers: requestHeaders() });
+      const data = await readEvolutionJson<{ rows?: CrmHistory[]; error?: string }>(response, "Não foi possível carregar histórico CRM");
+      if (!response.ok) throw new Error(data.error ?? "Não foi possível carregar histórico CRM");
+      setCrmHistory(data.rows ?? []);
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar histórico CRM"); }
   }, [requestHeaders]);
 
   useEffect(() => {
@@ -198,6 +228,26 @@ export default function EvolutionAdmin() {
     finally { setSavingInstance(null); }
   }
 
+  async function moveCrmLead(lead: Lead, stage: CrmStage) {
+    if (lead.crmStage === stage) return;
+    setMovingCrmLead(lead.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/evolution/leads/${lead.id}/crm-stage`, { method: "PUT", headers: requestHeaders(), body: JSON.stringify({ instanceName: lead.instanceName, stage }) });
+      const data = await readEvolutionJson<{ crmStage?: CrmStage; crmStageUpdatedAt?: string; error?: string }>(response, "Não foi possível mover o lead no CRM");
+      if (!response.ok || !data.crmStage) throw new Error(data.error ?? "Não foi possível mover o lead no CRM");
+      setRawOverview((current) => ({ ...current, leads: current.leads.map((item) => item.id === lead.id ? { ...item, crmStage: data.crmStage!, crmStageUpdatedAt: data.crmStageUpdatedAt ?? item.crmStageUpdatedAt } : item) }));
+      if (crmDetailLeadId === lead.id) await loadCrmHistory(lead.id);
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível mover o lead no CRM"); }
+    finally { setMovingCrmLead(null); }
+  }
+
+  async function openCrmDetail(lead: Lead) {
+    setCrmDetailLeadId(lead.id);
+    setSelectedLeadId(lead.id);
+    await Promise.all([loadConversation(lead.id), loadCrmHistory(lead.id)]);
+  }
+
   const metrics = [
     { label: "Eventos hoje", value: scopedSummary.eventsToday, icon: Activity, color: "text-cyan-300", bg: "bg-cyan-400/10" },
     { label: "Contatos rastreados", value: scopedSummary.totalLeads, icon: UsersRound, color: "text-indigo-300", bg: "bg-indigo-400/10" },
@@ -236,8 +286,14 @@ export default function EvolutionAdmin() {
         </section>
 
         <nav aria-label="Áreas do Evolution Monitor" className="mb-8 flex flex-wrap gap-2 border-b border-white/8 pb-4">
-          {([ ["operacao", "Operação", Activity], ["atribuicao", "Atribuição Meta", MousePointerClick], ["conversas", "Conversas", MessageCircleMore], ["origem", "Origem & tags", Tag], ["auditoria", "Auditoria", FileJson] ] as const).map(([id, label, Icon]) => <button key={id} onClick={() => setView(id)} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs transition ${view === id ? "bg-cyan-300 text-[#082124] font-medium" : "border border-white/10 bg-white/[.025] text-zinc-400 hover:bg-white/[.06] hover:text-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
+          {([ ["operacao", "Operação", Activity], ["crm", "CRM", UsersRound], ["atribuicao", "Atribuição Meta", MousePointerClick], ["conversas", "Conversas", MessageCircleMore], ["origem", "Origem & tags", Tag], ["auditoria", "Auditoria", FileJson] ] as const).map(([id, label, Icon]) => <button key={id} onClick={() => setView(id)} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs transition ${view === id ? "bg-cyan-300 text-[#082124] font-medium" : "border border-white/10 bg-white/[.025] text-zinc-400 hover:bg-white/[.06] hover:text-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
         </nav>
+
+        {view === "crm" && <section className="space-y-5">
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[.025] p-6 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">CRM por instância</p><h2 className="mt-1 font-['Space_Grotesk'] text-2xl font-light text-white">Pipeline comercial</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Arraste um contato entre as etapas. A movimentação fica registrada no Supabase Evolution e nunca mistura contatos de instâncias fora do filtro atual.</p></div><div className="rounded-xl border border-cyan-300/15 bg-cyan-400/5 px-4 py-3 text-xs text-cyan-100"><strong className="font-medium">{scopedLeads.length}</strong> contato(s) no escopo atual</div></div>
+          <div className="grid gap-4 overflow-x-auto pb-2 xl:grid-cols-7">{crmStages.map((stage) => { const leads = scopedLeads.filter((lead) => lead.crmStage === stage.value); return <article key={stage.value} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("application/evolution-lead"); const lead = scopedLeads.find((item) => item.id === id); if (lead) void moveCrmLead(lead, stage.value); }} className={`min-h-[340px] min-w-[245px] rounded-2xl border p-3 ${stage.color}`}><div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-medium text-zinc-100">{stage.label}</h3><span className="rounded-full border border-white/10 bg-black/15 px-2 py-0.5 text-[10px] text-zinc-400">{leads.length}</span></div><div className="space-y-2">{leads.length === 0 ? <p className="rounded-xl border border-dashed border-white/10 px-3 py-6 text-center text-xs text-zinc-600">Arraste contatos para cá</p> : leads.map((lead) => { const attr = attributionByLead.get(lead.id); return <button draggable key={lead.id} onDragStart={(event) => event.dataTransfer.setData("application/evolution-lead", lead.id)} onClick={() => void openCrmDetail(lead)} className="w-full cursor-grab rounded-xl border border-white/10 bg-[#101214]/95 p-3 text-left shadow-lg shadow-black/10 transition hover:border-cyan-300/40 hover:bg-[#14181a] active:cursor-grabbing"><p className="truncate text-sm text-zinc-100">{lead.contactName || "Contato sem nome"}</p><p className="mt-1 flex items-center gap-1 text-[11px] text-zinc-500"><Phone className="h-3 w-3" />{formatAdminPhone(lead)}</p><p className="mt-2 text-[10px] text-zinc-600">{lead.instanceName} · {lead.messagesReceived} recebidas / {lead.messagesSent} enviadas</p>{attr?.campaignName ? <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-cyan-200">{attr.campaignName}</p> : <p className="mt-2 text-[10px] text-zinc-600">{originLabel(lead.originPlatform)}</p>}{movingCrmLead === lead.id && <p className="mt-2 text-[10px] text-cyan-300">Movendo…</p>}</button>; })}</div></article>; })}</div>
+          {crmDetailLead && <aside className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Detalhes do lead"><div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-white/10 bg-[#101214] shadow-2xl shadow-black/60"><header className="flex items-start justify-between gap-4 border-b border-white/8 p-6"><div><p className="text-xs uppercase tracking-[.18em] text-cyan-300">Detalhe do contato</p><h3 className="mt-1 font-['Space_Grotesk'] text-2xl font-light text-white">{crmDetailLead.contactName || "Contato sem nome"}</h3><p className="mt-2 text-sm text-zinc-400">{formatAdminPhone(crmDetailLead)} · {crmDetailLead.instanceName}</p></div><button onClick={() => setCrmDetailLeadId(null)} className="rounded-xl border border-white/10 p-2 text-zinc-400 hover:bg-white/[.06] hover:text-white" aria-label="Fechar detalhes"><X className="h-4 w-4" /></button></header><div className="grid gap-6 p-6 lg:grid-cols-[1fr_1.2fr]"><div className="space-y-5"><section className="rounded-xl border border-white/8 bg-black/15 p-4"><p className="text-[10px] uppercase tracking-[.16em] text-zinc-600">Origem e atribuição</p><div className="mt-3"><OriginPill platform={crmDetailLead.originPlatform} evidence={crmDetailLead.originEvidence} /></div><dl className="mt-4 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-zinc-600">Campanha</dt><dd className="text-right text-zinc-200">{attributionByLead.get(crmDetailLead.id)?.campaignName || "Não identificada"}</dd></div><div className="flex justify-between gap-3"><dt className="text-zinc-600">Conjunto</dt><dd className="text-right text-zinc-200">{attributionByLead.get(crmDetailLead.id)?.adsetName || "—"}</dd></div><div className="flex justify-between gap-3"><dt className="text-zinc-600">Criativo</dt><dd className="text-right text-zinc-200">{attributionByLead.get(crmDetailLead.id)?.creativeName || attributionByLead.get(crmDetailLead.id)?.adName || "—"}</dd></div></dl></section><section className="rounded-xl border border-white/8 bg-black/15 p-4"><p className="text-[10px] uppercase tracking-[.16em] text-zinc-600">Histórico comercial</p><div className="mt-3 space-y-3">{crmHistory.length === 0 ? <p className="text-xs text-zinc-600">Nenhuma movimentação registrada ainda.</p> : crmHistory.map((item) => <div key={item.id} className="border-l border-cyan-300/30 pl-3 text-xs"><p className="text-zinc-300">{crmStages.find((stage) => stage.value === item.fromStage)?.label || "Entrada"} <ChevronRight className="inline h-3 w-3 text-zinc-600" /> {crmStages.find((stage) => stage.value === item.toStage)?.label}</p><p className="mt-1 text-zinc-600">{formatDate(item.changedAt)} · {item.changedBy || "Sistema"}</p></div>)}</div></section></div><section className="rounded-xl border border-white/8 bg-black/15 p-4"><p className="text-[10px] uppercase tracking-[.16em] text-zinc-600">Mensagens</p><div className="mt-3 max-h-[420px] space-y-3 overflow-y-auto pr-1">{conversationLoading ? <RefreshCw className="mx-auto my-10 h-5 w-5 animate-spin text-zinc-500" /> : conversation.length === 0 ? <p className="py-10 text-center text-xs text-zinc-600">Não há mensagens textuais registradas.</p> : conversation.map((message) => <div key={message.id} className={`flex ${message.direction === "outgoing" ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm ${message.direction === "outgoing" ? "bg-cyan-300 text-[#082124]" : "bg-white/[.07] text-zinc-200"}`}><p className="whitespace-pre-wrap break-words">{message.bodyText}</p><p className={`mt-1 text-[10px] ${message.direction === "outgoing" ? "text-[#164044]" : "text-zinc-600"}`}>{message.direction === "outgoing" ? "Enviada pela unidade" : "Recebida do contato"} · {formatDate(message.sentAt)}</p></div></div>)}</div></section></div></div></aside>}
+        </section>}
 
         {view === "operacao" && <section className="mb-8 rounded-2xl border border-white/8 bg-white/[.025] p-6">
           <div className="mb-6 flex items-end justify-between gap-4"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Organização operacional</p><h2 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">Instâncias por unidade</h2><p className="mt-2 text-sm leading-6 text-zinc-500">Cadastre um nome de operação e a unidade responsável por cada WhatsApp. Cada nova instância que enviar eventos ao mesmo webhook aparecerá aqui.</p></div><Database className="h-5 w-5 text-zinc-600" /></div>

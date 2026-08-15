@@ -420,4 +420,15 @@
 
 - [x] Atualizar README com arquitetura, autenticação Supabase, fontes de dados e rotas
 - [x] Documentar o módulo Evolution isolado, Supabase dedicado, webhook e operação multi-instância
-- [ ] Validar e salvar checkpoint da documentação atualizada
+- [x] Validar e salvar checkpoint da documentação atualizada
+
+## CRM Evolution por instância
+
+- [x] Criar as etapas do funil: não respondido, respondido, follow-up, respondeu, negociação e fechado
+- [x] Persistir a etapa, histórico de movimentação e responsável no Supabase Evolution
+- [x] Armazenar e exibir o número completo somente no CRM administrativo, recuperando eventos históricos quando disponível
+- [x] Criar endpoints administrativos de consulta e mudança de etapa por instância
+- [x] Criar a aba CRM com pipeline drag-and-drop filtrado pela instância selecionada
+- [x] Exibir detalhe do contato com telefone, mensagens, origem, campanha, conjunto e criativo disponíveis
+- [x] Cobrir movimentação, persistência e isolamento entre instâncias em testes
+- [x] Validar no navegador e salvar checkpoint do CRM Evolution

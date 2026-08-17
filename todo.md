@@ -657,6 +657,12 @@
 - [ ] Abrir o compositor com a data do dia selecionado já preenchida
 - [ ] Cobrir o preenchimento de data e validar a interação antes do checkpoint
 
+## Correção de sessão na exclusão
+
+- [ ] Diagnosticar a autenticação enviada ao excluir um agendamento
+- [ ] Corrigir a gestão de sessão da Central sem alterar itens publicados
+- [ ] Cobrir a exclusão autenticada e publicar a correção
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

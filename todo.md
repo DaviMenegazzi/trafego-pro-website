@@ -481,3 +481,17 @@
 - [x] Exibir no cadastro de instâncias somente as unidades permitidas ao utilizador atual
 - [x] Cobrir a autorização de associação em testes e validar como administrador
 - [x] Salvar checkpoint da integração de unidades
+
+## Publicações sociais Meta
+
+- [ ] Confirmar a configuração OAuth e as permissões necessárias para Facebook e Instagram profissional
+- [x] Criar armazenamento isolado para contas conectadas, rascunhos, mídias, agendamentos e resultados de publicação
+- [x] Criar módulo administrativo de calendário editorial, rascunhos e estados de publicação
+- [x] Implementar conexão segura à Meta e seleção das páginas e perfis autorizados
+- [x] Implementar rotina agendada de publicação, tentativas controladas e histórico de falhas
+- [x] Cobrir autorização, calendário, agendamento e erros em testes
+- [ ] Validar o módulo e salvar checkpoint de publicação social
+- [x] Suportar publicação completa de feed, carrossel, vídeo e Reel no Facebook e Instagram profissional
+- [x] Preparar o roteiro para criação da aplicação Meta e configuração da URL de retorno
+- [ ] Criar a aplicação Meta, cadastrar as variáveis protegidas e validar uma publicação real por canal
+- [ ] Ativar o agendamento de publicação após conectar a primeira Página Meta

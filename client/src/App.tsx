@@ -18,6 +18,7 @@ import DashboardFeedbackLeads, { StandaloneFeedbackLeads } from "./pages/Dashboa
 import DashboardFeedbackLeadsList from "./pages/DashboardFeedbackLeadsList";
 import DashboardUsuarios from "./pages/DashboardUsuarios";
 import EvolutionAdmin from "./pages/EvolutionAdmin";
+import SocialPublishingAdmin from "./pages/SocialPublishingAdmin";
 
 function ExistingSiteRoutes() {
   return (
@@ -65,6 +66,8 @@ function App() {
           <Switch>
             <Route path={"/evolution"} component={EvolutionAdmin} />
             <Route path={"/evolution/"} component={EvolutionAdmin} />
+            <Route path={"/publicacoes"} component={SocialPublishingAdmin} />
+            <Route path={"/publicacoes/"} component={SocialPublishingAdmin} />
             <Route component={ExistingSiteWithClientProvider} />
           </Switch>
         </TooltipProvider>

@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import * as XLSX from "xlsx";
+import multer from "multer";
 import { getAuthedSupabase, getSupabase, getSupabaseForAccessToken, isSupabaseConfigured } from "./supabase.js";
 import { groupClientAccessByUser, uniqueGrantedClientIds } from "./clientAccess.js";
 import { validateMetricsClientSelection } from "./metricsAccess.js";
@@ -37,6 +38,8 @@ import { createSocialPostSql, getSocialOAuthSessionSql, getSocialPublishingSetti
 import { socialPostStatusForConnection, validateSocialPostDraft, type SocialPostDraftInput } from "./socialPublishingPolicy.js";
 import { isSocialBulkLocalId, validateSocialBulkBatch } from "./socialBulkPolicy.js";
 import { createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, exchangeMetaAuthorizationCode, getMetaOAuthConfig, isMetaOAuthConfigured, listMetaPageCandidates, runScheduledSocialPublishing, verifyMetaOAuthState } from "./socialMetaService.js";
+import { storagePut } from "./storage.js";
+import { validateSocialMediaUpload } from "./socialMediaUploadPolicy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -353,6 +356,7 @@ async function persistEvolutionMetaAttribution(event: NonNullable<ReturnType<typ
 export async function startServer({ listen = true }: { listen?: boolean } = {}) {
   const app = express();
   const server = createServer(app);
+  const socialMediaUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
 
   app.set("trust proxy", 1);
   app.use(express.json());
@@ -582,6 +586,18 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     } catch (error) {
       console.error("[social] Falha ao salvar conexão Meta:", error);
       res.status(503).json({ error: "Não foi possível salvar a conexão Meta" });
+    }
+  });
+
+  app.post("/api/social/media", requireAuth, requireSupabaseAdmin, (req, res, next) => socialMediaUpload.single("file")(req, res, (error) => error ? res.status(400).json({ error: "Envie um único arquivo de até 50 MB" }) : next()), async (req, res) => {
+    const validation = validateSocialMediaUpload(req.file);
+    if (typeof validation === "string") { res.status(400).json({ error: validation }); return; }
+    try {
+      const stored = await storagePut(`social-media/${req.claims!.id}/${crypto.randomUUID()}.${validation.extension}`, req.file!.buffer, req.file!.mimetype);
+      res.status(201).json({ url: `https://www.trafego.pro${stored.url}`, mediaType: validation.mediaType });
+    } catch (error) {
+      console.error("[social] Falha no upload de mídia:", error);
+      res.status(503).json({ error: "Não foi possível armazenar a mídia selecionada" });
     }
   });
 

@@ -566,3 +566,12 @@
 - [ ] Inspecionar logs de produção e a sessão temporária após a autorização concluída
 - [ ] Identificar o ponto de falha sem modificar o código do projeto
 - [ ] Apresentar o diagnóstico e aguardar autorização para correção
+
+## Upload local de mídia para publicações
+
+- [x] Criar endpoint administrativo protegido para enviar imagens e vídeos locais ao armazenamento seguro
+- [x] Validar tipo e tamanho de arquivo antes de persistir a mídia
+- [x] Substituir o campo obrigatório de URL pelo seletor de arquivo e manter URL opcional para fluxos externos
+- [x] Preencher automaticamente a fila mensal com a URL segura do arquivo enviado
+- [x] Cobrir upload, validação e autorização em testes sem publicar conteúdo
+- [ ] Validar a interface e salvar checkpoint do upload de mídia

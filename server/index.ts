@@ -35,6 +35,7 @@ import { isEvolutionAiAutomationRunning } from "../shared/evolutionAiPolicy.js";
 import { resolveAuthorizedEvolutionUnit } from "./evolutionUnitAssignment.js";
 import { createSocialPostSql, getSocialOAuthSessionSql, getSocialPublishingSettingsSql, listSocialMetaConnectionsSql, listSocialPostsSql, saveSocialOAuthSessionSql, updateSocialPublishingSettingsSql, upsertSocialMetaConnectionSql } from "./socialPublishingSql.js";
 import { socialPostStatusForConnection, validateSocialPostDraft, type SocialPostDraftInput } from "./socialPublishingPolicy.js";
+import { isSocialBulkLocalId, validateSocialBulkBatch } from "./socialBulkPolicy.js";
 import { createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, exchangeMetaAuthorizationCode, getMetaOAuthConfig, isMetaOAuthConfigured, listMetaPageCandidates, runScheduledSocialPublishing, verifyMetaOAuthState } from "./socialMetaService.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -584,8 +585,42 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     }
   });
 
+  app.post("/api/social/posts/batch", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    const body = req.body as { items?: Array<Partial<SocialPostDraftInput> & { localId?: string; unitId?: string; connectionId?: string | null }> };
+    const items = Array.isArray(body.items) ? body.items : [];
+    const batchError = validateSocialBulkBatch(items);
+    if (batchError) { res.status(400).json({ error: batchError }); return; }
+    try {
+      const sb = getSupabaseForRequest(req);
+      if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
+      const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
+      if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades autorizadas" }); return; }
+      const connections = await listSocialMetaConnectionsSql(req.claims!.id);
+      const results: Array<{ localId: string; postId?: string; error?: string }> = [];
+      for (const item of items) {
+        const localId = typeof item.localId === "string" ? item.localId : "";
+        if (!isSocialBulkLocalId(localId)) { results.push({ localId, error: "Identificador local inválido" }); continue; }
+        const draft: SocialPostDraftInput = { title: typeof item.title === "string" ? item.title : "", caption: typeof item.caption === "string" ? item.caption : "", linkUrl: typeof item.linkUrl === "string" ? item.linkUrl : undefined, contentFormat: item.contentFormat as SocialPostDraftInput["contentFormat"], targetFacebook: item.targetFacebook === true, targetInstagram: item.targetInstagram === true, scheduledFor: typeof item.scheduledFor === "string" ? item.scheduledFor : undefined, media: Array.isArray(item.media) ? item.media as SocialPostDraftInput["media"] : [] };
+        const validation = validateSocialPostDraft(draft);
+        if (validation) { results.push({ localId, error: validation }); continue; }
+        const unit = resolveAuthorizedEvolutionUnit(item.unitId, catalog.clients);
+        if (!unit) { results.push({ localId, error: "Unidade não autorizada" }); continue; }
+        const connection = item.connectionId ? connections.find((value) => value.id === item.connectionId && value.unitId === unit.id && value.connectionStatus === "active") ?? null : null;
+        if (item.connectionId && !connection) { results.push({ localId, error: "Conta Meta não ativa para esta unidade" }); continue; }
+        try {
+          const post = await createSocialPostSql({ ownerUserId: req.claims!.id, clientBatchKey: localId, unitId: unit.id, unitName: unit.name, socialConnectionId: connection?.id ?? null, title: draft.title.trim(), caption: draft.caption.trim(), linkUrl: draft.linkUrl?.trim() || null, contentFormat: draft.contentFormat, targetFacebook: draft.targetFacebook, targetInstagram: draft.targetInstagram, status: socialPostStatusForConnection(connection?.id ?? null, Boolean(draft.scheduledFor)), scheduledFor: draft.scheduledFor ?? null, media: draft.media });
+          results.push({ localId, postId: post.id });
+        } catch { results.push({ localId, error: "Não foi possível gravar esta publicação" }); }
+      }
+      res.status(results.some((item) => item.error) ? 207 : 201).json({ results });
+    } catch (error) {
+      console.error("[social] Falha ao inserir lote de publicações:", error);
+      res.status(503).json({ error: "Não foi possível processar a fila de publicações" });
+    }
+  });
+
   app.post("/api/social/posts", requireAuth, requireSupabaseAdmin, async (req, res) => {
-    const body = req.body as Partial<SocialPostDraftInput> & { unitId?: string; connectionId?: string | null };
+    const body = req.body as Partial<SocialPostDraftInput> & { unitId?: string; connectionId?: string | null; localId?: string };
     const draft: SocialPostDraftInput = {
       title: typeof body.title === "string" ? body.title : "", caption: typeof body.caption === "string" ? body.caption : "",
       linkUrl: typeof body.linkUrl === "string" ? body.linkUrl : undefined, contentFormat: body.contentFormat as SocialPostDraftInput["contentFormat"],
@@ -605,7 +640,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       const connection = body.connectionId ? connections.find((item) => item.id === body.connectionId && item.unitId === unit.id && item.connectionStatus === "active") ?? null : null;
       if (body.connectionId && !connection) { res.status(403).json({ error: "A conta Meta selecionada não está ativa para esta unidade" }); return; }
       const wantsSchedule = Boolean(draft.scheduledFor);
-      const post = await createSocialPostSql({ ownerUserId: req.claims!.id, unitId: unit.id, unitName: unit.name, socialConnectionId: connection?.id ?? null, title: draft.title.trim(), caption: draft.caption.trim(), linkUrl: draft.linkUrl?.trim() || null, contentFormat: draft.contentFormat, targetFacebook: draft.targetFacebook, targetInstagram: draft.targetInstagram, status: socialPostStatusForConnection(connection?.id ?? null, wantsSchedule), scheduledFor: draft.scheduledFor ?? null, media: draft.media });
+      const post = await createSocialPostSql({ ownerUserId: req.claims!.id, clientBatchKey: typeof body.localId === "string" && /^[0-9a-f-]{36}$/i.test(body.localId) ? body.localId : null, unitId: unit.id, unitName: unit.name, socialConnectionId: connection?.id ?? null, title: draft.title.trim(), caption: draft.caption.trim(), linkUrl: draft.linkUrl?.trim() || null, contentFormat: draft.contentFormat, targetFacebook: draft.targetFacebook, targetInstagram: draft.targetInstagram, status: socialPostStatusForConnection(connection?.id ?? null, wantsSchedule), scheduledFor: draft.scheduledFor ?? null, media: draft.media });
       res.status(201).json({ post });
     } catch (error) {
       console.error("[social] Falha ao criar publicação:", error);

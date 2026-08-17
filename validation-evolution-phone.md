@@ -38,3 +38,7 @@ Data da validação: 17 de agosto de 2026.
 - Com a sessão renovada, a Central de Publicações exibiu o estado de conexão Meta pendente, o calendário vazio e a ação de criação de conteúdo sem apresentar dados artificiais.
 - O compositor foi validado sem submissão: lista apenas unidades autorizadas, mantém a conta Meta opcional enquanto não conectada, oferece imagem, carrossel, vídeo e Reel, aceita URLs HTTPS de mídia, canais Facebook/Instagram e agendamento futuro.
 - Após o cadastro dos segredos, o módulo exibiu o estado “Aplicação Meta configurada” e habilitou a ação “Conectar Página Meta”, mantendo o processador inativo até a primeira conexão autorizada.
+- A Central de Publicações carregou o novo acesso “Planejar em massa” ao lado da criação individual, sem ativar o processador nem criar conteúdo de teste.
+- A tabela mensal abriu com as colunas de unidade, conta Meta, formato, canais, legenda, mídia HTTPS e data. Uma linha vazia foi adicionada apenas para testar o rascunho local, sem envio ao servidor ou publicação.
+- Após recarregar a Central de Publicações, o calendário voltou ao estado inicial sem criar conteúdo ou acionar publicação; a conferência da fila local continua restrita ao painel “Planejar em massa”.
+- Ao reabrir o painel após a recarga, a linha de teste permaneceu disponível, confirmando a persistência local. Ela foi removida em seguida, deixando a fila local vazia e sem qualquer peça enviada.

@@ -503,3 +503,13 @@
 - [ ] Validar a URL de autorização e concluir a associação de uma Página Meta a uma unidade autorizada
 - [ ] Validar uma publicação real controlada antes de ativar a rotina recorrente
 - [x] Manter a autorização Meta, a publicação real e a ativação do agendamento sob execução manual do utilizador
+
+## Planeamento mensal em massa de publicações
+
+- [x] Criar uma tabela de fila mensal por unidade com múltiplas peças editáveis
+- [x] Persistir rascunhos locais no navegador para sobreviver a recargas de página
+- [x] Validar em lote formato, canais, URLs HTTPS e datas futuras antes do envio
+- [x] Enviar peças aprovadas em lotes graduais para a agenda persistente sem duplicação
+- [x] Exibir o progresso, erros por linha e resultados de cada lote no calendário editorial
+- [x] Cobrir rascunho local, validações, idempotência e envio em massa com testes
+- [x] Validar visualmente e salvar checkpoint do planeador mensal

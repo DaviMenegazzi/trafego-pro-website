@@ -18,6 +18,7 @@ export type SocialMetaConnection = {
 
 export type SocialPost = {
   id: string;
+  clientBatchKey: string | null;
   unitId: string;
   unitName: string;
   socialConnectionId: string | null;
@@ -44,7 +45,7 @@ type ConnectionRow = RowDataPacket & {
   token_expires_at: Date | string | null; last_error_message: string | null; created_at: Date | string;
 };
 type PostRow = RowDataPacket & {
-  id: string; unit_id: string; unit_name: string; social_connection_id: string | null; title: string; caption: string;
+  id: string; client_batch_key: string | null; unit_id: string; unit_name: string; social_connection_id: string | null; title: string; caption: string;
   link_url: string | null; content_format: SocialContentFormat; target_facebook: number; target_instagram: number; status: string;
   scheduled_for: Date | string | null; published_at: Date | string | null; facebook_post_id: string | null; instagram_media_id: string | null; created_at: Date | string;
 };
@@ -73,7 +74,7 @@ function mapConnection(row: ConnectionRow): SocialMetaConnection {
 
 function mapPost(row: PostRow, media: MediaRow[]): SocialPost {
   return {
-    id: row.id, unitId: row.unit_id, unitName: row.unit_name, socialConnectionId: row.social_connection_id,
+    id: row.id, clientBatchKey: row.client_batch_key, unitId: row.unit_id, unitName: row.unit_name, socialConnectionId: row.social_connection_id,
     title: row.title, caption: row.caption, linkUrl: row.link_url, contentFormat: row.content_format,
     targetFacebook: Boolean(row.target_facebook), targetInstagram: Boolean(row.target_instagram), status: row.status,
     scheduledFor: toIso(row.scheduled_for), publishedAt: toIso(row.published_at), facebookPostId: row.facebook_post_id,
@@ -89,22 +90,38 @@ export async function listSocialMetaConnectionsSql(ownerUserId: string): Promise
 
 export async function listSocialPostsSql(ownerUserId: string): Promise<SocialPost[]> {
   const db = getPool();
-  const [posts] = await db.query<PostRow[]>(`SELECT id, unit_id, unit_name, social_connection_id, title, caption, link_url, content_format, target_facebook, target_instagram, status, scheduled_for, published_at, facebook_post_id, instagram_media_id, created_at FROM social_posts WHERE owner_user_id = ? ORDER BY COALESCE(scheduled_for, created_at) ASC LIMIT 200`, [ownerUserId]);
+  const [posts] = await db.query<PostRow[]>(`SELECT id, client_batch_key, unit_id, unit_name, social_connection_id, title, caption, link_url, content_format, target_facebook, target_instagram, status, scheduled_for, published_at, facebook_post_id, instagram_media_id, created_at FROM social_posts WHERE owner_user_id = ? ORDER BY COALESCE(scheduled_for, created_at) ASC LIMIT 200`, [ownerUserId]);
   if (!posts.length) return [];
   const [media] = await db.query<MediaRow[]>(`SELECT id, post_id, public_url, media_type, alt_text FROM social_post_media WHERE post_id IN (${posts.map(() => "?").join(",")}) ORDER BY sort_order`, posts.map((post) => post.id));
   return posts.map((post) => mapPost(post, media));
 }
 
+async function getSocialPostByIdSql(ownerUserId: string, id: string): Promise<SocialPost | null> {
+  const db = getPool();
+  const [posts] = await db.query<PostRow[]>(`SELECT id, client_batch_key, unit_id, unit_name, social_connection_id, title, caption, link_url, content_format, target_facebook, target_instagram, status, scheduled_for, published_at, facebook_post_id, instagram_media_id, created_at FROM social_posts WHERE owner_user_id = ? AND id = ? LIMIT 1`, [ownerUserId, id]);
+  const post = posts[0];
+  if (!post) return null;
+  const [media] = await db.query<MediaRow[]>("SELECT id, post_id, public_url, media_type, alt_text FROM social_post_media WHERE post_id = ? ORDER BY sort_order", [id]);
+  return mapPost(post, media);
+}
+
 export async function createSocialPostSql(input: {
-  ownerUserId: string; unitId: string; unitName: string; socialConnectionId: string | null; title: string; caption: string; linkUrl: string | null;
+  ownerUserId: string; clientBatchKey?: string | null; unitId: string; unitName: string; socialConnectionId: string | null; title: string; caption: string; linkUrl: string | null;
   contentFormat: SocialContentFormat; targetFacebook: boolean; targetInstagram: boolean; status: string; scheduledFor: string | null; media: SocialPostMediaInput[];
 }): Promise<SocialPost> {
+  if (input.clientBatchKey) {
+    const [existing] = await getPool().query<RowDataPacket[]>("SELECT id FROM social_posts WHERE owner_user_id = ? AND client_batch_key = ? LIMIT 1", [input.ownerUserId, input.clientBatchKey]);
+    if (existing[0]?.id) {
+      const post = await getSocialPostByIdSql(input.ownerUserId, existing[0].id as string);
+      if (post) return post;
+    }
+  }
   const id = crypto.randomUUID();
   const db = getPool();
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    await connection.execute<ResultSetHeader>(`INSERT INTO social_posts (id, owner_user_id, unit_id, unit_name, social_connection_id, title, caption, link_url, content_format, target_facebook, target_instagram, status, scheduled_for, created_by_user_id, updated_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, input.ownerUserId, input.unitId, input.unitName, input.socialConnectionId, input.title, input.caption, input.linkUrl, input.contentFormat, input.targetFacebook, input.targetInstagram, input.status, input.scheduledFor ? new Date(input.scheduledFor) : null, input.ownerUserId, input.ownerUserId]);
+    await connection.execute<ResultSetHeader>(`INSERT INTO social_posts (id, client_batch_key, owner_user_id, unit_id, unit_name, social_connection_id, title, caption, link_url, content_format, target_facebook, target_instagram, status, scheduled_for, created_by_user_id, updated_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, input.clientBatchKey ?? null, input.ownerUserId, input.unitId, input.unitName, input.socialConnectionId, input.title, input.caption, input.linkUrl, input.contentFormat, input.targetFacebook, input.targetInstagram, input.status, input.scheduledFor ? new Date(input.scheduledFor) : null, input.ownerUserId, input.ownerUserId]);
     for (let index = 0; index < input.media.length; index += 1) {
       const media = input.media[index]!;
       await connection.execute<ResultSetHeader>(`INSERT INTO social_post_media (id, post_id, sort_order, public_url, media_type, alt_text) VALUES (?, ?, ?, ?, ?, ?)`, [crypto.randomUUID(), id, index, media.url, media.mediaType, media.altText?.trim() || null]);

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS social_meta_connections (
 
 CREATE TABLE IF NOT EXISTS social_posts (
   id CHAR(36) NOT NULL PRIMARY KEY,
+  client_batch_key CHAR(36) NULL,
   owner_user_id VARCHAR(64) NOT NULL,
   unit_id CHAR(36) NOT NULL,
   unit_name VARCHAR(255) NOT NULL,
@@ -47,7 +48,8 @@ CREATE TABLE IF NOT EXISTS social_posts (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_social_posts_schedule (status, scheduled_for),
   KEY idx_social_posts_unit (unit_id, scheduled_for),
-  KEY idx_social_posts_connection (social_connection_id)
+  KEY idx_social_posts_connection (social_connection_id),
+  UNIQUE KEY uq_social_posts_owner_batch_key (owner_user_id, client_batch_key)
 );
 
 CREATE TABLE IF NOT EXISTS social_post_media (

@@ -615,6 +615,15 @@
 - [ ] Cobrir autorização, edição, exclusão e cancelamento em testes
 - [ ] Validar o calendário e salvar checkpoint da experiência de gestão
 
+## Calendário mensal como página inicial
+
+- [ ] Exibir uma grade mensal com dias da semana e posições vazias consistentes
+- [ ] Adicionar navegação entre meses e retorno ao mês atual
+- [ ] Posicionar cada agendamento no dia correto com estado e canais visíveis
+- [ ] Manter Nova publicação e Planejar em massa em painéis flutuantes independentes
+- [ ] Cobrir os cálculos de grade e navegação em testes
+- [ ] Validar visualmente e salvar checkpoint do calendário mensal
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

@@ -34,10 +34,10 @@ import { runDailyEvolutionAiAutomation } from "./evolutionAiAutomation.js";
 import { authenticateScheduledTask } from "./manusScheduleAuth.js";
 import { isEvolutionAiAutomationRunning } from "../shared/evolutionAiPolicy.js";
 import { resolveAuthorizedEvolutionUnit } from "./evolutionUnitAssignment.js";
-import { createSocialPostSql, getSocialOAuthSessionSql, getSocialPublishingSettingsSql, listSocialMetaConnectionsSql, listSocialPostsSql, saveSocialOAuthSessionSql, updateSocialPublishingSettingsSql, upsertSocialMetaConnectionSql } from "./socialPublishingSql.js";
+import { createSocialPostSql, getSocialOAuthSessionSql, getSocialPostForProcessingSql, getSocialPublishingSettingsSql, listSocialMetaConnectionsSql, listSocialPostsSql, saveSocialOAuthSessionSql, updateSocialPublishingSettingsSql, upsertSocialMetaConnectionSql } from "./socialPublishingSql.js";
 import { socialPostStatusForConnection, validateSocialPostDraft, type SocialPostDraftInput } from "./socialPublishingPolicy.js";
 import { isSocialBulkLocalId, validateSocialBulkBatch } from "./socialBulkPolicy.js";
-import { createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, exchangeMetaAuthorizationCode, getMetaOAuthConfig, isMetaOAuthConfigured, listMetaPageCandidates, runScheduledSocialPublishing, verifyMetaOAuthState } from "./socialMetaService.js";
+import { createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, exchangeMetaAuthorizationCode, getMetaOAuthConfig, isMetaOAuthConfigured, listMetaPageCandidates, runScheduledSocialPublishing, scheduleFacebookForPost, verifyMetaOAuthState } from "./socialMetaService.js";
 import { storagePut } from "./storage.js";
 import { validateSocialMediaUpload } from "./socialMediaUploadPolicy.js";
 
@@ -657,7 +657,11 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       if (body.connectionId && !connection) { res.status(403).json({ error: "A conta Meta selecionada não está ativa para esta unidade" }); return; }
       const wantsSchedule = Boolean(draft.scheduledFor);
       const post = await createSocialPostSql({ ownerUserId: req.claims!.id, clientBatchKey: typeof body.localId === "string" && /^[0-9a-f-]{36}$/i.test(body.localId) ? body.localId : null, unitId: unit.id, unitName: unit.name, socialConnectionId: connection?.id ?? null, title: draft.title.trim(), caption: draft.caption.trim(), linkUrl: draft.linkUrl?.trim() || null, contentFormat: draft.contentFormat, targetFacebook: draft.targetFacebook, targetInstagram: draft.targetInstagram, status: socialPostStatusForConnection(connection?.id ?? null, wantsSchedule), scheduledFor: draft.scheduledFor ?? null, media: draft.media });
-      res.status(201).json({ post });
+      if (post.targetFacebook && connection && wantsSchedule) {
+        const due = await getSocialPostForProcessingSql(post.id);
+        if (due) await scheduleFacebookForPost(due);
+      }
+      res.status(201).json({ post: (await listSocialPostsSql(req.claims!.id)).find((item) => item.id === post.id) ?? post });
     } catch (error) {
       console.error("[social] Falha ao criar publicação:", error);
       res.status(503).json({ error: "Não foi possível salvar a publicação" });

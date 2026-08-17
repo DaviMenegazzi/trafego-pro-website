@@ -575,3 +575,32 @@
 - [x] Preencher automaticamente a fila mensal com a URL segura do arquivo enviado
 - [x] Cobrir upload, validação e autorização em testes sem publicar conteúdo
 - [ ] Validar a interface e salvar checkpoint do upload de mídia
+
+## Diagnóstico de agendamento Meta não refletido
+
+- [ ] Inspecionar a publicação criada, a conexão Meta selecionada e seu estado persistido
+- [ ] Verificar se o processador de publicação está ativo e recebeu uma tarefa agendada
+- [ ] Identificar a diferença entre agendar internamente e programar diretamente na Meta
+- [ ] Apresentar o diagnóstico antes de alterar qualquer comportamento de publicação
+
+## Estratégia gradual por conta Meta
+
+- [ ] Confirmar as capacidades de agendamento nativo do Facebook e Instagram profissional
+- [ ] Definir limites, intervalos e tentativas por conta Meta para a fila de publicação
+- [ ] Criar uma flag auditável de automação por conexão e métricas de consumo da fila
+- [ ] Apresentar a estratégia antes de alterar o processamento de publicação
+
+## Verificação de agendamento nativo Meta
+
+- [ ] Confirmar se a API oferece agendamento nativo para Instagram profissional vinculado à Página
+- [ ] Confirmar se há agendamento conjunto nativo Facebook e Instagram pela mesma chamada
+- [ ] Apresentar o resultado documentado antes de alterar o módulo
+
+## Agendamento híbrido Facebook e Instagram
+
+- [ ] Agendar nativamente posts de Facebook com data futura dentro da janela suportada
+- [ ] Criar fila persistente de Instagram com execução idempotente no horário definido
+- [ ] Adicionar tentativas progressivas, pausa por erro e auditoria por conexão Meta
+- [ ] Registrar a rotina gerenciada de processamento sem depender do navegador
+- [ ] Cobrir os dois fluxos em testes sem publicar conteúdo real
+- [ ] Validar a estratégia híbrida e salvar checkpoint

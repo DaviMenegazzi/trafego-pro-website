@@ -1,5 +1,6 @@
 import crypto from "crypto";
-import { listDueSocialPostsSql, recordSocialPublicationAttemptSql, updateSocialPostPublicationSql, type DueSocialPost } from "./socialPublishingSql.js";
+import { listDueSocialPostsSql, markFacebookNativeScheduleSql, recordSocialPublicationAttemptSql, updateSocialPostPublicationSql, type DueSocialPost } from "./socialPublishingSql.js";
+import { canUseNativeFacebookSchedule } from "./socialHybridPolicy.js";
 
 const META_VERSION = "v26.0";
 const GRAPH_URL = `https://graph.facebook.com/${META_VERSION}`;
@@ -124,6 +125,30 @@ async function publishFacebook(post: DueSocialPost, token: string): Promise<stri
   uploadedPhotoIds.forEach((photoId, index) => { attachments[`attached_media[${index}]`] = JSON.stringify({ media_fbid: photoId }); });
   const carousel = await graphJson<{ id?: string }>(`${post.facebookPageId}/feed`, { message: post.caption, access_token: token, ...attachments });
   return carousel.id || "facebook-carousel-published";
+}
+
+export async function scheduleFacebookForPost(post: DueSocialPost): Promise<void> {
+  try {
+    if (!canUseNativeFacebookSchedule(post.scheduledFor, post.contentFormat)) throw new Error("Formato ou data fora da janela nativa do Facebook");
+    if (post.contentFormat !== "image" && post.contentFormat !== "carousel") throw new Error("Agendamento nativo disponível para imagem e carrossel do Facebook");
+    const token = decryptSocialSecret(post.accessTokenEncrypted);
+    const ids = await Promise.all(post.media.map(async (media) => {
+      if (media.mediaType !== "image") throw new Error("O agendamento nativo requer imagens");
+      const item = await graphJson<{ id?: string }>(`${post.facebookPageId}/photos`, { url: media.url, published: "false", access_token: token });
+      if (!item.id) throw new Error("Foto temporária não retornada pela Meta");
+      return item.id;
+    }));
+    const attachments: Record<string, string> = {};
+    ids.forEach((id, index) => { attachments[`attached_media[${index}]`] = JSON.stringify({ media_fbid: id }); });
+    const result = await graphJson<{ id?: string }>(`${post.facebookPageId}/feed`, { message: post.caption, published: "false", scheduled_publish_time: post.scheduledFor!, access_token: token, ...attachments });
+    if (!result.id) throw new Error("Agendamento nativo não retornou identificador");
+    await markFacebookNativeScheduleSql({ id: post.id, status: "scheduled", facebookPostId: result.id });
+    await recordSocialPublicationAttemptSql({ postId: post.id, channel: "facebook", action: "scheduled", providerPostId: result.id, safeMessage: "Agendamento nativo criado" });
+  } catch (error) {
+    const message = safeMessage(error);
+    await markFacebookNativeScheduleSql({ id: post.id, status: "failed", error: message });
+    await recordSocialPublicationAttemptSql({ postId: post.id, channel: "facebook", action: "failed", safeMessage: message });
+  }
 }
 
 async function createInstagramContainer(post: DueSocialPost, token: string): Promise<string> {

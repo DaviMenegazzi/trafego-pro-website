@@ -164,6 +164,18 @@ export async function upsertSocialMetaConnectionSql(input: { id: string; ownerUs
 
 export type DueSocialPost = SocialPost & { facebookPageId: string; instagramAccountId: string | null; accessTokenEncrypted: string };
 
+export async function getSocialPostForProcessingSql(id: string): Promise<DueSocialPost | null> {
+  const [rows] = await getPool().query<(PostRow & ConnectionRow & { access_token_encrypted: string })[]>(`SELECT p.id, p.client_batch_key, p.unit_id, p.unit_name, p.social_connection_id, p.title, p.caption, p.link_url, p.content_format, p.target_facebook, p.target_instagram, p.status, p.scheduled_for, p.published_at, p.facebook_post_id, p.instagram_media_id, p.created_at, c.facebook_page_id, c.instagram_account_id, c.access_token_encrypted FROM social_posts p JOIN social_meta_connections c ON c.id = p.social_connection_id WHERE p.id = ? LIMIT 1`, [id]);
+  const row = rows[0];
+  if (!row) return null;
+  const [media] = await getPool().query<MediaRow[]>("SELECT id, post_id, public_url, media_type, alt_text FROM social_post_media WHERE post_id = ? ORDER BY sort_order", [id]);
+  return { ...mapPost(row, media), facebookPageId: row.facebook_page_id, instagramAccountId: row.instagram_account_id, accessTokenEncrypted: row.access_token_encrypted };
+}
+
+export async function markFacebookNativeScheduleSql(input: { id: string; status: "scheduled" | "failed"; facebookPostId?: string | null; error?: string | null }): Promise<void> {
+  await getPool().execute("UPDATE social_posts SET facebook_schedule_status = ?, facebook_post_id = COALESCE(?, facebook_post_id), facebook_schedule_error = ? WHERE id = ?", [input.status, input.facebookPostId ?? null, input.error?.slice(0, 1000) ?? null, input.id]);
+}
+
 export async function listDueSocialPostsSql(limit = 20): Promise<DueSocialPost[]> {
   const [rows] = await getPool().query<(PostRow & ConnectionRow & { access_token_encrypted: string })[]>(`SELECT p.id, p.unit_id, p.unit_name, p.social_connection_id, p.title, p.caption, p.link_url, p.content_format, p.target_facebook, p.target_instagram, p.status, p.scheduled_for, p.published_at, p.facebook_post_id, p.instagram_media_id, p.created_at, c.facebook_page_id, c.instagram_account_id, c.access_token_encrypted FROM social_posts p JOIN social_meta_connections c ON c.id = p.social_connection_id WHERE p.status = 'scheduled' AND p.scheduled_for <= UTC_TIMESTAMP() AND c.connection_status = 'active' ORDER BY p.scheduled_for ASC LIMIT ?`, [limit]);
   if (!rows.length) return [];

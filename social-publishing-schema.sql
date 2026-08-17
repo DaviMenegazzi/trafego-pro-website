@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS social_meta_connections (
   token_expires_at DATETIME NULL,
   granted_scopes TEXT NULL,
   connection_status ENUM('active', 'expired', 'revoked', 'error') NOT NULL DEFAULT 'active',
+  automation_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  automation_paused_at DATETIME NULL,
+  automation_last_error VARCHAR(1000) NULL,
   last_error_code VARCHAR(80) NULL,
   last_error_message VARCHAR(500) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -41,6 +44,11 @@ CREATE TABLE IF NOT EXISTS social_posts (
   published_at DATETIME NULL,
   facebook_post_id VARCHAR(128) NULL,
   instagram_media_id VARCHAR(128) NULL,
+  facebook_schedule_status ENUM('not_requested', 'pending', 'scheduled', 'failed') NOT NULL DEFAULT 'not_requested',
+  instagram_schedule_status ENUM('not_requested', 'pending', 'publishing', 'published', 'retrying', 'failed') NOT NULL DEFAULT 'not_requested',
+  instagram_attempt_count INT NOT NULL DEFAULT 0,
+  instagram_next_attempt_at DATETIME NULL,
+  facebook_schedule_error VARCHAR(1000) NULL,
   provider_state_encrypted MEDIUMTEXT NULL,
   created_by_user_id VARCHAR(64) NOT NULL,
   updated_by_user_id VARCHAR(64) NOT NULL,
@@ -49,6 +57,7 @@ CREATE TABLE IF NOT EXISTS social_posts (
   KEY idx_social_posts_schedule (status, scheduled_for),
   KEY idx_social_posts_unit (unit_id, scheduled_for),
   KEY idx_social_posts_connection (social_connection_id),
+  KEY idx_social_posts_instagram_queue (instagram_schedule_status, instagram_next_attempt_at),
   UNIQUE KEY uq_social_posts_owner_batch_key (owner_user_id, client_batch_key)
 );
 

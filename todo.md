@@ -624,6 +624,13 @@
 - [ ] Cobrir os cálculos de grade e navegação em testes
 - [ ] Validar visualmente e salvar checkpoint do calendário mensal
 
+## Painel flutuante de detalhes da publicação
+
+- [x] Abrir um painel flutuante ao clicar em um item do calendário
+- [x] Exibir conteúdo, data e hora, Página Meta, unidade, canais e estado
+- [x] Disponibilizar ações permitidas de editar e excluir no painel
+- [x] Cobrir abertura e dados exibidos em testes e salvar checkpoint
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

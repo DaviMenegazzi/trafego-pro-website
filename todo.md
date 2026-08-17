@@ -598,9 +598,9 @@
 
 ## Agendamento híbrido Facebook e Instagram
 
-- [ ] Agendar nativamente posts de Facebook com data futura dentro da janela suportada
-- [ ] Criar fila persistente de Instagram com execução idempotente no horário definido
+- [x] Agendar nativamente posts de Facebook com data futura dentro da janela suportada
+- [x] Criar fila persistente de Instagram com execução idempotente no horário definido
 - [ ] Adicionar tentativas progressivas, pausa por erro e auditoria por conexão Meta
-- [ ] Registrar a rotina gerenciada de processamento sem depender do navegador
+- [x] Registrar a rotina gerenciada de processamento sem depender do navegador
 - [ ] Cobrir os dois fluxos em testes sem publicar conteúdo real
 - [ ] Validar a estratégia híbrida e salvar checkpoint

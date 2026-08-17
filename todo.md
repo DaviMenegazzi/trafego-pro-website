@@ -473,3 +473,11 @@
 - [x] Verificar que nenhuma branch remota alcançável contém os padrões de credencial identificados
 - [x] Documentar a rotação obrigatória da senha TiDB e da senha administrativa legada
 - [x] Validar a contenção final e salvar checkpoint de segurança
+
+## Unidades autorizadas no cadastro Evolution
+
+- [x] Reutilizar as unidades autorizadas do Supabase da dashboard no módulo Evolution
+- [x] Restringir no servidor a associação de instâncias apenas a unidades permitidas
+- [x] Exibir no cadastro de instâncias somente as unidades permitidas ao utilizador atual
+- [x] Cobrir a autorização de associação em testes e validar como administrador
+- [x] Salvar checkpoint da integração de unidades

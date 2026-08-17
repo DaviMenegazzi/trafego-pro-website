@@ -10,6 +10,7 @@ import { isEvolutionAiAutomationRunning, wasLastCrmUpdateMadeByAi, type Evolutio
 
 type Summary = { totalLeads: number; pendingLeads: number; qualifiedLeads: number; closedLeads: number; eventsToday: number };
 type Instance = { instanceName: string; displayName: string | null; unitName: string | null; connectionStatus: string; lastEventAt: string | null; lastMessageAt: string | null };
+type AuthorizedUnit = { id: string; name: string; client_group: string | null };
 type OriginPlatform = "meta" | "google_ads" | "mixed" | "unknown";
 type OriginEvidence = "verified" | "observed" | "none";
 type EventItem = { id: string; instanceName: string; eventType: string; direction: string; messageType: string | null; messagePreview: string | null; occurredAt: string | null; receivedAt: string; originPlatform: OriginPlatform; originEvidence: OriginEvidence; metaCtwaClid: string | null; metaSourceId: string | null; metaSourceType: string | null; googleClickId: string | null; attributionPayload: Record<string, string> | null };
@@ -111,6 +112,7 @@ export default function EvolutionAdmin() {
   const [activeCrmLeadId, setActiveCrmLeadId] = useState<string | null>(null);
   const [unitScope, setUnitScope] = useState("all");
   const [instanceScope, setInstanceScope] = useState("all");
+  const [authorizedUnits, setAuthorizedUnits] = useState<AuthorizedUnit[]>([]);
   const [savingInstance, setSavingInstance] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -180,6 +182,17 @@ export default function EvolutionAdmin() {
     } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar atribuições Meta"); }
   }, [requestHeaders]);
 
+  const loadAuthorizedUnits = useCallback(async () => {
+    try {
+      const response = await fetch("/api/metrics/clients", { headers: requestHeaders() });
+      const data = await readEvolutionJson<{ clients?: AuthorizedUnit[]; error?: string }>(response, "Não foi possível carregar as unidades autorizadas");
+      if (!response.ok) throw new Error(data.error ?? "Não foi possível carregar as unidades autorizadas");
+      setAuthorizedUnits(data.clients ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível carregar as unidades autorizadas");
+    }
+  }, [requestHeaders]);
+
   const loadConversation = useCallback(async (leadId: string) => {
     setConversationLoading(true);
     try {
@@ -206,8 +219,8 @@ export default function EvolutionAdmin() {
       navigate("/login");
       return;
     }
-    loadOverview();
-  }, [loadOverview, navigate, token]);
+    void Promise.all([loadOverview(), loadAuthorizedUnits()]);
+  }, [loadAuthorizedUnits, loadOverview, navigate, token]);
 
   useEffect(() => { if (view === "atribuicao") void loadAttributions(); }, [loadAttributions, view]);
   useEffect(() => { if (view === "conversas" && selectedLead) void loadConversation(selectedLead.id); }, [loadConversation, selectedLead, view]);
@@ -243,7 +256,7 @@ export default function EvolutionAdmin() {
     const fields = new FormData(event.currentTarget);
     try {
       const response = await fetch(`/api/evolution/instances/${instance.instanceName}`, {
-        method: "PUT", headers: requestHeaders(), body: JSON.stringify({ displayName: fields.get("displayName"), unitName: fields.get("unitName") }),
+        method: "PUT", headers: requestHeaders(), body: JSON.stringify({ displayName: fields.get("displayName"), unitId: fields.get("unitId") }),
       });
       const data = await readEvolutionJson<Instance & { error?: string }>(response, "Não foi possível atualizar a instância");
       if (!response.ok || !("instanceName" in data)) throw new Error(data.error ?? "Não foi possível atualizar a instância");
@@ -330,12 +343,12 @@ export default function EvolutionAdmin() {
         </section>}
 
         {view === "operacao" && <section className="mb-8 rounded-2xl border border-white/8 bg-white/[.025] p-6">
-          <div className="mb-6 flex items-end justify-between gap-4"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Organização operacional</p><h2 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">Instâncias por unidade</h2><p className="mt-2 text-sm leading-6 text-zinc-500">Cadastre um nome de operação e a unidade responsável por cada WhatsApp. Cada nova instância que enviar eventos ao mesmo webhook aparecerá aqui.</p></div><Database className="h-5 w-5 text-zinc-600" /></div>
+          <div className="mb-6 flex items-end justify-between gap-4"><div><p className="text-xs uppercase tracking-[.18em] text-zinc-600">Organização operacional</p><h2 className="mt-1 font-['Space_Grotesk'] text-xl font-light text-white">Instâncias por unidade</h2><p className="mt-2 text-sm leading-6 text-zinc-500">Cadastre um nome de operação e associe cada WhatsApp somente a uma unidade autorizada no Supabase da dashboard. Cada nova instância que enviar eventos ao mesmo webhook aparecerá aqui.</p></div><Database className="h-5 w-5 text-zinc-600" /></div>
           {scopedInstances.length === 0 ? <p className="rounded-xl border border-dashed border-white/10 px-5 py-8 text-center text-sm text-zinc-500">Nenhuma instância nesta seleção.</p> : <div className="space-y-3">{scopedInstances.map((instance) => <form key={instance.instanceName} onSubmit={(event) => updateInstanceProfile(event, instance)} className="grid gap-3 rounded-xl border border-white/8 bg-black/15 p-4 md:grid-cols-[1fr_1fr_auto_auto]">
             <label className="text-[10px] uppercase tracking-[.14em] text-zinc-600">Nome da instância<input name="displayName" defaultValue={instance.displayName || ""} placeholder={instance.instanceName} className="mt-1.5 block w-full rounded-lg border border-white/10 bg-[#101214] px-3 py-2 text-xs normal-case tracking-normal text-zinc-200 outline-none focus:border-cyan-300/50" /></label>
-            <label className="text-[10px] uppercase tracking-[.14em] text-zinc-600">Unidade<input name="unitName" defaultValue={instance.unitName || ""} placeholder="Ex.: Vida Card Ijuí" className="mt-1.5 block w-full rounded-lg border border-white/10 bg-[#101214] px-3 py-2 text-xs normal-case tracking-normal text-zinc-200 outline-none focus:border-cyan-300/50" /></label>
+            <label className="text-[10px] uppercase tracking-[.14em] text-zinc-600">Unidade<select key={`${instance.instanceName}-${authorizedUnits.map((unit) => unit.id).join("-")}`} name="unitId" defaultValue={authorizedUnits.find((unit) => unit.name === instance.unitName)?.id ?? ""} disabled={authorizedUnits.length === 0} className="mt-1.5 block w-full rounded-lg border border-white/10 bg-[#101214] px-3 py-2 text-xs normal-case tracking-normal text-zinc-200 outline-none focus:border-cyan-300/50 disabled:cursor-not-allowed disabled:opacity-60"><option value="">{authorizedUnits.length === 0 ? "Nenhuma unidade autorizada" : "Selecione a unidade"}</option>{authorizedUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label>
             <div className="flex items-end"><span className={`rounded-full border px-2.5 py-2 text-[10px] uppercase tracking-[.12em] ${statusClass(instance.connectionStatus)}`}>{instance.connectionStatus}</span></div>
-            <div className="flex items-end"><button disabled={savingInstance === instance.instanceName} className="rounded-lg bg-cyan-300 px-3 py-2 text-xs font-medium text-[#082124] disabled:opacity-60">{savingInstance === instance.instanceName ? "Salvando" : "Salvar"}</button></div>
+            <div className="flex items-end"><button disabled={savingInstance === instance.instanceName || authorizedUnits.length === 0} className="rounded-lg bg-cyan-300 px-3 py-2 text-xs font-medium text-[#082124] disabled:opacity-60">{savingInstance === instance.instanceName ? "Salvando" : "Salvar"}</button></div>
           </form>)}</div>}
         </section>}
 

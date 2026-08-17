@@ -32,6 +32,7 @@ import { resolveEvolutionMetaAttribution, type MetaOfferRow } from "./evolutionM
 import { runDailyEvolutionAiAutomation } from "./evolutionAiAutomation.js";
 import { authenticateScheduledTask } from "./manusScheduleAuth.js";
 import { isEvolutionAiAutomationRunning } from "../shared/evolutionAiPolicy.js";
+import { resolveAuthorizedEvolutionUnit } from "./evolutionUnitAssignment.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -560,13 +561,18 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   app.put("/api/evolution/instances/:instanceName", requireAuth, requireSupabaseAdmin, async (req, res) => {
     const instanceName = req.params.instanceName;
-    const body = req.body as { displayName?: string; unitName?: string };
+    const body = req.body as { displayName?: string; unitId?: string };
     const displayName = body.displayName;
-    const unitName = body.unitName;
     if (!/^[a-zA-Z0-9_-]{1,120}$/.test(instanceName)) { res.status(400).json({ error: "Instância inválida" }); return; }
-    if (typeof displayName !== "string" || typeof unitName !== "string") { res.status(400).json({ error: "Identificação da instância inválida" }); return; }
+    if (typeof displayName !== "string") { res.status(400).json({ error: "Identificação da instância inválida" }); return; }
     try {
-      const instance = await updateEvolutionInstanceProfileSupabase(instanceName, { displayName, unitName });
+      const sb = getSupabaseForRequest(req);
+      if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
+      const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
+      if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades autorizadas" }); return; }
+      const unit = resolveAuthorizedEvolutionUnit(body.unitId, catalog.clients);
+      if (!unit) { res.status(403).json({ error: "A instância só pode ser associada a uma unidade autorizada no Supabase" }); return; }
+      const instance = await updateEvolutionInstanceProfileSupabase(instanceName, { displayName, unitName: unit.name });
       if (!instance) { res.status(404).json({ error: "Instância não encontrada" }); return; }
       res.json(instance);
     } catch (error) {

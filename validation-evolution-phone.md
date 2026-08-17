@@ -18,3 +18,11 @@ Data da validação: 15 de agosto de 2026.
 - O grid responsivo substituiu a faixa horizontal fixa: os estágios quebram em linhas conforme a largura disponível e a página não apresenta overflow horizontal global.
 - A validação no navegador confirmou `scrollWidth` de 1265 px em viewport de 1280 px, três cartões registrados no mecanismo de arrastar e os atributos acessíveis do `dnd-kit` no cartão.
 - Não foi alterada a etapa de nenhum contato real durante a validação visual.
+
+## Unidades autorizadas no cadastro de instâncias
+
+Data da validação: 17 de agosto de 2026.
+
+- Em sessão administrativa, o painel Evolution carregou o catálogo de unidades diretamente do endpoint Supabase já usado pela dashboard.
+- O formulário da instância `davi03` exibiu um seletor, sem campo livre, com as unidades autorizadas no utilizador autenticado.
+- Nenhuma associação de instância foi salva durante a validação visual.

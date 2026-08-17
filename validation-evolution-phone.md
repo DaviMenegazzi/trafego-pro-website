@@ -37,3 +37,4 @@ Data da validação: 17 de agosto de 2026.
 - A sessão administrativa expirou durante a validação; ela foi renovada e o dashboard voltou a carregar as unidades autorizadas do Supabase antes da continuação da verificação social.
 - Com a sessão renovada, a Central de Publicações exibiu o estado de conexão Meta pendente, o calendário vazio e a ação de criação de conteúdo sem apresentar dados artificiais.
 - O compositor foi validado sem submissão: lista apenas unidades autorizadas, mantém a conta Meta opcional enquanto não conectada, oferece imagem, carrossel, vídeo e Reel, aceita URLs HTTPS de mídia, canais Facebook/Instagram e agendamento futuro.
+- Após o cadastro dos segredos, o módulo exibiu o estado “Aplicação Meta configurada” e habilitou a ação “Conectar Página Meta”, mantendo o processador inativo até a primeira conexão autorizada.

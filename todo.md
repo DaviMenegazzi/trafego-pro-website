@@ -495,3 +495,11 @@
 - [x] Preparar o roteiro para criação da aplicação Meta e configuração da URL de retorno
 - [ ] Criar a aplicação Meta, cadastrar as variáveis protegidas e validar uma publicação real por canal
 - [ ] Ativar o agendamento de publicação após conectar a primeira Página Meta
+
+## Ativação OAuth Meta
+
+- [x] Cadastrar o App ID e o App Secret recebidos exclusivamente como segredos protegidos
+- [x] Gerar e cadastrar a chave de criptografia dos tokens sociais como segredo protegido
+- [ ] Validar a URL de autorização e concluir a associação de uma Página Meta a uma unidade autorizada
+- [ ] Validar uma publicação real controlada antes de ativar a rotina recorrente
+- [x] Manter a autorização Meta, a publicação real e a ativação do agendamento sob execução manual do utilizador

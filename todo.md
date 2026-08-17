@@ -522,3 +522,10 @@
 - [x] Permitir escolher entre múltiplas Páginas Meta conectadas para cada linha da fila
 - [x] Cobrir importação, persistência local e seleção de múltiplas conexões em testes
 - [x] Validar a interface e salvar checkpoint do importador Excel
+
+## Correção de segurança OAuth Meta
+
+- [x] Diagnosticar a URL de retorno enviada na autorização Meta
+- [x] Forçar a geração de retorno HTTPS e evitar URLs de pré-visualização na produção
+- [x] Atualizar o roteiro de configuração da aplicação Meta com a URL exata de retorno
+- [x] Validar a URL OAuth e salvar checkpoint da correção

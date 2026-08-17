@@ -354,6 +354,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   const app = express();
   const server = createServer(app);
 
+  app.set("trust proxy", 1);
   app.use(express.json());
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
@@ -529,8 +530,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   app.get("/api/social/meta/connect", requireAuth, requireSupabaseAdmin, async (req, res) => {
     try {
-      const origin = `${req.protocol}://${req.get("host")}`;
-      const config = getMetaOAuthConfig(origin);
+      const config = getMetaOAuthConfig();
       res.json({ authorizationUrl: createMetaAuthorizationUrl(config, createMetaOAuthState(req.claims!.id)) });
     } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : "A conexão Meta não está disponível" }); }
   });
@@ -541,7 +541,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     if (!verified) { res.status(400).send("A autorização Meta expirou ou não é válida. Volte à Central de Publicações e tente novamente."); return; }
     if (oauthError || !code) { res.redirect(`/publicacoes?meta_error=${encodeURIComponent(errorDescription || oauthError || "Autorização cancelada")}`); return; }
     try {
-      const config = getMetaOAuthConfig(`${req.protocol}://${req.get("host")}`);
+      const config = getMetaOAuthConfig();
       const candidates = await listMetaPageCandidates(await exchangeMetaAuthorizationCode(config, code));
       const sessionId = crypto.randomUUID();
       await saveSocialOAuthSessionSql({ id: sessionId, ownerUserId: verified.ownerUserId, candidatesEncrypted: encryptSocialSecret(JSON.stringify(candidates)), expiresAt: new Date(Date.now() + 15 * 60 * 1000) });

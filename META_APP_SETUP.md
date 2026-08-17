@@ -8,13 +8,11 @@ Crie uma aplicação no [Meta for Developers](https://developers.facebook.com/ap
 
 ## 2. Configurar URLs de retorno
 
-No produto de login, cadastre as URLs de redirecionamento exatas abaixo. Mantenha somente domínios controlados pela Tráfego Pro.
+No produto de login, cadastre **somente** a URL exata abaixo em **Valid OAuth Redirect URIs** e informe `www.trafego.pro` em **App Domains**.
 
-| Ambiente | URL de retorno |
-|---|---|
-| Produção principal | `https://www.trafego.pro/api/social/meta/callback` |
-| Produção alternativa | `https://trafego-pro.manus.space/api/social/meta/callback` |
-| Pré-visualização local | Não cadastrar; use somente produção para conectar contas reais. |
+`https://www.trafego.pro/api/social/meta/callback`
+
+Não cadastre links de pré-visualização, `localhost`, domínios alternativos ou qualquer URL com `http`. A Central de Publicações usa esse retorno HTTPS canônico, mesmo quando o utilizador abre a pré-visualização técnica.
 
 ## 3. Solicitar permissões necessárias
 

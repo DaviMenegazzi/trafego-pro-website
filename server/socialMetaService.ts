@@ -6,6 +6,7 @@ const GRAPH_URL = `https://graph.facebook.com/${META_VERSION}`;
 
 export type MetaOAuthConfig = { appId: string; appSecret: string; redirectUri: string };
 export type MetaPageCandidate = { facebookPageId: string; facebookPageName: string; instagramAccountId: string | null; instagramUsername: string | null; pageAccessToken: string };
+export const DEFAULT_SOCIAL_META_REDIRECT_URI = "https://www.trafego.pro/api/social/meta/callback";
 
 function requiredSecret(): string {
   const secret = process.env.SOCIAL_TOKEN_ENCRYPTION_KEY;
@@ -19,9 +20,19 @@ export function isMetaOAuthConfigured(): boolean {
   return Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.SOCIAL_TOKEN_ENCRYPTION_KEY);
 }
 
-export function getMetaOAuthConfig(origin: string): MetaOAuthConfig {
+export function getSocialMetaRedirectUri(): string {
+  const redirectUri = process.env.SOCIAL_META_REDIRECT_URI || DEFAULT_SOCIAL_META_REDIRECT_URI;
+  let parsed: URL;
+  try { parsed = new URL(redirectUri); } catch { throw new Error("SOCIAL_META_REDIRECT_URI inválida"); }
+  if (parsed.protocol !== "https:" || parsed.pathname !== "/api/social/meta/callback" || parsed.search || parsed.hash) {
+    throw new Error("SOCIAL_META_REDIRECT_URI deve usar HTTPS e terminar em /api/social/meta/callback");
+  }
+  return parsed.toString().replace(/\/$/, "");
+}
+
+export function getMetaOAuthConfig(): MetaOAuthConfig {
   if (!isMetaOAuthConfigured()) throw new Error("A aplicação Meta ainda não foi configurada");
-  return { appId: process.env.META_APP_ID!, appSecret: process.env.META_APP_SECRET!, redirectUri: `${origin}/api/social/meta/callback` };
+  return { appId: process.env.META_APP_ID!, appSecret: process.env.META_APP_SECRET!, redirectUri: getSocialMetaRedirectUri() };
 }
 
 export function encryptSocialSecret(value: string): string {

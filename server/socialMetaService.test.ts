@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, isMetaOAuthConfigured, verifyMetaOAuthState } from "./socialMetaService.js";
+import { createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, getSocialMetaRedirectUri, isMetaOAuthConfigured, verifyMetaOAuthState } from "./socialMetaService.js";
 
 describe("segurança da conexão Meta", () => {
   it("não considera OAuth Meta configurado sem as variáveis protegidas", () => {
@@ -32,5 +32,20 @@ describe("segurança da conexão Meta", () => {
     expect(url.searchParams.get("redirect_uri")).toBe("https://trafego.pro/api/social/meta/callback");
     expect(url.searchParams.get("scope")).toContain("pages_manage_posts");
     expect(url.searchParams.get("scope")).toContain("instagram_content_publish");
+  });
+
+  it("usa retorno HTTPS canônico sem depender da URL de pré-visualização", () => {
+    const previous = process.env.SOCIAL_META_REDIRECT_URI;
+    delete process.env.SOCIAL_META_REDIRECT_URI;
+    expect(getSocialMetaRedirectUri()).toBe("https://www.trafego.pro/api/social/meta/callback");
+    if (previous) process.env.SOCIAL_META_REDIRECT_URI = previous;
+  });
+
+  it("rejeita retorno OAuth que não use HTTPS", () => {
+    const previous = process.env.SOCIAL_META_REDIRECT_URI;
+    process.env.SOCIAL_META_REDIRECT_URI = "http://www.trafego.pro/api/social/meta/callback";
+    expect(() => getSocialMetaRedirectUri()).toThrow("HTTPS");
+    if (previous) process.env.SOCIAL_META_REDIRECT_URI = previous;
+    else delete process.env.SOCIAL_META_REDIRECT_URI;
   });
 });

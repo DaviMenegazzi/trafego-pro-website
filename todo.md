@@ -631,6 +631,16 @@
 - [x] Disponibilizar ações permitidas de editar e excluir no painel
 - [x] Cobrir abertura e dados exibidos em testes e salvar checkpoint
 
+## Controlador e hierarquia da Central de Publicações
+
+- [ ] Criar controlador visual de unidade e Página Meta no topo do calendário
+- [ ] Atualizar o calendário imediatamente ao mudar unidade ou Página
+- [ ] Manter o calendário como elemento principal fixo da tela
+- [ ] Mover criar agendamento e conectar Página para ações discretas em painel separado
+- [ ] Redesenhar Planejar em massa no padrão visual dos filtros do Evolution
+- [ ] Cobrir filtros de escopo em testes e validar a interface
+- [ ] Salvar checkpoint da reorganização da Central
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

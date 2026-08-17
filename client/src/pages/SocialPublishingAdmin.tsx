@@ -54,6 +54,8 @@ export default function SocialPublishingAdmin() {
   const [showComposer, setShowComposer] = useState(false);
   const [selectedPost, setSelectedPost] = useState<SocialPost | null>(null);
   const [calendarCursor, setCalendarCursor] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [calendarUnitId, setCalendarUnitId] = useState("");
+  const [calendarConnectionId, setCalendarConnectionId] = useState("");
   const [showBulkPlanner, setShowBulkPlanner] = useState(false);
   const [form, setForm] = useState<PostForm>(defaultForm());
   const [metaCandidates, setMetaCandidates] = useState<MetaCandidate[]>([]);
@@ -120,15 +122,17 @@ export default function SocialPublishingAdmin() {
   const selectedUnit = useMemo(() => overview?.units.find((unit) => unit.id === form.unitId) ?? null, [form.unitId, overview?.units]);
   const compatibleConnections = useMemo(() => overview?.connections.filter((connection) => connection.unitId === form.unitId && connection.connectionStatus === "active") ?? [], [form.unitId, overview?.connections]);
   const calendarDays = useMemo(() => buildSocialCalendarMonth(calendarCursor), [calendarCursor]);
+  const calendarConnections = useMemo(() => (overview?.connections ?? []).filter((connection) => !calendarUnitId || connection.unitId === calendarUnitId), [calendarUnitId, overview?.connections]);
+  const calendarPosts = useMemo(() => (overview?.posts ?? []).filter((post) => (!calendarUnitId || overview?.connections.some((connection) => connection.unitId === calendarUnitId && connection.unitName === post.unitName)) && (!calendarConnectionId || overview?.connections.some((connection) => connection.id === calendarConnectionId && connection.unitName === post.unitName))), [calendarConnectionId, calendarUnitId, overview?.connections, overview?.posts]);
   const postsByDay = useMemo(() => {
     const grouped = new Map<string, SocialPost[]>();
-    for (const post of overview?.posts ?? []) {
+    for (const post of calendarPosts) {
       if (!post.scheduledFor) continue;
       const key = socialCalendarKey(post.scheduledFor);
       grouped.set(key, [...(grouped.get(key) ?? []), post]);
     }
     return grouped;
-  }, [overview?.posts]);
+  }, [calendarPosts]);
 
   async function createPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -273,6 +277,7 @@ export default function SocialPublishingAdmin() {
       <div><p className="text-[10px] font-medium uppercase tracking-[.24em] text-cyan-300">Módulo isolado · administrativo</p><h1 className="mt-2 font-['Space_Grotesk'] text-3xl font-light tracking-tight text-white">Central de Publicações</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Planeje conteúdo por unidade, mantenha rascunhos e programe feed, carrosséis, vídeos e Reels. Esta área não interfere na dashboard, no CRM ou no Evolution.</p></div>
       <div className="flex flex-wrap gap-2"><button onClick={() => navigate("/dashboard")} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300">Voltar à dashboard</button><button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-lg bg-cyan-300 px-3 py-2 text-xs font-semibold text-[#07252a]"><RefreshCw className="h-3.5 w-3.5" />Atualizar</button></div>
     </header>
+    {overview && <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#0d1215]/90 p-3 shadow-lg lg:sticky lg:top-3 lg:z-20 lg:flex-row lg:items-center lg:justify-between"><div className="flex flex-wrap gap-2"><select value={calendarUnitId} onChange={(event) => { setCalendarUnitId(event.target.value); setCalendarConnectionId(""); }} className="rounded-lg border border-white/10 bg-[#101416] px-3 py-2 text-xs text-zinc-100"><option value="">Todas as unidades</option>{overview.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select><select value={calendarConnectionId} onChange={(event) => setCalendarConnectionId(event.target.value)} className="rounded-lg border border-white/10 bg-[#101416] px-3 py-2 text-xs text-zinc-100"><option value="">Todas as Páginas</option>{calendarConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.facebookPageName}</option>)}</select></div><div className="flex gap-2"><button onClick={() => setShowBulkPlanner(true)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300">Planejar em massa</button><button onClick={() => setShowComposer(true)} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#0a1012]">Novo agendamento</button></div></div>}
 
     {error && <div className="mb-5 flex items-start gap-3 rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-100"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span><button className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button></div>}
     {loading || !overview ? <div className="rounded-2xl border border-white/10 bg-white/[.025] p-10 text-center text-sm text-zinc-500">Carregando calendário editorial…</div> : <>

@@ -34,7 +34,7 @@ import { runDailyEvolutionAiAutomation } from "./evolutionAiAutomation.js";
 import { authenticateScheduledTask } from "./manusScheduleAuth.js";
 import { isEvolutionAiAutomationRunning } from "../shared/evolutionAiPolicy.js";
 import { resolveAuthorizedEvolutionUnit } from "./evolutionUnitAssignment.js";
-import { createSocialPostSql, getSocialOAuthSessionSql, getSocialPostForProcessingSql, getSocialPublishingSettingsSql, listSocialMetaConnectionsSql, listSocialPostsSql, saveSocialOAuthSessionSql, updateSocialPublishingSettingsSql, upsertSocialMetaConnectionSql } from "./socialPublishingSql.js";
+import { cancelSocialPostSql, createSocialPostSql, getSocialOAuthSessionSql, getSocialPostForProcessingSql, getSocialPublishingSettingsSql, listSocialMetaConnectionsSql, listSocialPostsSql, saveSocialOAuthSessionSql, updateSocialPostScheduleSql, updateSocialPublishingSettingsSql, upsertSocialMetaConnectionSql } from "./socialPublishingSql.js";
 import { socialPostStatusForConnection, validateSocialPostDraft, type SocialPostDraftInput } from "./socialPublishingPolicy.js";
 import { isSocialBulkLocalId, validateSocialBulkBatch } from "./socialBulkPolicy.js";
 import { createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, exchangeMetaAuthorizationCode, getMetaOAuthConfig, isMetaOAuthConfigured, listMetaPageCandidates, runScheduledSocialPublishing, scheduleFacebookForPost, verifyMetaOAuthState } from "./socialMetaService.js";
@@ -666,6 +666,21 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       console.error("[social] Falha ao criar publicação:", error);
       res.status(503).json({ error: "Não foi possível salvar a publicação" });
     }
+  });
+
+  app.patch("/api/social/posts/:id", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    const scheduledFor = typeof req.body?.scheduledFor === "string" ? req.body.scheduledFor : "";
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id) || Number.isNaN(new Date(scheduledFor).getTime())) { res.status(400).json({ error: "Agendamento inválido" }); return; }
+    const updated = await updateSocialPostScheduleSql(req.claims!.id, req.params.id, scheduledFor);
+    if (!updated) { res.status(409).json({ error: "Este item não pode mais ser editado" }); return; }
+    res.json({ ok: true });
+  });
+
+  app.delete("/api/social/posts/:id", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(400).json({ error: "Publicação inválida" }); return; }
+    const cancelled = await cancelSocialPostSql(req.claims!.id, req.params.id);
+    if (!cancelled) { res.status(409).json({ error: "Este item não pode mais ser excluído" }); return; }
+    res.json({ ok: true });
   });
 
   app.get("/api/evolution/overview", requireAuth, requireSupabaseAdmin, async (_req, res) => {

@@ -604,3 +604,13 @@
 - [x] Registrar a rotina gerenciada de processamento sem depender do navegador
 - [ ] Cobrir os dois fluxos em testes sem publicar conteúdo real
 - [ ] Validar a estratégia híbrida e salvar checkpoint
+
+## Calendário e gestão de agendamentos sociais
+
+- [ ] Exibir agendamentos em calendário fixo por mês, com navegação e leitura de estados
+- [ ] Mover o compositor de publicação para uma tela flutuante individual
+- [ ] Criar ações de editar e excluir por agendamento no calendário
+- [ ] Cancelar ou atualizar o agendamento nativo Facebook antes da data de publicação
+- [ ] Editar ou excluir itens pendentes da fila interna Instagram sem disparar publicação
+- [ ] Cobrir autorização, edição, exclusão e cancelamento em testes
+- [ ] Validar o calendário e salvar checkpoint da experiência de gestão

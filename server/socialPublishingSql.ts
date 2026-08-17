@@ -187,6 +187,16 @@ export async function updateSocialPostPublicationSql(input: { id: string; status
   await getPool().execute("UPDATE social_posts SET status = ?, facebook_post_id = COALESCE(?, facebook_post_id), instagram_media_id = COALESCE(?, instagram_media_id), published_at = ? WHERE id = ?", [input.status, input.facebookPostId ?? null, input.instagramMediaId ?? null, input.publishedAt ?? null, input.id]);
 }
 
+export async function cancelSocialPostSql(ownerUserId: string, id: string): Promise<boolean> {
+  const [result] = await getPool().execute<ResultSetHeader>("UPDATE social_posts SET status = 'cancelled' WHERE id = ? AND owner_user_id = ? AND status IN ('draft','scheduled','waiting_connection','failed')", [id, ownerUserId]);
+  return result.affectedRows > 0;
+}
+
+export async function updateSocialPostScheduleSql(ownerUserId: string, id: string, scheduledFor: string): Promise<boolean> {
+  const [result] = await getPool().execute<ResultSetHeader>("UPDATE social_posts SET scheduled_for = ? WHERE id = ? AND owner_user_id = ? AND status IN ('draft','scheduled','waiting_connection','failed')", [new Date(scheduledFor), id, ownerUserId]);
+  return result.affectedRows > 0;
+}
+
 export async function recordSocialPublicationAttemptSql(input: { postId: string; channel: "facebook" | "instagram"; action: "scheduled" | "published" | "failed" | "skipped"; providerPostId?: string | null; providerErrorCode?: string | null; safeMessage?: string | null }): Promise<void> {
   await getPool().execute("INSERT INTO social_publication_attempts (post_id, channel, action, provider_post_id, provider_error_code, safe_message) VALUES (?, ?, ?, ?, ?, ?)", [input.postId, input.channel, input.action, input.providerPostId ?? null, input.providerErrorCode ?? null, input.safeMessage ?? null]);
 }

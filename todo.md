@@ -542,3 +542,27 @@
 - [x] Cadastrar o ID de configuração Meta recebido exclusivamente como segredo protegido
 - [x] Enviar `config_id` na autorização e retirar a lista de escopos do diálogo OAuth
 - [ ] Validar manualmente a conexão de Página após a publicação da correção OAuth
+
+## Permissões Meta e atualização do OAuth
+
+- [ ] Confirmar que a configuração Login para Empresas inclui todas as permissões de publicação necessárias
+- [ ] Verificar a URL OAuth ativa no painel e eliminar redirecionamentos com URL antiga em cache
+- [ ] Atualizar as instruções de teste manual e validar o fluxo após a configuração das permissões
+
+## Caso de uso Meta para publicação social
+
+- [ ] Identificar o caso de uso ou produto Meta que libera permissões de Página e Instagram profissional
+- [ ] Adaptar a configuração OAuth ao fluxo compatível com publicação em Facebook e Instagram
+- [ ] Atualizar o roteiro de criação da aplicação e validar a autorização manual
+
+## Atualização de credencial Meta
+
+- [x] Atualizar o App Secret exclusivamente como variável protegida
+- [ ] Verificar nos logs que o callback OAuth deixa de rejeitar o segredo da aplicação
+- [ ] Orientar nova autorização manual sem alterar o código do projeto
+
+## Diagnóstico da conexão Meta concluída sem Página visível
+
+- [ ] Inspecionar logs de produção e a sessão temporária após a autorização concluída
+- [ ] Identificar o ponto de falha sem modificar o código do projeto
+- [ ] Apresentar o diagnóstico e aguardar autorização para correção

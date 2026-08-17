@@ -14,11 +14,17 @@ No produto de login, cadastre **somente** a URL exata abaixo em **Valid OAuth Re
 
 Não cadastre links de pré-visualização, `localhost`, domínios alternativos ou qualquer URL com `http`. A Central de Publicações usa esse retorno HTTPS canônico, mesmo quando o utilizador abre a pré-visualização técnica.
 
-## 3. Solicitar permissões necessárias
+## 3. Criar a configuração Login para Empresas
+
+No menu **Login do Facebook para Empresas → Configurações**, crie uma configuração com token de acesso de usuário do sistema e ativos de Páginas e Instagram. Selecione `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` e `instagram_content_publish`. Copie o **ID da configuração** e cadastre-o como `META_BUSINESS_LOGIN_CONFIG_ID` nos segredos protegidos.
+
+> Nesse fluxo, as permissões são definidas na configuração da Meta. A aplicação envia `config_id` para o diálogo OAuth e não envia uma lista `scope` diretamente.
+
+## 4. Solicitar permissões necessárias
 
 O módulo solicita somente as permissões necessárias para listar e publicar nas Páginas e contas Instagram profissional autorizadas: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` e `instagram_content_publish`. Solicite App Review e, quando exigido pela Meta, a verificação da empresa antes de disponibilizar a integração para contas fora dos papéis de teste.
 
-## 4. Inserir segredos protegidos
+## 5. Inserir segredos protegidos
 
 Depois de criar a aplicação, cadastre estes valores **exclusivamente** na área de segredos do projeto. Nunca use `.env`, `.project-config.json`, commits, mensagens de erro, nem código-fonte para esses valores.
 
@@ -26,9 +32,10 @@ Depois de criar a aplicação, cadastre estes valores **exclusivamente** na áre
 |---|---|---|
 | `META_APP_ID` | Painel da aplicação Meta | Identifica a aplicação no OAuth. |
 | `META_APP_SECRET` | Painel da aplicação Meta | Troca o código OAuth por token no servidor. |
+| `META_BUSINESS_LOGIN_CONFIG_ID` | Configuração Login para Empresas | Informa à Meta o conjunto autorizado de ativos e permissões. |
 | `SOCIAL_TOKEN_ENCRYPTION_KEY` | Segredo aleatório com ao menos 32 caracteres | Cifra tokens de Página e sessões temporárias antes da persistência SQL. |
 
-## 5. Conectar e validar
+## 6. Conectar e validar
 
 Depois de inserir os segredos, abra `/publicacoes`, escolha **Conectar Página Meta**, autorize a conta, associe cada Página a uma unidade permitida e crie uma publicação de teste com conteúdo real autorizado. Em seguida, o processador agendado poderá ser ativado com uma tarefa recorrente protegida.
 

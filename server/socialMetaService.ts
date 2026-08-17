@@ -4,7 +4,7 @@ import { listDueSocialPostsSql, recordSocialPublicationAttemptSql, updateSocialP
 const META_VERSION = "v26.0";
 const GRAPH_URL = `https://graph.facebook.com/${META_VERSION}`;
 
-export type MetaOAuthConfig = { appId: string; appSecret: string; redirectUri: string };
+export type MetaOAuthConfig = { appId: string; appSecret: string; redirectUri: string; businessLoginConfigId: string };
 export type MetaPageCandidate = { facebookPageId: string; facebookPageName: string; instagramAccountId: string | null; instagramUsername: string | null; pageAccessToken: string };
 export const DEFAULT_SOCIAL_META_REDIRECT_URI = "https://www.trafego.pro/api/social/meta/callback";
 
@@ -17,7 +17,7 @@ function requiredSecret(): string {
 function key(): Buffer { return crypto.createHash("sha256").update(requiredSecret()).digest(); }
 
 export function isMetaOAuthConfigured(): boolean {
-  return Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.SOCIAL_TOKEN_ENCRYPTION_KEY);
+  return Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.SOCIAL_TOKEN_ENCRYPTION_KEY && process.env.META_BUSINESS_LOGIN_CONFIG_ID);
 }
 
 export function getSocialMetaRedirectUri(): string {
@@ -32,7 +32,9 @@ export function getSocialMetaRedirectUri(): string {
 
 export function getMetaOAuthConfig(): MetaOAuthConfig {
   if (!isMetaOAuthConfigured()) throw new Error("A aplicação Meta ainda não foi configurada");
-  return { appId: process.env.META_APP_ID!, appSecret: process.env.META_APP_SECRET!, redirectUri: getSocialMetaRedirectUri() };
+  const businessLoginConfigId = process.env.META_BUSINESS_LOGIN_CONFIG_ID!;
+  if (!/^\d+$/.test(businessLoginConfigId)) throw new Error("META_BUSINESS_LOGIN_CONFIG_ID inválida");
+  return { appId: process.env.META_APP_ID!, appSecret: process.env.META_APP_SECRET!, redirectUri: getSocialMetaRedirectUri(), businessLoginConfigId };
 }
 
 export function encryptSocialSecret(value: string): string {
@@ -69,7 +71,7 @@ export function verifyMetaOAuthState(state: string): { ownerUserId: string } | n
 }
 
 export function createMetaAuthorizationUrl(config: MetaOAuthConfig, state: string): string {
-  const params = new URLSearchParams({ client_id: config.appId, redirect_uri: config.redirectUri, state, response_type: "code", scope: "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish" });
+  const params = new URLSearchParams({ client_id: config.appId, redirect_uri: config.redirectUri, state, response_type: "code", config_id: config.businessLoginConfigId, override_default_response_type: "true" });
   return `https://www.facebook.com/${META_VERSION}/dialog/oauth?${params.toString()}`;
 }
 

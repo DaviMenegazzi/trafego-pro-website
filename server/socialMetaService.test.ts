@@ -28,10 +28,11 @@ describe("segurança da conexão Meta", () => {
   });
 
   it("solicita apenas os escopos de publicação necessários no OAuth", () => {
-    const url = new URL(createMetaAuthorizationUrl({ appId: "app-123", appSecret: "segredo", redirectUri: "https://trafego.pro/api/social/meta/callback" }, "estado-assinado"));
+    const url = new URL(createMetaAuthorizationUrl({ appId: "app-123", appSecret: "segredo", redirectUri: "https://trafego.pro/api/social/meta/callback", businessLoginConfigId: "123456789" }, "estado-assinado"));
     expect(url.searchParams.get("redirect_uri")).toBe("https://trafego.pro/api/social/meta/callback");
-    expect(url.searchParams.get("scope")).toContain("pages_manage_posts");
-    expect(url.searchParams.get("scope")).toContain("instagram_content_publish");
+    expect(url.searchParams.get("config_id")).toBe("123456789");
+    expect(url.searchParams.get("scope")).toBeNull();
+    expect(url.searchParams.get("override_default_response_type")).toBe("true");
   });
 
   it("usa retorno HTTPS canônico sem depender da URL de pré-visualização", () => {

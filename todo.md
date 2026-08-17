@@ -529,3 +529,16 @@
 - [x] Forçar a geração de retorno HTTPS e evitar URLs de pré-visualização na produção
 - [x] Atualizar o roteiro de configuração da aplicação Meta com a URL exata de retorno
 - [x] Validar a URL OAuth e salvar checkpoint da correção
+
+## Correção de escopos OAuth Meta
+
+- [x] Confirmar a configuração do Login do Facebook para Empresas e o identificador de configuração OAuth
+- [x] Ajustar a autorização para solicitar apenas permissões disponíveis na configuração Meta
+- [x] Documentar as permissões de publicação que devem ser habilitadas no painel Meta
+- [x] Validar a autorização sem escopos inválidos e salvar checkpoint
+
+## Ativação de configuração Login para Empresas
+
+- [x] Cadastrar o ID de configuração Meta recebido exclusivamente como segredo protegido
+- [x] Enviar `config_id` na autorização e retirar a lista de escopos do diálogo OAuth
+- [ ] Validar manualmente a conexão de Página após a publicação da correção OAuth

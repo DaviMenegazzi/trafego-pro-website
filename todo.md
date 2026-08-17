@@ -641,6 +641,11 @@
 - [ ] Cobrir filtros de escopo em testes e validar a interface
 - [ ] Salvar checkpoint da reorganização da Central
 
+## Simplificação da página inicial da Central
+
+- [ ] Remover o bloco redundante de resumo editorial acima do calendário
+- [ ] Validar a hierarquia visual simplificada e salvar checkpoint
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

@@ -513,3 +513,12 @@
 - [x] Exibir o progresso, erros por linha e resultados de cada lote no calendário editorial
 - [x] Cobrir rascunho local, validações, idempotência e envio em massa com testes
 - [x] Validar visualmente e salvar checkpoint do planeador mensal
+
+## Importação Excel e múltiplas Páginas Meta
+
+- [x] Definir e disponibilizar modelo Excel para a fila mensal de publicações
+- [x] Importar planilha localmente, mapear colunas e validar cada linha antes de adicioná-la à fila
+- [x] Exibir pré-visualização e erros de importação sem enviar conteúdo ao servidor
+- [x] Permitir escolher entre múltiplas Páginas Meta conectadas para cada linha da fila
+- [x] Cobrir importação, persistência local e seleção de múltiplas conexões em testes
+- [x] Validar a interface e salvar checkpoint do importador Excel

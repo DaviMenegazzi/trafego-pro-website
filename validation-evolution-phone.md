@@ -42,3 +42,5 @@ Data da validação: 17 de agosto de 2026.
 - A tabela mensal abriu com as colunas de unidade, conta Meta, formato, canais, legenda, mídia HTTPS e data. Uma linha vazia foi adicionada apenas para testar o rascunho local, sem envio ao servidor ou publicação.
 - Após recarregar a Central de Publicações, o calendário voltou ao estado inicial sem criar conteúdo ou acionar publicação; a conferência da fila local continua restrita ao painel “Planejar em massa”.
 - Ao reabrir o painel após a recarga, a linha de teste permaneceu disponível, confirmando a persistência local. Ela foi removida em seguida, deixando a fila local vazia e sem qualquer peça enviada.
+- Após a inclusão do importador Excel, a Central de Publicações carregou com sessão administrativa, aplicação Meta configurada e processador ainda inativo, sem criar publicações de teste.
+- O painel “Planejar em massa” exibiu os controles “Modelo Excel”, “Importar Excel”, “Adicionar linha” e “Enviar fila”, além da coluna “Página Meta”; a geração do modelo não criou fila nem acionou publicação.

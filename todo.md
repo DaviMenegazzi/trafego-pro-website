@@ -646,6 +646,11 @@
 - [ ] Remover o bloco redundante de resumo editorial acima do calendário
 - [ ] Validar a hierarquia visual simplificada e salvar checkpoint
 
+## Ocultação do painel operacional
+
+- [ ] Ocultar o painel de conexão Meta e status do processador da página inicial
+- [ ] Validar a Central simplificada e salvar checkpoint
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

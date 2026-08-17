@@ -151,6 +151,14 @@ export async function scheduleFacebookForPost(post: DueSocialPost): Promise<void
   }
 }
 
+export async function cancelFacebookNativeSchedule(post: DueSocialPost): Promise<void> {
+  if (!post.facebookPostId) return;
+  const token = decryptSocialSecret(post.accessTokenEncrypted);
+  const response = await fetch(`${GRAPH_URL}/${post.facebookPostId}?${new URLSearchParams({ access_token: token })}`, { method: "DELETE" });
+  const data = await response.json().catch(() => ({})) as { success?: boolean; error?: { message?: string } };
+  if (!response.ok || data.success === false || data.error) throw new Error(data.error?.message || "A Meta não aceitou o cancelamento do agendamento");
+}
+
 async function createInstagramContainer(post: DueSocialPost, token: string): Promise<string> {
   if (!post.instagramAccountId) throw new Error("A conta conectada não possui Instagram profissional associado");
   const createOne = async (media: DueSocialPost["media"][number], carouselItem = false) => graphJson<{ id?: string }>(`${post.instagramAccountId}/media`, { ...(media.mediaType === "video" ? { video_url: media.url, media_type: post.contentFormat === "reel" ? "REELS" : "VIDEO" } : { image_url: media.url }), ...(carouselItem ? { is_carousel_item: "true" } : {}), access_token: token });

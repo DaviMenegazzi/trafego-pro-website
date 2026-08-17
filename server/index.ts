@@ -37,7 +37,7 @@ import { resolveAuthorizedEvolutionUnit } from "./evolutionUnitAssignment.js";
 import { cancelSocialPostSql, createSocialPostSql, getSocialOAuthSessionSql, getSocialPostForProcessingSql, getSocialPublishingSettingsSql, listSocialMetaConnectionsSql, listSocialPostsSql, saveSocialOAuthSessionSql, updateSocialPostScheduleSql, updateSocialPublishingSettingsSql, upsertSocialMetaConnectionSql } from "./socialPublishingSql.js";
 import { socialPostStatusForConnection, validateSocialPostDraft, type SocialPostDraftInput } from "./socialPublishingPolicy.js";
 import { isSocialBulkLocalId, validateSocialBulkBatch } from "./socialBulkPolicy.js";
-import { createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, exchangeMetaAuthorizationCode, getMetaOAuthConfig, isMetaOAuthConfigured, listMetaPageCandidates, runScheduledSocialPublishing, scheduleFacebookForPost, verifyMetaOAuthState } from "./socialMetaService.js";
+import { cancelFacebookNativeSchedule, createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, exchangeMetaAuthorizationCode, getMetaOAuthConfig, isMetaOAuthConfigured, listMetaPageCandidates, runScheduledSocialPublishing, scheduleFacebookForPost, verifyMetaOAuthState } from "./socialMetaService.js";
 import { storagePut } from "./storage.js";
 import { validateSocialMediaUpload } from "./socialMediaUploadPolicy.js";
 
@@ -678,6 +678,11 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   app.delete("/api/social/posts/:id", requireAuth, requireSupabaseAdmin, async (req, res) => {
     if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(400).json({ error: "Publicação inválida" }); return; }
+    const post = await getSocialPostForProcessingSql(req.params.id);
+    if (post?.facebookPostId) {
+      try { await cancelFacebookNativeSchedule(post); }
+      catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : "Não foi possível cancelar o agendamento no Facebook" }); return; }
+    }
     const cancelled = await cancelSocialPostSql(req.claims!.id, req.params.id);
     if (!cancelled) { res.status(409).json({ error: "Este item não pode mais ser excluído" }); return; }
     res.json({ ok: true });

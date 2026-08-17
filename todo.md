@@ -614,3 +614,9 @@
 - [ ] Editar ou excluir itens pendentes da fila interna Instagram sem disparar publicação
 - [ ] Cobrir autorização, edição, exclusão e cancelamento em testes
 - [ ] Validar o calendário e salvar checkpoint da experiência de gestão
+
+## Correção de exclusão de agendamento
+
+- [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual
+- [ ] Corrigir o cancelamento de itens futuros sem permitir remover itens publicados
+- [ ] Cobrir a exclusão em teste e publicar a correção validada

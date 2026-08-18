@@ -690,6 +690,19 @@
 - [x] Ajustar o perfil, o seletor de unidade e os controles de colapso ao novo acabamento
 - [x] Validar responsividade, acessibilidade e salvar checkpoint da reestilização
 
+## Sidebar monocromática e tipográfica
+
+- [x] Remover o monograma TP do cabeçalho da sidebar
+- [x] Manter apenas a identificação textual TRÁFEGO PRO no cabeçalho
+- [x] Remover acentos azulados e aplicar contraste somente em preto, grafite, cinza e branco
+- [x] Validar a sidebar simplificada e salvar checkpoint
+
+## Paleta monocromática da sidebar
+
+- [x] Remover acentos azulados da sidebar, dos estados e dos controles
+- [x] Aplicar contrastes em preto, grafite, cinza e branco para legibilidade
+- [x] Validar a paleta e salvar checkpoint
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

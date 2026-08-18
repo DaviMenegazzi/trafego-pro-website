@@ -90,8 +90,8 @@ function ClientSelector({ collapsed }: { collapsed: boolean }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" aria-label="Selecionar unidade" className="inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 py-2.5 text-left text-xs text-foreground shadow-sm transition-all duration-200 hover:border-sky-300/40 hover:bg-surface focus:outline-none focus:ring-1 focus:ring-ring">
-          <Building2 className="size-4 shrink-0 text-sky-300" />
+        <button type="button" aria-label="Selecionar unidade" className="inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left text-xs text-foreground shadow-sm transition-all duration-200 hover:border-zinc-500 hover:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-zinc-400">
+          <Building2 className="size-4 shrink-0 text-zinc-300" />
           <span className="min-w-0 flex-1 truncate font-medium">{selectedName}</span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
         </button>
@@ -101,7 +101,7 @@ function ClientSelector({ collapsed }: { collapsed: boolean }) {
         <div className="max-h-64 overflow-y-auto p-2">
           {filteredClients.map((client) => {
             const selected = client.id === selectedClientId;
-            return <button key={client.id} type="button" onClick={() => { setSelectedClientId(client.id); setOpen(false); }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition-colors ${selected ? "bg-sky-300 text-slate-950 shadow-sm" : "text-foreground hover:bg-surface-2"}`}><span className="truncate font-medium">{client.name}</span>{selected && <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-800">Selecionada</span>}</button>;
+            return <button key={client.id} type="button" onClick={() => { setSelectedClientId(client.id); setOpen(false); }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition-colors ${selected ? "bg-zinc-200 text-zinc-950 shadow-sm" : "text-foreground hover:bg-white/[0.06]"}`}><span className="truncate font-medium">{client.name}</span>{selected && <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-700">Selecionada</span>}</button>;
           })}
         </div>
       </PopoverContent>
@@ -137,8 +137,8 @@ function UserProfileButton({ collapsed }: { collapsed: boolean }) {
       title="Sair"
       className={`group flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors overflow-hidden ${collapsed ? "justify-center px-0" : ""}`}
     >
-      <div className="size-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-        <User className="size-3.5 text-primary" />
+      <div className="size-7 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+        <User className="size-3.5 text-zinc-200" />
       </div>
       <div
         className="flex-1 min-w-0 overflow-hidden text-left"
@@ -187,11 +187,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const renderSidebar = (isCollapsed: boolean) => (
     <>
       {/* Header */}
-      <div className={`relative flex h-[4.5rem] shrink-0 items-center border-b border-sky-300/10 px-3 ${isCollapsed ? "justify-center" : "justify-between"}`}>
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-300 font-display text-[10px] font-bold tracking-[-0.06em] text-slate-950 shadow-[0_0_24px_rgba(125,211,252,0.2)]">
-            TP
-          </div>
+      <div className={`relative flex h-[4.5rem] shrink-0 items-center border-b border-white/10 px-4 ${isCollapsed ? "justify-center" : "justify-between"}`}>
+        <div className="flex min-w-0 items-center">
           <div
             className="flex-1 min-w-0 overflow-hidden"
             style={{
@@ -200,13 +197,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
               transition: `max-width ${DURATION} ${EASE}, opacity ${DURATION} ${EASE}`,
             }}
           >
-            <div className="font-display text-sm font-semibold tracking-[0.16em] whitespace-nowrap text-foreground">TRÁFEGO<span className="text-sky-300"> PRO</span></div>
-            <div className="mt-0.5 text-[8px] font-medium uppercase tracking-[0.24em] text-muted-foreground">Central de gestão</div>
+            <div className="font-display text-sm font-semibold tracking-[0.16em] whitespace-nowrap text-white">TRÁFEGO<span className="text-zinc-400"> PRO</span></div>
+            <div className="mt-0.5 text-[8px] font-medium uppercase tracking-[0.24em] text-zinc-500">Central de gestão</div>
           </div>
         </div>
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="hidden size-7 shrink-0 items-center justify-center rounded-lg border border-sidebar-border/70 text-muted-foreground transition-colors hover:border-sky-300/30 hover:bg-sky-300/10 hover:text-sky-200 md:flex"
+          className="hidden size-7 shrink-0 items-center justify-center rounded-lg border border-white/10 text-zinc-400 transition-colors hover:border-zinc-500 hover:bg-white/[0.07] hover:text-white md:flex"
           title={isCollapsed ? "Expandir" : "Recolher"}
         >
           {isCollapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
@@ -215,7 +212,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Client selector */}
       {!isCollapsed && (
-        <div className="space-y-1.5 border-b border-sky-300/10 px-3 pb-4 pt-3">
+        <div className="space-y-1.5 border-b border-white/10 px-3 pb-4 pt-3">
           <div className="px-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Contexto de trabalho</div>
           <ClientSelector collapsed={false} />
         </div>
@@ -236,11 +233,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 isCollapsed ? "size-10 justify-center px-0 py-0" : "px-3 py-2.5"
               } ${
                 active
-                  ? "bg-sky-300/10 text-foreground shadow-[inset_3px_0_0_#7dd3fc]"
+                  ? "bg-white/10 text-white shadow-[inset_3px_0_0_#e4e4e7]"
                   : "text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"
               }`}
             >
-              <Icon className={`size-4 shrink-0 transition-colors ${active ? "text-sky-300" : "group-hover:text-sky-200"}`} />
+              <Icon className={`size-4 shrink-0 transition-colors ${active ? "text-white" : "group-hover:text-zinc-200"}`} />
               <span
                 className="whitespace-nowrap overflow-hidden"
                 style={{
@@ -257,7 +254,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </nav>
 
       {/* User */}
-      <div className="mt-auto border-t border-sky-300/10 p-3">
+      <div className="mt-auto border-t border-white/10 p-3">
         <UserProfileButton collapsed={isCollapsed} />
       </div>
     </>
@@ -289,7 +286,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside
-        className="fixed inset-y-0 left-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-sky-300/10 bg-[linear-gradient(180deg,rgba(9,15,22,0.98)_0%,rgba(4,8,12,0.98)_100%)] shadow-[18px_0_50px_rgba(0,0,0,0.12)] backdrop-blur-xl md:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#111111_0%,#090909_52%,#030303_100%)] shadow-[18px_0_50px_rgba(0,0,0,0.28)] backdrop-blur-xl md:flex"
         style={{
           width: sidebarWidth,
           transition: `width ${DURATION} ${EASE}`,
@@ -300,7 +297,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-[70] flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-sky-300/10 bg-[linear-gradient(180deg,rgba(9,15,22,0.99)_0%,rgba(4,8,12,0.99)_100%)] shadow-2xl backdrop-blur-xl transition-transform duration-300 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-[70] flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-white/10 bg-[linear-gradient(180deg,#111111_0%,#090909_52%,#030303_100%)] shadow-2xl backdrop-blur-xl transition-transform duration-300 md:hidden ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ transitionTimingFunction: EASE }}

@@ -683,6 +683,13 @@
 - [x] Refinar a transição e a hierarquia visual no estado compacto
 - [x] Validar os dois estados e salvar checkpoint
 
+## Reestilização da sidebar pela identidade Tráfego Pro
+
+- [x] Reforçar a presença da marca e a hierarquia visual da navegação
+- [x] Criar estados ativos, hover e compacto coerentes com a paleta da Tráfego Pro
+- [x] Ajustar o perfil, o seletor de unidade e os controles de colapso ao novo acabamento
+- [x] Validar responsividade, acessibilidade e salvar checkpoint da reestilização
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

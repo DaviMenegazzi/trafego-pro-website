@@ -187,10 +187,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const renderSidebar = (isCollapsed: boolean) => (
     <>
       {/* Header */}
-      <div className={`flex items-center h-14 shrink-0 border-b border-sidebar-border px-3 ${isCollapsed ? "justify-center" : "justify-between"}`}>
+      <div className={`relative flex h-[4.5rem] shrink-0 items-center border-b border-sky-300/10 px-3 ${isCollapsed ? "justify-center" : "justify-between"}`}>
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="size-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
-            <LayoutDashboard className="size-4 text-primary-foreground" />
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-300 font-display text-[10px] font-bold tracking-[-0.06em] text-slate-950 shadow-[0_0_24px_rgba(125,211,252,0.2)]">
+            TP
           </div>
           <div
             className="flex-1 min-w-0 overflow-hidden"
@@ -200,12 +200,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
               transition: `max-width ${DURATION} ${EASE}, opacity ${DURATION} ${EASE}`,
             }}
           >
-            <div className="font-display text-sm font-semibold tracking-[0.14em] whitespace-nowrap">TRÁFEGO<span className="text-muted-foreground"> PRO</span></div>
+            <div className="font-display text-sm font-semibold tracking-[0.16em] whitespace-nowrap text-foreground">TRÁFEGO<span className="text-sky-300"> PRO</span></div>
+            <div className="mt-0.5 text-[8px] font-medium uppercase tracking-[0.24em] text-muted-foreground">Central de gestão</div>
           </div>
         </div>
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="hidden md:flex size-6 items-center justify-center rounded-md hover:bg-sidebar-accent/50 text-muted-foreground transition-colors shrink-0"
+          className="hidden size-7 shrink-0 items-center justify-center rounded-lg border border-sidebar-border/70 text-muted-foreground transition-colors hover:border-sky-300/30 hover:bg-sky-300/10 hover:text-sky-200 md:flex"
           title={isCollapsed ? "Expandir" : "Recolher"}
         >
           {isCollapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
@@ -214,14 +215,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Client selector */}
       {!isCollapsed && (
-        <div className="space-y-1.5 border-b border-sidebar-border/70 px-3 pb-3 pt-3">
-          <div className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground/70">Unidade</div>
+        <div className="space-y-1.5 border-b border-sky-300/10 px-3 pb-4 pt-3">
+          <div className="px-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Contexto de trabalho</div>
           <ClientSelector collapsed={false} />
         </div>
       )}
 
       {/* Nav */}
-      <nav className={`flex-1 space-y-0.5 ${isCollapsed ? "px-2 pt-3" : "px-2 pt-3"}`}>
+      <nav className={`flex-1 space-y-1 ${isCollapsed ? "px-2 pt-4" : "px-3 pt-4"}`}>
         {nav.map((item) => {
           const active = pathname === item.to || (item.to !== "/dashboard" && pathname.startsWith(item.to));
           const Icon = item.icon;
@@ -231,15 +232,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
               href={item.to}
               title={isCollapsed ? item.label : undefined}
               onClick={() => setMobileSidebarOpen(false)}
-              className={`group flex items-center gap-3 rounded-lg text-sm transition-colors overflow-hidden ${
-                isCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2"
+              className={`group flex items-center gap-3 overflow-hidden rounded-xl text-sm transition-all duration-200 ${
+                isCollapsed ? "size-10 justify-center px-0 py-0" : "px-3 py-2.5"
               } ${
                 active
-                  ? "bg-sidebar-accent text-foreground brand-border-glow"
-                  : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                  ? "bg-sky-300/10 text-foreground shadow-[inset_3px_0_0_#7dd3fc]"
+                  : "text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"
               }`}
             >
-              <Icon className={`size-4 shrink-0 ${active ? "text-primary" : ""}`} />
+              <Icon className={`size-4 shrink-0 transition-colors ${active ? "text-sky-300" : "group-hover:text-sky-200"}`} />
               <span
                 className="whitespace-nowrap overflow-hidden"
                 style={{
@@ -256,7 +257,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </nav>
 
       {/* User */}
-      <div className="mt-auto p-2 border-t border-sidebar-border">
+      <div className="mt-auto border-t border-sky-300/10 p-3">
         <UserProfileButton collapsed={isCollapsed} />
       </div>
     </>
@@ -288,7 +289,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside
-        className="fixed inset-y-0 left-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar/90 backdrop-blur-xl md:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-sky-300/10 bg-[linear-gradient(180deg,rgba(9,15,22,0.98)_0%,rgba(4,8,12,0.98)_100%)] shadow-[18px_0_50px_rgba(0,0,0,0.12)] backdrop-blur-xl md:flex"
         style={{
           width: sidebarWidth,
           transition: `width ${DURATION} ${EASE}`,
@@ -299,7 +300,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-[70] flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-[70] flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-sky-300/10 bg-[linear-gradient(180deg,rgba(9,15,22,0.99)_0%,rgba(4,8,12,0.99)_100%)] shadow-2xl backdrop-blur-xl transition-transform duration-300 md:hidden ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ transitionTimingFunction: EASE }}

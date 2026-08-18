@@ -90,7 +90,7 @@ function ClientSelector({ collapsed }: { collapsed: boolean }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" aria-label="Selecionar unidade" className="inline-flex min-h-10 w-full items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-2.5 text-left text-xs text-foreground transition-colors hover:bg-surface focus:outline-none focus:ring-1 focus:ring-ring">
+        <button type="button" aria-label="Selecionar unidade" className="inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 py-2.5 text-left text-xs text-foreground shadow-sm transition-all duration-200 hover:border-sky-300/40 hover:bg-surface focus:outline-none focus:ring-1 focus:ring-ring">
           <Building2 className="size-4 shrink-0 text-sky-300" />
           <span className="min-w-0 flex-1 truncate font-medium">{selectedName}</span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
@@ -213,24 +213,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Client selector */}
-      <div className="pb-3 space-y-1.5 px-3 pt-3">
-        <div
-          className="overflow-hidden"
-          style={{
-            maxHeight: isCollapsed ? 0 : 20,
-            opacity: isCollapsed ? 0 : 1,
-            transition: `max-height ${DURATION} ${EASE}, opacity ${DURATION} ${EASE}`,
-          }}
-        >
+      {!isCollapsed && (
+        <div className="space-y-1.5 border-b border-sidebar-border/70 px-3 pb-3 pt-3">
           <div className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground/70">Unidade</div>
+          <ClientSelector collapsed={false} />
         </div>
-        <div className={isCollapsed ? "" : "-mx-3"}>
-          <ClientSelector collapsed={isCollapsed} />
-        </div>
-      </div>
+      )}
 
       {/* Nav */}
-      <nav className="space-y-0.5 px-2 flex-1">
+      <nav className={`flex-1 space-y-0.5 ${isCollapsed ? "px-2 pt-3" : "px-2 pt-3"}`}>
         {nav.map((item) => {
           const active = pathname === item.to || (item.to !== "/dashboard" && pathname.startsWith(item.to));
           const Icon = item.icon;

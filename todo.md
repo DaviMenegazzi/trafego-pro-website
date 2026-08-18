@@ -671,6 +671,12 @@
 - [x] Cobrir acesso público e proteção de rotas em testes
 - [x] Validar no navegador e salvar checkpoint
 
+## Padronização do seletor de unidades da dashboard
+
+- [x] Localizar o seletor de unidade da aba e o seletor do corpo da dashboard
+- [x] Reutilizar o padrão visual e de interação do seletor principal na aba
+- [x] Cobrir a seleção de unidade e publicar a padronização
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

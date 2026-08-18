@@ -18,9 +18,11 @@ import {
   ShieldCheck,
   Tag,
   ChevronDown,
+  Building2,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const DURATION = "200ms";
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
@@ -59,6 +61,7 @@ const NAV_ADMIN_ONLY = [
 function ClientSelector({ collapsed }: { collapsed: boolean }) {
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
   const user = useMemo(() => getStoredUser(), []);
+  const [open, setOpen] = useState(false);
 
   // Filtra clients pelas permissões do usuário
   const filteredClients = useMemo(() => {
@@ -80,32 +83,29 @@ function ClientSelector({ collapsed }: { collapsed: boolean }) {
 
   if (filteredClients.length === 0) return null;
 
-  // Se só tem 1 unidade, não mostra um controle sem alternativas.
-  if (filteredClients.length === 1) {
-    if (collapsed) return null;
-    return (
-      <div className="px-1 py-2 text-xs text-muted-foreground truncate">
-        {filteredClients[0].name}
-      </div>
-    );
-  }
-
   if (collapsed) return null;
 
+  const selectedName = filteredClients.find((client) => client.id === selectedClientId)?.name ?? filteredClients[0].name;
+
   return (
-    <div className="relative px-3">
-      <select
-        aria-label="Selecionar cliente"
-        value={selectedClientId ?? filteredClients[0].id}
-        onChange={(event) => setSelectedClientId(event.target.value)}
-        className="h-9 w-full appearance-none rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 pr-8 text-xs font-medium text-foreground outline-none transition-colors hover:bg-sidebar-accent focus:ring-1 focus:ring-ring"
-      >
-        {filteredClients.map((client) => (
-          <option key={client.id} value={client.id}>{client.name}</option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" aria-label="Selecionar unidade" className="inline-flex min-h-10 w-full items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-2.5 text-left text-xs text-foreground transition-colors hover:bg-surface focus:outline-none focus:ring-1 focus:ring-ring">
+          <Building2 className="size-4 shrink-0 text-sky-300" />
+          <span className="min-w-0 flex-1 truncate font-medium">{selectedName}</span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="right" sideOffset={10} className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border-border bg-[color:var(--color-surface)] p-0 text-foreground shadow-2xl">
+        <div className="border-b border-border px-4 py-4"><p className="font-display text-base font-semibold">Unidades disponíveis</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Selecione a unidade para atualizar toda a dashboard.</p></div>
+        <div className="max-h-64 overflow-y-auto p-2">
+          {filteredClients.map((client) => {
+            const selected = client.id === selectedClientId;
+            return <button key={client.id} type="button" onClick={() => { setSelectedClientId(client.id); setOpen(false); }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition-colors ${selected ? "bg-sky-300 text-slate-950 shadow-sm" : "text-foreground hover:bg-surface-2"}`}><span className="truncate font-medium">{client.name}</span>{selected && <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-800">Selecionada</span>}</button>;
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

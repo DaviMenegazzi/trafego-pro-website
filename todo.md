@@ -663,6 +663,14 @@
 - [ ] Corrigir a gestão de sessão da Central sem alterar itens publicados
 - [ ] Cobrir a exclusão autenticada e publicar a correção
 
+## Página inicial pública sem login
+
+- [x] Diagnosticar o redirecionamento de autenticação indevido na rota inicial
+- [x] Manter a Home pública sem leitura ou exigência de sessão
+- [x] Restringir o login às rotas administrativas
+- [x] Cobrir acesso público e proteção de rotas em testes
+- [x] Validar no navegador e salvar checkpoint
+
 ## Correção de exclusão de agendamento
 
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual

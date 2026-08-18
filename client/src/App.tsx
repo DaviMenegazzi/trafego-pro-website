@@ -23,7 +23,6 @@ import SocialPublishingAdmin from "./pages/SocialPublishingAdmin";
 function ExistingSiteRoutes() {
   return (
     <Switch>
-      <Route path={"/"} component={TrafegoProHome} />
       <Route path={"/login"} component={Login} />
       <Route path={"/feedback-leads"} component={StandaloneFeedbackLeads} />
       <Route path={"/feedback-leads/"} component={StandaloneFeedbackLeads} />
@@ -64,6 +63,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Switch>
+            <Route path={"/"} component={TrafegoProHome} />
             <Route path={"/evolution"} component={EvolutionAdmin} />
             <Route path={"/evolution/"} component={EvolutionAdmin} />
             <Route path={"/publicacoes"} component={SocialPublishingAdmin} />

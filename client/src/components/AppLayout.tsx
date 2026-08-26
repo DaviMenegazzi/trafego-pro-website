@@ -16,6 +16,8 @@ import {
   MessageSquare,
   Inbox,
   ShieldCheck,
+  Link2,
+  UsersRound,
   Tag,
   ChevronDown,
   Building2,
@@ -50,12 +52,14 @@ const NAV_BASE = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
   { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
+  { to: "/dashboard/banco-talentos", label: "Banco de Talentos", icon: UsersRound },
   { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 const NAV_ADMIN_ONLY = [
   { to: "/dashboard/feedback-leads/list", label: "Feedbacks enviados", icon: Inbox },
   { to: "/dashboard/usuarios", label: "Usuários", icon: ShieldCheck },
+  { to: "/dashboard/integracoes-ia", label: "Integrações de IA", icon: Link2 },
 ];
 
 function ClientSelector({ collapsed }: { collapsed: boolean }) {

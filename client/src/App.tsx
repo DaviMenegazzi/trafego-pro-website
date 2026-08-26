@@ -17,6 +17,9 @@ import DashboardAnuncios from "./pages/DashboardAnuncios";
 import DashboardFeedbackLeads, { StandaloneFeedbackLeads } from "./pages/DashboardFeedbackLeads";
 import DashboardFeedbackLeadsList from "./pages/DashboardFeedbackLeadsList";
 import DashboardUsuarios from "./pages/DashboardUsuarios";
+import DashboardExternalAiTokens from "./pages/DashboardExternalAiTokens";
+import TalentPublicForm from "./pages/TalentPublicForm";
+import TalentBankAdmin from "./pages/TalentBankAdmin";
 import EvolutionAdmin from "./pages/EvolutionAdmin";
 import SocialPublishingAdmin from "./pages/SocialPublishingAdmin";
 
@@ -46,6 +49,8 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/anuncios/"} component={DashboardAnuncios} />
       <Route path={"/dashboard/usuarios"} component={DashboardUsuarios} />
       <Route path={"/dashboard/usuarios/"} component={DashboardUsuarios} />
+      <Route path={"/dashboard/integracoes-ia"} component={DashboardExternalAiTokens} />
+      <Route path={"/dashboard/integracoes-ia/"} component={DashboardExternalAiTokens} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
@@ -68,6 +73,9 @@ function App() {
             <Route path={"/evolution/"} component={EvolutionAdmin} />
             <Route path={"/publicacoes"} component={SocialPublishingAdmin} />
             <Route path={"/publicacoes/"} component={SocialPublishingAdmin} />
+            <Route path={"/dashboard/banco-talentos"} component={TalentBankAdmin} />
+            <Route path={"/dashboard/banco-talentos/"} component={TalentBankAdmin} />
+            <Route path={"/trabalhe-conosco/:slug"} component={TalentPublicForm} />
             <Route component={ExistingSiteWithClientProvider} />
           </Switch>
         </TooltipProvider>

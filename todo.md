@@ -720,3 +720,36 @@
 - [x] Receber o token renovado por campo seguro e não persistir o valor em código ou Git
 - [x] Validar a expiração, `ads_read` e as contas de anúncio acessíveis pela Graph API
 - [x] Apresentar o resultado sem alterar a dashboard nem a sincronização atual
+
+## API externa segura para IA
+
+- [ ] Criar ou confirmar as tabelas SQL de tokens externos e eventos de auditoria
+- [ ] Implementar geração de token opaco, armazenamento por hash, expiração e revogação imediata
+- [ ] Implementar endpoints externos de métricas, resumo de leads e resumo de CRM, com escopo por unidade
+- [ ] Aplicar autenticação Bearer, rate limit e respostas seguras à API externa
+- [ ] Criar página administrativa para emitir, consultar metadados e revogar tokens
+- [ ] Adicionar navegação administrativa de integrações de IA para usuários admin
+- [ ] Configurar o usuário técnico de leitura do Supabase com privilégios mínimos
+- [ ] Cobrir emissão, revogação, expiração, escopo de unidade, rate limit e leitura externa em testes Vitest
+- [ ] Documentar os endpoints e um exemplo seguro de consumo por IA externa
+- [ ] Validar TypeScript, testes, build e fluxo visual antes da publicação
+
+## Banco de Talentos Vida Card
+
+- [x] Adaptar as entidades de unidade, gestor e permissões à estrutura Supabase já usada pela dashboard
+- [x] Criar tabelas para configuração de formulário, campos dinâmicos, candidaturas e anexos
+- [x] Criar rota pública por unidade para candidatura e página de confirmação
+- [x] Implementar upload seguro de currículo com validação de PDF/DOCX e limite de tamanho
+- [x] Implementar renderização dinâmica e validação dos campos do formulário público
+- [x] Criar painel administrativo por unidade para configurar formulário e campos com ordenação drag-and-drop
+- [x] Criar listagem, filtros, detalhe, alteração de status e anotações para candidatos
+- [x] Criar exportação XLSX de candidatos filtrados sem expor dados de outras unidades
+- [x] Adicionar rotas e navegação administrativas respeitando o acesso por unidade e administradores
+- [x] Cobrir RLS lógico, validação, upload, filtros, exportação e isolamento entre unidades em Vitest
+- [ ] Validar responsividade, acessibilidade, TypeScript, testes, build e publicação
+
+## Supabase separado para Banco de Talentos
+
+- [x] Preservar o Supabase da dashboard somente como fonte de autorizações de usuário e unidade
+- [x] Conectar o Supabase separado do usuário para dados, anexos e configurações de recrutamento
+- [x] Sincronizar ou resolver o catálogo mínimo de unidades autorizadas sem copiar usuários ou expor credenciais

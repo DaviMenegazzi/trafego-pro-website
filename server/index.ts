@@ -40,6 +40,11 @@ import { isSocialBulkLocalId, validateSocialBulkBatch } from "./socialBulkPolicy
 import { cancelFacebookNativeSchedule, createMetaAuthorizationUrl, createMetaOAuthState, decryptSocialSecret, encryptSocialSecret, exchangeMetaAuthorizationCode, getMetaOAuthConfig, isMetaOAuthConfigured, listMetaPageCandidates, runScheduledSocialPublishing, scheduleFacebookForPost, verifyMetaOAuthState } from "./socialMetaService.js";
 import { storagePut } from "./storage.js";
 import { validateSocialMediaUpload } from "./socialMediaUploadPolicy.js";
+import { createExternalAiApiToken, EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE, externalAiApiTokenPrefix, hasExternalAiApiScope, hashExternalAiApiToken, isExternalAiApiTokenActive, isExternalAiApiUnitAllowed, resolveExternalAiApiDateRange, validateExternalAiApiTokenDraft, type ExternalAiApiScope } from "./externalAiApiPolicy.js";
+import { consumeExternalAiApiRateLimitSql, createExternalAiApiTokenSql, findExternalAiApiTokenByHashSql, listExternalAiApiTokensSql, recordExternalAiApiAuditSql, revokeExternalAiApiTokenSql, type ExternalAiApiToken } from "./externalAiApiSql.js";
+import { getExternalAiCrmSummary, getExternalAiLeadSummary, getExternalAiMetrics, getExternalAiUnit, listExternalAiUnits } from "./externalAiApiData.js";
+import { createTalentAttachmentUrl, createTalentFormForClient, createTalentSubmission, getPublicTalentForm, getTalentFormForClient, listTalentSubmissions, saveTalentForm, talentSlugFromUnitName, updateTalentSubmission, uploadTalentAttachment, type TalentField, type TalentFieldType, type TalentSubmissionStatus } from "./talentBankSupabaseStore.js";
+import { validateTalentSubmission, validateTalentUpload } from "./talentBankPolicy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -260,6 +265,8 @@ declare global {
   namespace Express {
     interface Request {
       claims?: JwtClaims;
+      externalAiToken?: ExternalAiApiToken;
+      externalAiOutcome?: string;
     }
   }
 }
@@ -329,6 +336,46 @@ async function requireSupabaseAdmin(req: express.Request, res: express.Response,
   next();
 }
 
+function externalAiIpHash(req: express.Request): string | null {
+  const ip = req.ip || req.socket.remoteAddress;
+  return ip ? crypto.createHmac("sha256", JWT_SECRET).update(ip).digest("hex") : null;
+}
+
+function auditExternalAiRequest(req: express.Request, res: express.Response, tokenId: string): void {
+  res.once("finish", () => {
+    void recordExternalAiApiAuditSql({ tokenId, method: req.method, path: req.path, status: res.statusCode, outcome: req.externalAiOutcome ?? (res.statusCode < 400 ? "success" : "error"), ipHash: externalAiIpHash(req) }).catch((error) => console.error("[external-ai] Falha de auditoria:", error));
+  });
+}
+
+function requireExternalAiToken(scope?: ExternalAiApiScope) {
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.setHeader("Cache-Control", "no-store");
+    const header = req.headers.authorization;
+    if (!header?.startsWith("Bearer ")) { res.status(401).json({ error: "Token de API ausente ou inválido" }); return; }
+    const rawToken = header.slice(7).trim();
+    if (!rawToken.startsWith("tpai_live_") || rawToken.length < 40) { res.status(401).json({ error: "Token de API ausente ou inválido" }); return; }
+    try {
+      const token = await findExternalAiApiTokenByHashSql(hashExternalAiApiToken(rawToken));
+      if (!token || !isExternalAiApiTokenActive(token)) { res.status(401).json({ error: "Token de API ausente ou inválido" }); return; }
+      if (scope && !hasExternalAiApiScope(token.scopes, scope)) { req.externalAiOutcome = "scope_denied"; auditExternalAiRequest(req, res, token.id); res.status(403).json({ error: "O token não possui o escopo necessário" }); return; }
+      const rate = await consumeExternalAiApiRateLimitSql(token.id, EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE);
+      res.setHeader("X-RateLimit-Limit", String(EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE));
+      res.setHeader("X-RateLimit-Remaining", String(Math.max(0, EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE - rate.count)));
+      if (!rate.allowed) { req.externalAiOutcome = "rate_limited"; auditExternalAiRequest(req, res, token.id); res.setHeader("Retry-After", "60"); res.status(429).json({ error: "Limite de chamadas excedido" }); return; }
+      req.externalAiToken = token;
+      auditExternalAiRequest(req, res, token.id);
+      next();
+    } catch (error) { console.error("[external-ai] Falha de autenticação:", error); res.status(503).json({ error: "A API externa está temporariamente indisponível" }); }
+  };
+}
+
+function externalAiUnitId(req: express.Request, res: express.Response): string | null {
+  const unitId = typeof req.query.unit_id === "string" ? req.query.unit_id : "";
+  if (!/^[0-9a-f-]{36}$/i.test(unitId)) { res.status(400).json({ error: "Informe unit_id como UUID" }); return null; }
+  if (!req.externalAiToken || !isExternalAiApiUnitAllowed(req.externalAiToken.unitIds, unitId)) { req.externalAiOutcome = "unit_denied"; res.status(403).json({ error: "O token não possui acesso a esta unidade" }); return null; }
+  return unitId;
+}
+
 async function persistEvolutionMetaAttribution(event: NonNullable<ReturnType<typeof normalizeEvolutionWebhook>>, eventId: string): Promise<void> {
   if (!event.contactKey || event.origin.platform !== "meta") return;
   const leadId = await findEvolutionLeadIdSupabase(event.instanceName, event.contactKey);
@@ -357,6 +404,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   const app = express();
   const server = createServer(app);
   const socialMediaUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
+  const talentResumeUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 5 } });
 
   app.set("trust proxy", 1);
   app.use(express.json());
@@ -440,6 +488,155 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.post("/api/auth/logout", requireAuth, (_req, res) => {
     res.clearCookie(SUPABASE_ACCESS_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
     res.status(204).end();
+  });
+
+  // ─── Banco de Talentos Vida Card ──────────────────────────────────────────
+  const allowedTalentTypes: TalentFieldType[] = ["text", "textarea", "email", "phone", "cpf", "number", "select", "radio", "checkbox", "date", "file"];
+  const allowedTalentStatuses: TalentSubmissionStatus[] = ["novo", "em_analise", "entrevista", "aprovado", "reprovado", "banco"];
+  const publicTalentRate = new Map<string, { count: number; startedAt: number }>();
+  const safeTalentSlug = (value: string) => /^[a-z0-9][a-z0-9-]{1,118}[a-z0-9]$/.test(value);
+  const talentIpHash = (req: express.Request) => { const ip = req.ip || req.socket.remoteAddress; return ip ? crypto.createHmac("sha256", JWT_SECRET).update(ip).digest("hex") : null; };
+  const publicTalentAllowed = (req: express.Request) => { const key = talentIpHash(req) ?? "unknown"; const now = Date.now(); const bucket = publicTalentRate.get(key); if (!bucket || now - bucket.startedAt > 60 * 60_000) { publicTalentRate.set(key, { count: 1, startedAt: now }); return true; } bucket.count += 1; return bucket.count <= 12; };
+  const trimText = (value: unknown, max: number) => typeof value === "string" ? value.trim().slice(0, max) : "";
+  async function talentClientAllowed(req: express.Request, clientId: string): Promise<{ id: string; name: string } | null> { const sb = getSupabaseForRequest(req); if (!sb || !req.claims) return null; const catalog = await listDashboardClientsFromSupabase(sb, req.claims); if (catalog.error) throw new Error(catalog.error); const client = catalog.clients.find((item) => item.id === clientId); return client ? { id: client.id, name: client.name } : null; }
+  function talentManager(req: express.Request, res: express.Response): boolean { if (!req.claims || req.claims.role === "none") { res.status(403).json({ error: "Acesso restrito a gestores de unidade" }); return false; } return true; }
+  function talentFieldPayload(value: unknown, index: number): Omit<TalentField, "id" | "formId"> | null { const item = value && typeof value === "object" ? value as Record<string, unknown> : {}; const fieldKey = trimText(item.fieldKey, 100).toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/(^_|_$)/g, ""); const type = trimText(item.fieldType, 20) as TalentFieldType; const label = trimText(item.label, 500); if (!fieldKey || !label || !allowedTalentTypes.includes(type)) return null; const options = Array.isArray(item.options) ? item.options.slice(0, 30).map((option) => option && typeof option === "object" ? option as Record<string, unknown> : {}).filter((option) => trimText(option.label, 120) && trimText(option.value, 120)).map((option) => ({ label: trimText(option.label, 120), value: trimText(option.value, 120) })) : []; return { fieldKey, label, placeholder: trimText(item.placeholder, 220) || null, helpText: trimText(item.helpText, 500) || null, fieldType: type, isRequired: item.isRequired === true, orderIndex: index, options, validationRules: item.validationRules && typeof item.validationRules === "object" && !Array.isArray(item.validationRules) ? item.validationRules as Record<string, unknown> : {} }; }
+
+  app.get("/api/talent/public/:slug", async (req, res) => {
+    const slug = req.params.slug.toLowerCase();
+    if (!safeTalentSlug(slug)) { res.status(404).json({ error: "Unidade não encontrada" }); return; }
+    try { const form = await getPublicTalentForm(slug); if (!form) { res.status(404).json({ error: "Esta página de oportunidades não está disponível" }); return; } const { clientId: _clientId, ...publicForm } = form; res.setHeader("Cache-Control", "public, max-age=120"); res.json(publicForm); }
+    catch (error) { console.error("[talent] Falha ao carregar formulário público:", error); res.status(503).json({ error: "Não foi possível carregar o formulário" }); }
+  });
+
+  app.post("/api/talent/public/:slug/submit", talentResumeUpload.any(), async (req, res) => {
+    const slug = req.params.slug.toLowerCase();
+    if (!safeTalentSlug(slug)) { res.status(404).json({ error: "Unidade não encontrada" }); return; }
+    if (!publicTalentAllowed(req)) { res.status(429).json({ error: "Muitas tentativas. Aguarde antes de enviar novamente." }); return; }
+    try {
+      const form = await getPublicTalentForm(slug);
+      if (!form) { res.status(404).json({ error: "Esta página de oportunidades não está disponível" }); return; }
+      const answers = JSON.parse(String(req.body.answers ?? "{}")) as Record<string, unknown>;
+      if (!answers || typeof answers !== "object" || Array.isArray(answers) || req.body.lgpdAccepted !== "true") { res.status(400).json({ error: "Revise os dados e confirme o consentimento LGPD" }); return; }
+      const uploads = (req.files ?? []) as Express.Multer.File[];
+      const validation = validateTalentSubmission(form.fields, answers, uploads.map((item) => item.fieldname.replace(/^file_/, "")));
+      if (validation) { res.status(400).json({ error: validation }); return; }
+      const attachments = [];
+      for (const current of uploads) {
+        const fieldKey = current.fieldname.replace(/^file_/, "");
+        const config = form.fields.find((field) => field.fieldKey === fieldKey && field.fieldType === "file");
+        const uploadError = validateTalentUpload({ fieldKey, mimeType: current.mimetype, size: current.size, allowedFieldKeys: form.fields.filter((field) => field.fieldType === "file").map((field) => field.fieldKey) });
+        if (!config || uploadError) { res.status(400).json({ error: uploadError ?? "Anexo não permitido" }); return; }
+        attachments.push(await uploadTalentAttachment({ formId: form.id, fieldKey, fileName: current.originalname, file: current.buffer, mimeType: current.mimetype }));
+      }
+      await createTalentSubmission({ form, answers, attachments, ipHash: talentIpHash(req), userAgent: req.get("user-agent") ?? null });
+      res.status(201).json({ ok: true, successTitle: form.successTitle, successMessage: form.successMessage });
+    } catch (error) { console.error("[talent] Falha ao enviar candidatura:", error); res.status(503).json({ error: "Não foi possível enviar sua candidatura agora. Tente novamente." }); }
+  });
+
+  app.get("/api/talent/admin/units", requireAuth, async (req, res) => {
+    if (!talentManager(req, res)) return;
+    try { const sb = getSupabaseForRequest(req); if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; } const catalog = await listDashboardClientsFromSupabase(sb, req.claims!); if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades" }); return; } res.json({ units: catalog.clients }); }
+    catch (error) { console.error("[talent] Falha ao listar unidades:", error); res.status(503).json({ error: "Não foi possível carregar as unidades" }); }
+  });
+
+  app.get("/api/talent/admin/form", requireAuth, async (req, res) => {
+    if (!talentManager(req, res)) return;
+    const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
+    if (!/^[0-9a-f-]{36}$/i.test(clientId)) { res.status(400).json({ error: "Selecione uma unidade válida" }); return; }
+    try { const client = await talentClientAllowed(req, clientId); if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } let form = await getTalentFormForClient(clientId); if (!form) form = await createTalentFormForClient({ clientId, publicSlug: talentSlugFromUnitName(client.name, clientId), title: `Trabalhe Conosco — ${client.name}`, subtitle: "Faça parte do time Vida Card." }); res.json({ unit: client, form }); }
+    catch (error) { console.error("[talent] Falha ao carregar formulário administrativo:", error); res.status(503).json({ error: "Não foi possível carregar o formulário" }); }
+  });
+
+  app.put("/api/talent/admin/form", requireAuth, async (req, res) => {
+    if (!talentManager(req, res)) return;
+    const payload = req.body as Record<string, unknown>; const clientId = trimText(payload.clientId, 36); const formId = trimText(payload.formId, 36); if (!/^[0-9a-f-]{36}$/i.test(clientId) || !/^[0-9a-f-]{36}$/i.test(formId)) { res.status(400).json({ error: "Formulário ou unidade inválidos" }); return; }
+    const fieldsRaw = Array.isArray(payload.fields) ? payload.fields : []; const fields = fieldsRaw.map(talentFieldPayload).filter((item): item is Omit<TalentField, "id" | "formId"> => Boolean(item)); if (fields.length !== fieldsRaw.length || new Set(fields.map((item) => item.fieldKey)).size !== fields.length) { res.status(400).json({ error: "Revise as perguntas: cada chave deve ser única e válida" }); return; }
+    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const form = await saveTalentForm({ clientId, formId, title: trimText(payload.title, 255) || "Trabalhe Conosco", subtitle: trimText(payload.subtitle, 1200) || "Faça parte do time Vida Card.", bannerUrl: trimText(payload.bannerUrl, 1000) || null, lgpdDisclaimer: trimText(payload.lgpdDisclaimer, 3000) || "Autorizo o tratamento dos meus dados para fins de recrutamento.", successTitle: trimText(payload.successTitle, 255) || "Candidatura enviada!", successMessage: trimText(payload.successMessage, 1200) || "Recebemos suas informações.", isPublished: payload.isPublished === true, fields }); res.json({ form }); }
+    catch (error) { console.error("[talent] Falha ao salvar formulário:", error); res.status(503).json({ error: "Não foi possível salvar o formulário" }); }
+  });
+
+  app.get("/api/talent/admin/submissions", requireAuth, async (req, res) => {
+    if (!talentManager(req, res)) return;
+    const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
+    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const submissions = await listTalentSubmissions({ clientId, search: typeof req.query.search === "string" ? req.query.search : undefined, status: typeof req.query.status === "string" ? req.query.status : undefined, limit: Number(req.query.limit ?? 200) }); res.json({ submissions }); }
+    catch (error) { console.error("[talent] Falha ao listar candidaturas:", error); res.status(503).json({ error: "Não foi possível carregar as candidaturas" }); }
+  });
+
+  app.patch("/api/talent/admin/submissions/:id", requireAuth, async (req, res) => {
+    if (!talentManager(req, res)) return;
+    const payload = req.body as Record<string, unknown>; const clientId = trimText(payload.clientId, 36); const status = trimText(payload.status, 20) as TalentSubmissionStatus; if (!/^[0-9a-f-]{36}$/i.test(clientId) || !/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(400).json({ error: "Candidatura ou unidade inválida" }); return; }
+    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const result = await updateTalentSubmission({ id: req.params.id, clientId, status: allowedTalentStatuses.includes(status) ? status : undefined, notes: payload.notes === undefined ? undefined : trimText(payload.notes, 5000) || null }); if (!result) { res.status(404).json({ error: "Candidatura não encontrada" }); return; } res.json({ submission: result }); }
+    catch (error) { console.error("[talent] Falha ao atualizar candidatura:", error); res.status(503).json({ error: "Não foi possível atualizar a candidatura" }); }
+  });
+
+  app.get("/api/talent/admin/submissions/:id/attachments/:index", requireAuth, async (req, res) => {
+    if (!talentManager(req, res)) return;
+    const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
+    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const candidates = await listTalentSubmissions({ clientId, limit: 500 }); const candidate = candidates.find((item) => item.id === req.params.id); const attachment = candidate?.attachments[Number(req.params.index)]; if (!attachment) { res.status(404).json({ error: "Currículo não encontrado" }); return; } res.json({ url: await createTalentAttachmentUrl(attachment.storageKey), fileName: attachment.fileName }); }
+    catch (error) { console.error("[talent] Falha ao assinar currículo:", error); res.status(503).json({ error: "Não foi possível abrir o currículo" }); }
+  });
+
+  // ─── Integrações externas de IA: administração (somente admins) ───────────
+  app.get("/api/external-ai/tokens", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    try {
+      const sb = getSupabaseForRequest(req);
+      if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
+      const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
+      if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades autorizadas" }); return; }
+      const tokens = await listExternalAiApiTokensSql(req.claims!.id);
+      res.json({ scopes: ["metrics:read", "leads:summary:read", "crm:summary:read"], rateLimitPerMinute: EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE, units: catalog.clients, tokens: tokens.map(({ tokenHash: _hash, ...token }) => token) });
+    } catch (error) { console.error("[external-ai] Falha ao listar tokens:", error); res.status(503).json({ error: "Não foi possível carregar os tokens externos" }); }
+  });
+
+  app.post("/api/external-ai/tokens", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    const validated = validateExternalAiApiTokenDraft(req.body as Record<string, unknown>);
+    if (!validated.ok) { res.status(400).json({ error: validated.error }); return; }
+    try {
+      const sb = getSupabaseForRequest(req);
+      if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
+      const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
+      if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades autorizadas" }); return; }
+      const permitted = new Set(catalog.clients.map((unit) => unit.id));
+      if (!validated.value.unitIds.every((unitId) => permitted.has(unitId))) { res.status(403).json({ error: "O token só pode incluir unidades autorizadas" }); return; }
+      const rawToken = createExternalAiApiToken();
+      const token = await createExternalAiApiTokenSql({ ownerUserId: req.claims!.id, name: validated.value.name, tokenPrefix: externalAiApiTokenPrefix(rawToken), tokenHash: hashExternalAiApiToken(rawToken), scopes: validated.value.scopes, unitIds: validated.value.unitIds, expiresAt: validated.value.expiresAt });
+      const { tokenHash: _hash, ...metadata } = token;
+      res.status(201).json({ token: rawToken, metadata });
+    } catch (error) { console.error("[external-ai] Falha ao criar token:", error); res.status(503).json({ error: "Não foi possível criar o token externo" }); }
+  });
+
+  app.delete("/api/external-ai/tokens/:id", requireAuth, requireSupabaseAdmin, async (req, res) => {
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(400).json({ error: "Token inválido" }); return; }
+    try {
+      if (!await revokeExternalAiApiTokenSql(req.params.id, req.claims!.id)) { res.status(404).json({ error: "Token não encontrado ou já revogado" }); return; }
+      res.json({ ok: true });
+    } catch (error) { console.error("[external-ai] Falha ao revogar token:", error); res.status(503).json({ error: "Não foi possível revogar o token" }); }
+  });
+
+  // ─── API externa: apenas agregados, sem PII e sem qualquer escrita ─────────
+  app.get("/api/external/v1/units", requireExternalAiToken(), async (req, res) => {
+    try { res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), dataClassification: "aggregated", units: await listExternalAiUnits(req.externalAiToken!.unitIds) }); }
+    catch (error) { console.error("[external-ai] Falha ao listar unidades:", error); req.externalAiOutcome = "upstream_error"; res.status(503).json({ error: "Os dados estão temporariamente indisponíveis" }); }
+  });
+
+  app.get("/api/external/v1/metrics", requireExternalAiToken("metrics:read"), async (req, res) => {
+    const unitId = externalAiUnitId(req, res); if (!unitId) return;
+    const period = resolveExternalAiApiDateRange(req.query.start, req.query.end); if (!period.ok) { res.status(400).json({ error: period.error }); return; }
+    try { const [unit, metrics] = await Promise.all([getExternalAiUnit(unitId), getExternalAiMetrics(unitId, period.start, period.end)]); res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), dataClassification: "aggregated", unit, metrics }); }
+    catch (error) { console.error("[external-ai] Falha em métricas:", error); req.externalAiOutcome = "upstream_error"; res.status(503).json({ error: "Os dados estão temporariamente indisponíveis" }); }
+  });
+
+  app.get("/api/external/v1/leads/summary", requireExternalAiToken("leads:summary:read"), async (req, res) => {
+    const unitId = externalAiUnitId(req, res); if (!unitId) return;
+    try { const unit = await getExternalAiUnit(unitId); res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), dataClassification: "aggregated", unit, leads: await getExternalAiLeadSummary(unit.name) }); }
+    catch (error) { console.error("[external-ai] Falha em resumo de leads:", error); req.externalAiOutcome = "upstream_error"; res.status(503).json({ error: "Os dados estão temporariamente indisponíveis" }); }
+  });
+
+  app.get("/api/external/v1/crm/summary", requireExternalAiToken("crm:summary:read"), async (req, res) => {
+    const unitId = externalAiUnitId(req, res); if (!unitId) return;
+    try { const unit = await getExternalAiUnit(unitId); res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), dataClassification: "aggregated", unit, crm: await getExternalAiCrmSummary(unit.name) }); }
+    catch (error) { console.error("[external-ai] Falha em resumo CRM:", error); req.externalAiOutcome = "upstream_error"; res.status(503).json({ error: "Os dados estão temporariamente indisponíveis" }); }
   });
 
   // ─── Evolution — módulo isolado de rastreio ───────────────────────────────

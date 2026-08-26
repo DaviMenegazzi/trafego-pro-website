@@ -708,3 +708,15 @@
 - [ ] Identificar o estado e a resposta que bloqueiam a exclusão atual
 - [ ] Corrigir o cancelamento de itens futuros sem permitir remover itens publicados
 - [ ] Cobrir a exclusão em teste e publicar a correção validada
+
+## Avaliação de token Meta Business
+
+- [x] Mapear quais integrações atuais usam tokens Meta para métricas, publicação e atribuição
+- [x] Verificar a compatibilidade e os escopos do novo token sem persistir o valor em código ou Git
+- [x] Recomendar se o token deve substituir alguma integração atual e registrar o procedimento seguro de rotação
+
+## Validação isolada de token Meta renovado
+
+- [x] Receber o token renovado por campo seguro e não persistir o valor em código ou Git
+- [x] Validar a expiração, `ads_read` e as contas de anúncio acessíveis pela Graph API
+- [x] Apresentar o resultado sem alterar a dashboard nem a sincronização atual

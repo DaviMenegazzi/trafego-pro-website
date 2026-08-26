@@ -748,6 +748,14 @@
 - [x] Cobrir RLS lógico, validação, upload, filtros, exportação e isolamento entre unidades em Vitest
 - [ ] Validar responsividade, acessibilidade, TypeScript, testes, build e publicação
 
+## Ajustes de experiência do Banco de Talentos
+
+- [x] Corrigir a inclusão de múltiplos campos no construtor de formulário
+- [x] Aplicar aos seletores do Banco de Talentos o padrão visual interno da dashboard
+- [x] Exibir estado de publicação e ação explícita de despublicação no formulário
+- [x] Exibir pop-up de sucesso com o link público copiável após salvar um formulário publicado
+- [ ] Cobrir os ajustes de construtor e publicação em testes e validação visual
+
 ## Supabase separado para Banco de Talentos
 
 - [x] Preservar o Supabase da dashboard somente como fonte de autorizações de usuário e unidade

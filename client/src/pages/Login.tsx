@@ -7,23 +7,13 @@ import {
   EyeOff,
   ArrowRight,
   ShieldCheck,
-  Sparkles,
   TrendingUp,
   UsersRound,
   BarChart3,
-  CheckCircle2,
   Loader2,
   AlertCircle,
 } from "lucide-react";
 import { markDashboardPostLoginRefresh } from "@/lib/dashboardAuthSignal";
-
-const ROTATING_WORDS = [
-  "performance",
-  "crescimento",
-  "recrutamento",
-  "decisões ágeis",
-  "resultados",
-];
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -33,22 +23,6 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
-  const [fadeState, setFadeState] = useState<"in" | "out">("in");
-
-  // Rotating title animation
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setFadeState("out");
-      setTimeout(() => {
-        setCurrentWordIndex((prev) => (prev + 1) % ROTATING_WORDS.length);
-        setFadeState("in");
-      }, 300);
-    }, 3000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("tp_token");
@@ -107,7 +81,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen w-full bg-zinc-950 text-white flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200 relative overflow-hidden font-sans">
-      {/* Background Ambient Glows (Emerald & Slate) */}
+      {/* Background Ambient Glows */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
         {/* Ambient Top Emerald Glow */}
         <div
@@ -116,11 +90,11 @@ export default function Login() {
             background: "radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.1) 60%, transparent 80%)",
           }}
         />
-        {/* Ambient Bottom Slate/Emerald Glow */}
+        {/* Ambient Bottom Slate Glow */}
         <div
           className="absolute -bottom-40 -right-40 size-[650px] rounded-full opacity-15 blur-[140px]"
           style={{
-            background: "radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(30, 41, 59, 0.4) 60%, transparent 80%)",
+            background: "radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, rgba(30, 41, 59, 0.4) 60%, transparent 80%)",
           }}
         />
         {/* Subtle geometric dot grid pattern */}
@@ -134,30 +108,18 @@ export default function Login() {
       </div>
 
       {/* Main Content: Clean Centered Split Area */}
-      <main className="relative z-10 flex-1 flex items-center justify-center max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 md:py-16">
+      <main className="relative z-10 flex-1 flex items-center justify-center max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 md:py-16 my-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center w-full max-w-5xl">
           
-          {/* Left Column: Clean Animated Headline & Platform Highlights */}
-          <div className="hidden lg:flex lg:col-span-6 flex-col justify-center space-y-8 pr-2">
+          {/* Left Column: Minimalist Executive Headline & Platform Highlights */}
+          <div className="hidden lg:flex lg:col-span-6 flex-col justify-center space-y-7 pr-2">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-400 backdrop-blur-md">
-                <Sparkles className="size-3.5 animate-pulse" />
-                <span>Central de Gestão & Performance</span>
-              </div>
-
-              {/* Animated Headline */}
-              <h1 className="font-display text-4xl xl:text-5xl font-bold tracking-tight text-zinc-100 leading-[1.2]">
-                Sua plataforma para impulsionar{" "}
-                <span
-                  className={`inline-block bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200 bg-clip-text text-transparent transition-all duration-300 font-extrabold pb-0.5 border-b-2 border-emerald-500/50 ${
-                    fadeState === "in"
-                      ? "opacity-100 translate-y-0 scale-100"
-                      : "opacity-0 -translate-y-1 scale-95"
-                  }`}
-                >
-                  {ROTATING_WORDS[currentWordIndex]}
+              {/* Minimalist Headline with Subtle Shimmer */}
+              <h1 className="font-display text-4xl xl:text-5xl font-bold tracking-tight text-white leading-[1.18]">
+                Gestão inteligente.<br />
+                <span className="bg-gradient-to-r from-emerald-400 via-teal-200 to-zinc-400 bg-clip-text text-transparent">
+                  Performance em tempo real.
                 </span>
-                .
               </h1>
 
               <p className="text-sm xl:text-base text-zinc-400 leading-relaxed font-light max-w-lg">
@@ -166,7 +128,7 @@ export default function Login() {
             </div>
 
             {/* Feature Highlights with Slate & Emerald Accents */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-3 pt-1">
               <div className="flex items-center gap-3.5 rounded-2xl border border-white/5 bg-zinc-900/40 p-3.5 backdrop-blur-sm transition hover:border-emerald-500/30 hover:bg-zinc-900/70">
                 <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
                   <TrendingUp className="size-4" />
@@ -182,8 +144,8 @@ export default function Login() {
                   <UsersRound className="size-4" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-zinc-200">Banco de Talentos Inteligente</h4>
-                  <p className="text-[11px] text-zinc-400">Formulários customizados e funil de seleção de candidatos.</p>
+                  <h4 className="text-xs font-semibold text-zinc-200">Banco de Talentos & Recrutamento</h4>
+                  <p className="text-[11px] text-zinc-400">Formulários sob medida e funil de seleção de candidatos.</p>
                 </div>
               </div>
 
@@ -193,7 +155,7 @@ export default function Login() {
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-zinc-200">Retorno Comercial & Qualificação</h4>
-                  <p className="text-[11px] text-zinc-400">Feedbacks estruturados e acompanhamento operacional.</p>
+                  <p className="text-[11px] text-zinc-400">Feedbacks estruturados e acompanhamento de leads.</p>
                 </div>
               </div>
             </div>
@@ -205,16 +167,16 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Right Column: Modern Glass Card with Slate/Zinc & Emerald Touch */}
+          {/* Right Column: Modern Glass Card */}
           <div className="lg:col-span-6 flex justify-center">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900/60 p-8 sm:p-10 backdrop-blur-2xl shadow-2xl shadow-black/80 relative">
               
               {/* Card Header */}
               <div className="mb-7">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-emerald-400">
-                    Acesso à Plataforma
+                  <div className="size-2 rounded-full bg-emerald-400" />
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-emerald-400 font-mono">
+                    Acesso Seguro
                   </span>
                 </div>
                 <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">
@@ -315,7 +277,7 @@ export default function Login() {
                   </span>
                 </div>
 
-                {/* Submit Button (Modern Emerald Gradient Accent) */}
+                {/* Submit Button */}
                 <div className="pt-2">
                   <button
                     type="submit"
@@ -347,7 +309,7 @@ export default function Login() {
         </div>
       </main>
 
-      {/* Footer (Clean & Neutral) */}
+      {/* Footer */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-white/5 text-[11px] text-zinc-500">
         <div>
           © {new Date().getFullYear()} Tráfego Pro · Todos os direitos reservados.

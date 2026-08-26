@@ -20,8 +20,8 @@ export function validateTalentSubmission(fields: TalentField[], answers: Record<
     const value = answers[field.fieldKey];
     if (value === undefined || value === null || value === "") continue;
     if (field.fieldType === "email" && !/^\S+@\S+\.\S+$/.test(String(value))) return "Informe um e-mail válido";
-    if (["select", "radio"].includes(field.fieldType) && field.options.length && !field.options.some((option) => option.value === value)) return `Selecione uma opção válida para: ${field.label}`;
-    if (field.fieldType === "checkbox" && (!Array.isArray(value) || value.some((entry) => !field.options.some((option) => option.value === entry)))) return `Selecione opções válidas para: ${field.label}`;
+    if (["select", "radio"].includes(field.fieldType) && field.options.length && !field.options.some((option) => option.value === value || option.label === value)) return `Selecione uma opção válida para: ${field.label}`;
+    if (field.fieldType === "checkbox" && (!Array.isArray(value) || value.some((entry) => !field.options.some((option) => option.value === entry || option.label === entry)))) return `Selecione opções válidas para: ${field.label}`;
     if (typeof value === "string" && value.length > 5000) return `A resposta para ${field.label} é longa demais`;
   }
   return null;

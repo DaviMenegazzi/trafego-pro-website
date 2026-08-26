@@ -37,7 +37,122 @@ export async function getTalentFormForClient(clientId: string, formId?: string):
 export async function createTalentFormForClient(input: { clientId: string; publicSlug: string; title: string; subtitle: string }): Promise<TalentForm> { const sb = getTalentSupabase(); const { data, error } = await sb.from("talent_forms").insert({ client_id: input.clientId, public_slug: input.publicSlug, title: input.title, subtitle: input.subtitle }).select().single(); if (error) throw new Error(error.message); return form(data as Record<string, unknown>, []); }
 export async function saveTalentForm(input: { clientId: string; formId: string; title: string; subtitle: string; bannerUrl: string | null; lgpdDisclaimer: string; successTitle: string; successMessage: string; isPublished: boolean; fields: Array<Omit<TalentField, "id" | "formId"> & { id?: string }> }): Promise<TalentForm> { const sb = getTalentSupabase(); const { error: formError } = await sb.from("talent_forms").update({ title: input.title, subtitle: input.subtitle, banner_url: input.bannerUrl, lgpd_disclaimer: input.lgpdDisclaimer, success_title: input.successTitle, success_message: input.successMessage, is_published: input.isPublished }).eq("id", input.formId).eq("client_id", input.clientId); if (formError) throw new Error(formError.message); const { error: deleteError } = await sb.from("talent_form_fields").delete().eq("form_id", input.formId); if (deleteError) throw new Error(deleteError.message); if (input.fields.length) { const rows = input.fields.map((item, index) => ({ form_id: input.formId, field_key: item.fieldKey, label: item.label, placeholder: item.placeholder, help_text: item.helpText, field_type: item.fieldType, is_required: item.isRequired, order_index: index, options: item.options, validation_rules: item.validationRules })); const { error } = await sb.from("talent_form_fields").insert(rows); if (error) throw new Error(error.message); } const saved = await getTalentFormForClient(input.clientId); if (!saved) throw new Error("Formulário não encontrado após salvar"); return saved; }
 export async function uploadTalentAttachment(input: { formId: string; fieldKey: string; fileName: string; file: Buffer; mimeType: string }): Promise<TalentAttachment> { const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120); const storageKey = `${input.formId}/${Date.now()}-${crypto.randomUUID()}-${safeName}`; const { error } = await getTalentSupabase().storage.from("talent-resumes").upload(storageKey, input.file, { contentType: input.mimeType, upsert: false }); if (error) throw new Error(error.message); return { fieldKey: input.fieldKey, fileName: input.fileName.slice(0, 180), storageKey, fileSize: input.file.byteLength, mimeType: input.mimeType }; }
-export async function createTalentSubmission(input: { form: TalentForm; answers: Record<string, unknown>; attachments: TalentAttachment[]; ipHash: string | null; userAgent: string | null }): Promise<TalentSubmission> { const byKey = input.answers; const fields = input.form.fields; const find = (...keys: string[]) => fields.find((item) => keys.includes(item.fieldKey))?.fieldKey; const name = find("nome", "nome_completo", "name"); const email = find("email", "e_mail"); const phone = find("telefone", "phone", "celular", "whatsapp"); const { data, error } = await getTalentSupabase().from("talent_submissions").insert({ form_id: input.form.id, client_id: input.form.clientId, candidate_name: name ? String(byKey[name] ?? "").slice(0, 255) || null : null, candidate_email: email ? String(byKey[email] ?? "").slice(0, 255) || null : null, candidate_phone: phone ? String(byKey[phone] ?? "").slice(0, 50) || null : null, answers: input.answers, file_attachments: input.attachments, lgpd_accepted_at: new Date().toISOString(), ip_hash: input.ipHash, user_agent: input.userAgent?.slice(0, 1000) ?? null }).select().single(); if (error) throw new Error(error.message); return submission(data as Record<string, unknown>); }
+export async function createTalentSubmission(input: { form: TalentForm; answers: Record<string, unknown>; attachments: TalentAttachment[]; ipHash: string | null; userAgent: string | null }): Promise<TalentSubmission> {
+  const byKey = input.answers;
+  const fields = input.form.fields;
+
+  // Smart resolution for Name
+  const nameField = fields.find((item) => {
+    const k = item.fieldKey.toLowerCase();
+    const l = item.label.toLowerCase();
+    return ["nome", "nome_completo", "name", "full_name", "candidato"].includes(k) ||
+      k.includes("nome") || l.includes("nome");
+  });
+  const nameVal = nameField ? byKey[nameField.fieldKey] : undefined;
+
+  // Smart resolution for Email
+  const emailField = fields.find((item) => {
+    const k = item.fieldKey.toLowerCase();
+    return item.fieldType === "email" || ["email", "e_mail", "mail"].includes(k) || k.includes("email");
+  });
+  const emailVal = emailField ? byKey[emailField.fieldKey] : undefined;
+
+  // Smart resolution for Phone
+  const phoneField = fields.find((item) => {
+    const k = item.fieldKey.toLowerCase();
+    return item.fieldType === "phone" || ["telefone", "phone", "celular", "whatsapp", "contato"].includes(k) || k.includes("telefone") || k.includes("celular");
+  });
+  const phoneVal = phoneField ? byKey[phoneField.fieldKey] : undefined;
+
+  const { data, error } = await getTalentSupabase().from("talent_submissions").insert({
+    form_id: input.form.id,
+    client_id: input.form.clientId,
+    candidate_name: nameVal ? String(nameVal).slice(0, 255).trim() || null : null,
+    candidate_email: emailVal ? String(emailVal).slice(0, 255).trim() || null : null,
+    candidate_phone: phoneVal ? String(phoneVal).slice(0, 50).trim() || null : null,
+    answers: input.answers,
+    file_attachments: input.attachments,
+    lgpd_accepted_at: new Date().toISOString(),
+    ip_hash: input.ipHash,
+    user_agent: input.userAgent?.slice(0, 1000) ?? null
+  }).select().single();
+  if (error) throw new Error(error.message);
+  return submission(data as Record<string, unknown>);
+}
 export async function listTalentSubmissions(input: { clientId: string; formId?: string; search?: string; status?: string; limit?: number }): Promise<TalentSubmission[]> { let query = getTalentSupabase().from("talent_submissions").select("*").eq("client_id", input.clientId).order("created_at", { ascending: false }).limit(Math.min(Math.max(input.limit ?? 200, 1), 500)); if (input.formId) query = query.eq("form_id", input.formId); if (input.status && statuses.includes(input.status as TalentSubmissionStatus)) query = query.eq("status", input.status); if (input.search?.trim()) { const value = input.search.trim().replace(/[,%()]/g, " "); query = query.or(`candidate_name.ilike.%${value}%,candidate_email.ilike.%${value}%,candidate_phone.ilike.%${value}%`); } const { data, error } = await query; if (error) throw new Error(error.message); return (data ?? []).map((row) => submission(row as Record<string, unknown>)); }
 export async function updateTalentSubmission(input: { id: string; clientId: string; status?: TalentSubmissionStatus; notes?: string | null }): Promise<TalentSubmission | null> { const patch: Record<string, unknown> = {}; if (input.status) patch.status = input.status; if (input.notes !== undefined) patch.notes = input.notes; const { data, error } = await getTalentSupabase().from("talent_submissions").update(patch).eq("id", input.id).eq("client_id", input.clientId).select().maybeSingle(); if (error) throw new Error(error.message); return data ? submission(data as Record<string, unknown>) : null; }
 export async function createTalentAttachmentUrl(storageKey: string): Promise<string> { const { data, error } = await getTalentSupabase().storage.from("talent-resumes").createSignedUrl(storageKey, 60 * 10); if (error || !data?.signedUrl) throw new Error(error?.message ?? "Não foi possível assinar o currículo"); return data.signedUrl; }
+
+export async function deleteTalentFormForClient(clientId: string, formId: string): Promise<boolean> {
+  const sb = getTalentSupabase();
+  await sb.from("talent_submissions").delete().eq("form_id", formId).eq("client_id", clientId);
+  await sb.from("talent_form_fields").delete().eq("form_id", formId);
+  const { error } = await sb.from("talent_forms").delete().eq("id", formId).eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function uploadTalentLogo(input: {
+  clientId: string;
+  formId: string;
+  fileName: string;
+  file: Buffer;
+  mimeType: string;
+}): Promise<string> {
+  const sb = getTalentSupabase();
+  const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
+  const storageKey = `logos/${input.clientId}/${input.formId}-${Date.now()}-${safeName}`;
+
+  // 1. Try dedicated public bucket `talent-logos`
+  try {
+    const { data: buckets } = await sb.storage.listBuckets();
+    const hasLogosBucket = buckets?.some((b) => b.name === "talent-logos");
+    if (!hasLogosBucket) {
+      await sb.storage.createBucket("talent-logos", {
+        public: true,
+        allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"],
+        fileSizeLimit: 5 * 1024 * 1024,
+      });
+    }
+    const { error: uploadErr } = await sb.storage
+      .from("talent-logos")
+      .upload(storageKey, input.file, { contentType: input.mimeType, upsert: true });
+    if (!uploadErr) {
+      const { data } = sb.storage.from("talent-logos").getPublicUrl(storageKey);
+      if (data?.publicUrl) return data.publicUrl;
+    }
+  } catch (err) {
+    console.warn("[talent] Falha ao tentar bucket talent-logos:", err);
+  }
+
+  // 2. Try updating `talent-resumes` allowed mime types
+  try {
+    await sb.storage.updateBucket("talent-resumes", {
+      public: true,
+      allowedMimeTypes: [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/svg+xml",
+        "image/gif",
+      ],
+    });
+    const { error } = await sb.storage
+      .from("talent-resumes")
+      .upload(storageKey, input.file, { contentType: input.mimeType, upsert: true });
+    if (!error) {
+      const { data } = sb.storage.from("talent-resumes").getPublicUrl(storageKey);
+      if (data?.publicUrl) return data.publicUrl;
+    }
+  } catch (err) {
+    console.warn("[talent] Falha ao tentar bucket talent-resumes:", err);
+  }
+
+  // 3. Ultra-safe Fallback: Base64 data URL
+  const base64 = input.file.toString("base64");
+  return `data:${input.mimeType};base64,${base64}`;
+}
+
+

@@ -43,7 +43,7 @@ import { validateSocialMediaUpload } from "./socialMediaUploadPolicy.js";
 import { createExternalAiApiToken, EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE, externalAiApiTokenPrefix, hasExternalAiApiScope, hashExternalAiApiToken, isExternalAiApiTokenActive, isExternalAiApiUnitAllowed, resolveExternalAiApiDateRange, validateExternalAiApiTokenDraft, type ExternalAiApiScope } from "./externalAiApiPolicy.js";
 import { consumeExternalAiApiRateLimitSql, createExternalAiApiTokenSql, findExternalAiApiTokenByHashSql, listExternalAiApiTokensSql, recordExternalAiApiAuditSql, revokeExternalAiApiTokenSql, type ExternalAiApiToken } from "./externalAiApiSql.js";
 import { getExternalAiCrmSummary, getExternalAiLeadSummary, getExternalAiMetrics, getExternalAiUnit, listExternalAiUnits } from "./externalAiApiData.js";
-import { createTalentAttachmentUrl, createTalentFormForClient, createTalentSubmission, getPublicTalentForm, getTalentFormForClient, listTalentFormsForClient, listTalentSubmissions, saveTalentForm, talentSlugFromUnitName, updateTalentSubmission, uploadTalentAttachment, type TalentField, type TalentFieldType, type TalentSubmissionStatus } from "./talentBankSupabaseStore.js";
+import { createTalentAttachmentUrl, createTalentFormForClient, createTalentSubmission, deleteTalentFormForClient, getPublicTalentForm, getTalentFormForClient, listTalentFormsForClient, listTalentSubmissions, saveTalentForm, talentSlugFromUnitName, updateTalentSubmission, uploadTalentAttachment, uploadTalentLogo, type TalentField, type TalentFieldType, type TalentSubmissionStatus } from "./talentBankSupabaseStore.js";
 import { validateTalentSubmission, validateTalentUpload } from "./talentBankPolicy.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -562,6 +562,63 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     const fieldsRaw = Array.isArray(payload.fields) ? payload.fields : []; const fields = fieldsRaw.map(talentFieldPayload).filter((item): item is Omit<TalentField, "id" | "formId"> => Boolean(item)); if (fields.length !== fieldsRaw.length || new Set(fields.map((item) => item.fieldKey)).size !== fields.length) { res.status(400).json({ error: "Revise as perguntas: cada chave deve ser única e válida" }); return; }
     try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const form = await saveTalentForm({ clientId, formId, title: trimText(payload.title, 255) || "Trabalhe Conosco", subtitle: trimText(payload.subtitle, 1200) || "Faça parte do time Vida Card.", bannerUrl: trimText(payload.bannerUrl, 1000) || null, lgpdDisclaimer: trimText(payload.lgpdDisclaimer, 3000) || "Autorizo o tratamento dos meus dados para fins de recrutamento.", successTitle: trimText(payload.successTitle, 255) || "Candidatura enviada!", successMessage: trimText(payload.successMessage, 1200) || "Recebemos suas informações.", isPublished: payload.isPublished === true, fields }); res.json({ form }); }
     catch (error) { console.error("[talent] Falha ao salvar formulário:", error); res.status(503).json({ error: "Não foi possível salvar o formulário" }); }
+  });
+
+  app.delete("/api/talent/admin/forms/:id", requireAuth, async (req, res) => {
+    if (!talentManager(req, res)) return;
+    const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
+    const formId = req.params.id;
+    if (!/^[0-9a-f-]{36}$/i.test(clientId) || !/^[0-9a-f-]{36}$/i.test(formId)) {
+      res.status(400).json({ error: "Formulário ou unidade inválidos" });
+      return;
+    }
+    try {
+      if (!await talentClientAllowed(req, clientId)) {
+        res.status(403).json({ error: "Sem acesso a esta unidade" });
+        return;
+      }
+      await deleteTalentFormForClient(clientId, formId);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("[talent] Falha ao deletar formulário:", error);
+      res.status(503).json({ error: "Não foi possível deletar o formulário" });
+    }
+  });
+
+  app.post("/api/talent/admin/forms/:id/logo", requireAuth, talentResumeUpload.single("logo"), async (req, res) => {
+    if (!talentManager(req, res)) return;
+    const clientId = typeof req.body?.clientId === "string" && req.body.clientId ? req.body.clientId : (typeof req.query.client_id === "string" ? req.query.client_id : "");
+    const formId = req.params.id;
+    if (!/^[0-9a-f-]{36}$/i.test(clientId) || !/^[0-9a-f-]{36}$/i.test(formId)) {
+      res.status(400).json({ error: "Formulário ou unidade inválidos" });
+      return;
+    }
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "Nenhum arquivo de imagem enviado" });
+      return;
+    }
+    if (!file.mimetype.startsWith("image/")) {
+      res.status(400).json({ error: "O arquivo deve ser uma imagem (PNG, JPG, WEBP, SVG)" });
+      return;
+    }
+    try {
+      if (!await talentClientAllowed(req, clientId)) {
+        res.status(403).json({ error: "Sem acesso a esta unidade" });
+        return;
+      }
+      const logoUrl = await uploadTalentLogo({
+        clientId,
+        formId,
+        fileName: file.originalname,
+        file: file.buffer,
+        mimeType: file.mimetype,
+      });
+      res.json({ logoUrl });
+    } catch (error) {
+      console.error("[talent] Falha ao enviar logo:", error);
+      res.status(503).json({ error: "Não foi possível enviar a logo" });
+    }
   });
 
   app.get("/api/talent/admin/submissions", requireAuth, async (req, res) => {

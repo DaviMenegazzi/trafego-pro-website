@@ -259,10 +259,14 @@ export function TalentFormsList({
                       {f.isPublished ? "Publicado" : "Rascunho"}
                     </span>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <span className="flex items-center gap-1 text-[11px] text-zinc-500 font-mono">
                         <Layers className="size-3" />
                         {f.fields.length} {f.fields.length === 1 ? "campo" : "campos"}
+                      </span>
+                      <span className="flex items-center gap-1 text-[11px] text-emerald-400/90 font-mono font-medium">
+                        <Users className="size-3" />
+                        {f.candidateCount ?? 0}
                       </span>
                       <button
                         type="button"
@@ -330,6 +334,9 @@ export function TalentFormsList({
                     >
                       <Users className="size-3.5 text-emerald-400" />
                       <span>Candidatos</span>
+                      <span className="ml-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-300 border border-emerald-500/30">
+                        {f.candidateCount ?? 0}
+                      </span>
                     </button>
 
                     <button

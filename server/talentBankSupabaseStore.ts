@@ -5,7 +5,7 @@ export type TalentFieldType = "text" | "textarea" | "email" | "phone" | "cpf" | 
 export type TalentSubmissionStatus = "novo" | "em_analise" | "entrevista" | "aprovado" | "reprovado" | "banco";
 export type TalentFieldOption = { label: string; value: string };
 export type TalentField = { id: string; formId: string; fieldKey: string; label: string; placeholder: string | null; helpText: string | null; fieldType: TalentFieldType; isRequired: boolean; orderIndex: number; options: TalentFieldOption[]; validationRules: Record<string, unknown> };
-export type TalentForm = { id: string; clientId: string; publicSlug: string; title: string; subtitle: string; bannerUrl: string | null; lgpdDisclaimer: string; successTitle: string; successMessage: string; isPublished: boolean; fields: TalentField[] };
+export type TalentForm = { id: string; clientId: string; publicSlug: string; title: string; subtitle: string; bannerUrl: string | null; lgpdDisclaimer: string; successTitle: string; successMessage: string; isPublished: boolean; fields: TalentField[]; candidateCount?: number };
 export type TalentAttachment = { fieldKey: string; fileName: string; storageKey: string; fileSize: number; mimeType: string };
 export type TalentSubmission = { id: string; formId: string; clientId: string; candidateName: string | null; candidateEmail: string | null; candidatePhone: string | null; answers: Record<string, unknown>; attachments: TalentAttachment[]; status: TalentSubmissionStatus; notes: string | null; createdAt: string; updatedAt: string };
 
@@ -32,8 +32,39 @@ function submission(row: Record<string, unknown>): TalentSubmission { return { i
 export function talentSlugFromUnitName(name: string, clientId: string): string { const base = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 95) || "vida-card"; return `${base}-${clientId.slice(0, 8)}`; }
 
 export async function getPublicTalentForm(slug: string): Promise<TalentForm | null> { const sb = getTalentSupabase(); const { data, error } = await sb.from("talent_forms").select("*, talent_form_fields(*)").eq("public_slug", slug).eq("is_published", true).maybeSingle(); if (error) throw new Error(error.message); if (!data) return null; const row = data as Record<string, unknown>; return form(row, asArray(row.talent_form_fields).map((item) => field(asObject(item)))); }
-export async function listTalentFormsForClient(clientId: string): Promise<TalentForm[]> { const { data, error } = await getTalentSupabase().from("talent_forms").select("*, talent_form_fields(*)").eq("client_id", clientId).order("created_at", { ascending: false }); if (error) throw new Error(error.message); return (data ?? []).map((value) => { const row = value as Record<string, unknown>; return form(row, asArray(row.talent_form_fields).map((item) => field(asObject(item)))); }); }
-export async function getTalentFormForClient(clientId: string, formId?: string): Promise<TalentForm | null> { let query = getTalentSupabase().from("talent_forms").select("*, talent_form_fields(*)").eq("client_id", clientId); query = formId ? query.eq("id", formId) : query.order("created_at", { ascending: false }).limit(1); const { data, error } = await query.maybeSingle(); if (error) throw new Error(error.message); if (!data) return null; const row = data as Record<string, unknown>; return form(row, asArray(row.talent_form_fields).map((item) => field(asObject(item)))); }
+export async function listTalentFormsForClient(clientId: string): Promise<TalentForm[]> {
+  const sb = getTalentSupabase();
+  const { data: formsData, error } = await sb.from("talent_forms").select("*, talent_form_fields(*)").eq("client_id", clientId).order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  const { data: subData } = await sb.from("talent_submissions").select("form_id").eq("client_id", clientId);
+  const countMap: Record<string, number> = {};
+  (subData || []).forEach((row) => {
+    const fid = String((row as Record<string, unknown>).form_id);
+    countMap[fid] = (countMap[fid] || 0) + 1;
+  });
+
+  return (formsData ?? []).map((value) => {
+    const row = value as Record<string, unknown>;
+    const f = form(row, asArray(row.talent_form_fields).map((item) => field(asObject(item))));
+    f.candidateCount = countMap[f.id] || 0;
+    return f;
+  });
+}
+export async function getTalentFormForClient(clientId: string, formId?: string): Promise<TalentForm | null> {
+  const sb = getTalentSupabase();
+  let query = sb.from("talent_forms").select("*, talent_form_fields(*)").eq("client_id", clientId);
+  query = formId ? query.eq("id", formId) : query.order("created_at", { ascending: false }).limit(1);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const row = data as Record<string, unknown>;
+  const f = form(row, asArray(row.talent_form_fields).map((item) => field(asObject(item))));
+
+  const { count } = await sb.from("talent_submissions").select("*", { count: "exact", head: true }).eq("form_id", f.id).eq("client_id", clientId);
+  f.candidateCount = count ?? 0;
+  return f;
+}
 export async function createTalentFormForClient(input: { clientId: string; publicSlug: string; title: string; subtitle: string }): Promise<TalentForm> { const sb = getTalentSupabase(); const { data, error } = await sb.from("talent_forms").insert({ client_id: input.clientId, public_slug: input.publicSlug, title: input.title, subtitle: input.subtitle }).select().single(); if (error) throw new Error(error.message); return form(data as Record<string, unknown>, []); }
 export async function saveTalentForm(input: { clientId: string; formId: string; title: string; subtitle: string; bannerUrl: string | null; lgpdDisclaimer: string; successTitle: string; successMessage: string; isPublished: boolean; fields: Array<Omit<TalentField, "id" | "formId"> & { id?: string }> }): Promise<TalentForm> { const sb = getTalentSupabase(); const { error: formError } = await sb.from("talent_forms").update({ title: input.title, subtitle: input.subtitle, banner_url: input.bannerUrl, lgpd_disclaimer: input.lgpdDisclaimer, success_title: input.successTitle, success_message: input.successMessage, is_published: input.isPublished }).eq("id", input.formId).eq("client_id", input.clientId); if (formError) throw new Error(formError.message); const { error: deleteError } = await sb.from("talent_form_fields").delete().eq("form_id", input.formId); if (deleteError) throw new Error(deleteError.message); if (input.fields.length) { const rows = input.fields.map((item, index) => ({ form_id: input.formId, field_key: item.fieldKey, label: item.label, placeholder: item.placeholder, help_text: item.helpText, field_type: item.fieldType, is_required: item.isRequired, order_index: index, options: item.options, validation_rules: item.validationRules })); const { error } = await sb.from("talent_form_fields").insert(rows); if (error) throw new Error(error.message); } const saved = await getTalentFormForClient(input.clientId); if (!saved) throw new Error("Formulário não encontrado após salvar"); return saved; }
 export async function uploadTalentAttachment(input: { formId: string; fieldKey: string; fileName: string; file: Buffer; mimeType: string }): Promise<TalentAttachment> { const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120); const storageKey = `${input.formId}/${Date.now()}-${crypto.randomUUID()}-${safeName}`; const { error } = await getTalentSupabase().storage.from("talent-resumes").upload(storageKey, input.file, { contentType: input.mimeType, upsert: false }); if (error) throw new Error(error.message); return { fieldKey: input.fieldKey, fileName: input.fileName.slice(0, 180), storageKey, fileSize: input.file.byteLength, mimeType: input.mimeType }; }

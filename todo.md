@@ -766,6 +766,13 @@
 - [x] Cobrir persistência, listagem e exportação por formulário em testes Vitest
 - [ ] Validar no navegador a criação, candidatura, listagem e exportação de mais de um formulário
 
+## Reorganização de clareza do Banco de Talentos
+
+- [ ] Reavaliar a hierarquia atual de unidade, formulário, candidatos e ações primárias
+- [ ] Separar a seleção de formulário da edição de campos e da gestão de candidaturas
+- [ ] Reduzir controles concorrentes e tornar o estado de publicação inequívoco
+- [ ] Validar a jornada reorganizada com os fluxos de formulário, candidato e exportação
+
 ## Supabase separado para Banco de Talentos
 
 - [x] Preservar o Supabase da dashboard somente como fonte de autorizações de usuário e unidade

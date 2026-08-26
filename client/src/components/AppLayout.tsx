@@ -64,49 +64,81 @@ const NAV_ADMIN_ONLY = [
 
 function ClientSelector({ collapsed }: { collapsed: boolean }) {
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
-  const user = useMemo(() => getStoredUser(), []);
   const [open, setOpen] = useState(false);
-
-  // Filtra clients pelas permissões do usuário
-  const filteredClients = useMemo(() => {
-    if (!user.allowedClientIds || user.allowedClientIds.includes("*")) {
-      return clients;
-    }
-    return clients.filter((c) => user.allowedClientIds!.includes(String(c.id)));
-  }, [clients, user.allowedClientIds]);
+  const [unitSearch, setUnitSearch] = useState("");
 
   useEffect(() => {
-    if (filteredClients.length === 0) {
+    if (clients.length === 0) {
       if (selectedClientId !== null) setSelectedClientId(null);
       return;
     }
 
-    const hasSelectedClient = filteredClients.some((client) => client.id === selectedClientId);
-    if (!hasSelectedClient) setSelectedClientId(filteredClients[0].id);
-  }, [filteredClients, selectedClientId, setSelectedClientId]);
+    const hasSelectedClient = clients.some((client) => client.id === selectedClientId);
+    if (!hasSelectedClient) setSelectedClientId(clients[0].id);
+  }, [clients, selectedClientId, setSelectedClientId]);
 
-  if (filteredClients.length === 0) return null;
+  if (clients.length === 0 || collapsed) return null;
 
-  if (collapsed) return null;
+  const selectedName = clients.find((client) => client.id === selectedClientId)?.name ?? clients[0].name;
 
-  const selectedName = filteredClients.find((client) => client.id === selectedClientId)?.name ?? filteredClients[0].name;
+  const visibleClients = unitSearch.trim()
+    ? clients.filter((c) => c.name.toLowerCase().includes(unitSearch.toLowerCase()))
+    : clients;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setUnitSearch(""); }}>
       <PopoverTrigger asChild>
-        <button type="button" aria-label="Selecionar unidade" className="inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left text-xs text-foreground shadow-sm transition-all duration-200 hover:border-zinc-500 hover:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-zinc-400">
-          <Building2 className="size-4 shrink-0 text-zinc-300" />
+        <button
+          type="button"
+          aria-label="Selecionar unidade"
+          className="inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left text-xs text-foreground shadow-sm transition-all duration-200 hover:border-zinc-500 hover:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-zinc-400"
+        >
+          <Building2 className="size-4 shrink-0 text-emerald-400" />
           <span className="min-w-0 flex-1 truncate font-medium">{selectedName}</span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" side="right" sideOffset={10} className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border-border bg-[color:var(--color-surface)] p-0 text-foreground shadow-2xl">
-        <div className="border-b border-border px-4 py-4"><p className="font-display text-base font-semibold">Unidades disponíveis</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Selecione a unidade para atualizar toda a dashboard.</p></div>
+      <PopoverContent align="start" side="right" sideOffset={10} className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-zinc-950/95 p-0 text-foreground shadow-2xl backdrop-blur-2xl z-50">
+        <div className="border-b border-white/10 px-4 py-3">
+          <p className="font-display text-sm font-semibold text-white">Unidades disponíveis</p>
+          <p className="mt-0.5 text-xs text-zinc-400">Selecione para atualizar os dados.</p>
+          {clients.length > 5 && (
+            <div className="mt-2.5">
+              <input
+                type="text"
+                value={unitSearch}
+                onChange={(e) => setUnitSearch(e.target.value)}
+                placeholder="Filtrar unidade…"
+                className="h-8 w-full rounded-lg border border-white/10 bg-zinc-900 px-2.5 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500/60"
+              />
+            </div>
+          )}
+        </div>
         <div className="max-h-64 overflow-y-auto p-2">
-          {filteredClients.map((client) => {
-            const selected = client.id === selectedClientId;
-            return <button key={client.id} type="button" onClick={() => { setSelectedClientId(client.id); setOpen(false); }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition-colors ${selected ? "bg-zinc-200 text-zinc-950 shadow-sm" : "text-foreground hover:bg-white/[0.06]"}`}><span className="truncate font-medium">{client.name}</span>{selected && <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-700">Selecionada</span>}</button>;
-          })}
+          {visibleClients.length === 0 ? (
+            <p className="px-3 py-4 text-xs text-zinc-500 text-center">Nenhuma unidade encontrada.</p>
+          ) : (
+            visibleClients.map((client) => {
+              const selected = client.id === selectedClientId;
+              return (
+                <button
+                  key={client.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedClientId(client.id);
+                    setOpen(false);
+                    setUnitSearch("");
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs transition-colors ${
+                    selected ? "bg-emerald-500 text-zinc-950 font-bold shadow-sm" : "text-zinc-300 hover:bg-white/[0.06] hover:text-white"
+                  }`}
+                >
+                  <span className="truncate">{client.name}</span>
+                  {selected && <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider text-zinc-900">Ativa</span>}
+                </button>
+              );
+            })
+          )}
         </div>
       </PopoverContent>
     </Popover>

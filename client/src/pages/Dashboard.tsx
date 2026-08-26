@@ -13,18 +13,29 @@ import { createRequestGate } from "@/lib/requestGate";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+import {
+  RefreshCw,
+  ChevronDown,
+  CalendarRange,
+  Building2,
+  TrendingUp,
+  DollarSign,
+  MessageSquare,
+  Target,
+  Activity,
+  Layers,
+  BarChart3,
+  PieChart as PieChartIcon,
+} from "lucide-react";
 
 // ─── Paleta de destaque dos gráficos ─────────────────────────────────────────
-// Cores fixas (não usam --primary, que fica quase branco no tema escuro do
-// dashboard). Todas têm bom contraste sobre o fundo escuro.
 const CHART = {
-  green: "#22C55E",   // conversas / positivo
-  teal: "#2FD4A5",    // marca (Vida Card)
-  orange: "#F59E0B",  // investimento / atenção
-  red: "#EF4444",     // custo / alerta
-  blue: "#38BDF8",    // apoio
+  green: "#10B981",   // conversas / positivo (Emerald)
+  teal: "#14B8A6",    // taxa / conexões (Teal)
+  orange: "#F59E0B",  // investimento / atenção (Amber)
+  red: "#EF4444",     // custo / alerta (Rose)
+  blue: "#38BDF8",    // apoio (Sky)
 };
-import { RefreshCw, ChevronDown, CalendarRange, Building2 } from "lucide-react";
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
@@ -63,6 +74,7 @@ type CampaignRow = {
   avg_cpc: number | null;
   avg_cpm: number | null;
 };
+
 // ─── Formatação (pt-BR) ───────────────────────────────────────────────────────
 const n = (v: number) => v.toLocaleString("pt-BR");
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -70,35 +82,56 @@ const pct = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits:
 const num = (v: number | null | undefined) => Number(v ?? 0);
 
 const tooltipStyle: React.CSSProperties = {
-  background: "var(--color-popover)", border: "1px solid var(--color-border)",
-  borderRadius: 14, fontSize: 12, color: "var(--color-foreground)",
+  background: "#18181b",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  borderRadius: 14,
+  fontSize: 12,
+  color: "#f4f4f5",
+  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+  padding: "10px 14px",
 };
-const axisTick = { fontSize: 11, fill: "var(--color-muted-foreground)" };
+const axisTick = { fontSize: 11, fill: "#71717a" };
 
-// Regra de status provisória (a confirmar): custo por conversa.
 function statusFor(custo: number): "Positivo" | "Atenção" | "Crítico" {
   if (custo > 0 && custo <= 8) return "Positivo";
   if (custo <= 15) return "Atenção";
   return "Crítico";
 }
 const STATUS_CLS: Record<string, string> = {
-  Positivo: "bg-[color:var(--color-success)]/15 text-[color:var(--color-success)]",
-  Atenção: "bg-[color:var(--color-warning)]/15 text-[color:var(--color-warning)]",
-  Crítico: "bg-[color:var(--color-destructive)]/15 text-[color:var(--color-destructive)]",
+  Positivo: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
+  Atenção: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
+  Crítico: "bg-rose-500/15 text-rose-400 border border-rose-500/30",
 };
 
 const PERIOD_SHORTCUTS = [
-  { value: "7", label: "Últimos 7 dias" },
-  { value: "30", label: "Últimos 30 dias" },
-  { value: "90", label: "Últimos 90 dias" },
+  { value: "7", label: "7 dias" },
+  { value: "30", label: "30 dias" },
+  { value: "90", label: "90 dias" },
 ];
 
-function Panel({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+function Panel({
+  title,
+  note,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  note?: string;
+  icon?: React.ElementType;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="rounded-3xl border border-border bg-surface/40 overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-6 py-5 border-b border-border/70">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">{title}</h2>
-        {note && <span className="text-xs text-muted-foreground">{note}</span>}
+    <section className="rounded-3xl border border-white/10 bg-zinc-900/50 backdrop-blur-xl overflow-hidden shadow-xl shadow-black/40 transition-all duration-200 hover:border-white/15">
+      <div className="flex items-center justify-between gap-3 px-6 py-4.5 border-b border-white/5 bg-white/[0.015]">
+        <div className="flex items-center gap-2.5">
+          {Icon && (
+            <div className="flex size-7 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-zinc-300">
+              <Icon className="size-3.5" />
+            </div>
+          )}
+          <h2 className="font-display text-base font-bold tracking-tight text-zinc-100">{title}</h2>
+        </div>
+        {note && <span className="text-xs text-zinc-400 font-light">{note}</span>}
       </div>
       <div className="p-6">{children}</div>
     </section>
@@ -116,6 +149,7 @@ export default function DashboardPage() {
   const [draftEnd, setDraftEnd] = useState(customRange.end);
   const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
   const [unitMenuOpen, setUnitMenuOpen] = useState(false);
+  const [unitSearch, setUnitSearch] = useState("");
   const [customRangeError, setCustomRangeError] = useState<string | null>(null);
   const [daily, setDaily] = useState<DailyRow[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
@@ -219,7 +253,7 @@ export default function DashboardPage() {
     return () => controller.abort();
   }, [activeRange, token, selectedClientId, refreshIndex, setLocation]);
 
-  // ─── Agregações (mesma lógica da dashboard antiga) ──────────────────────────
+  // ─── Agregações ─────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
     const rows = daily;
     const sum = (k: keyof DailyRow) => rows.reduce((a, r) => a + num(r[k] as number), 0);
@@ -243,12 +277,42 @@ export default function DashboardPage() {
   }, [daily]);
 
   const responseRate = calculateResponseRate(kpi.respondidas, kpi.connections);
+
   const primaryKpis = [
-    { label: "Investimento", value: brl(kpi.spend), note: "no período selecionado", accent: "text-orange-300" },
-    { label: "Conversas iniciadas", value: n(kpi.conv), note: "pelo WhatsApp", accent: "text-emerald-300" },
-    { label: "Custo por conversa", value: brl(kpi.custoConversa), note: "média do período", accent: "text-sky-300" },
-    { label: "Taxa de resposta", value: pct(responseRate), note: "conversas respondidas", accent: "text-teal-300" },
+    {
+      label: "Total Investido",
+      value: brl(kpi.spend),
+      note: "verba Meta Ads no período",
+      accent: "text-amber-400",
+      icon: DollarSign,
+      indicator: "bg-amber-400/20 text-amber-300 border-amber-400/30",
+    },
+    {
+      label: "Conversas Iniciadas",
+      value: n(kpi.conv),
+      note: "inícios de conversa WhatsApp",
+      accent: "text-emerald-400",
+      icon: MessageSquare,
+      indicator: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+    },
+    {
+      label: "Custo por Conversa",
+      value: brl(kpi.custoConversa),
+      note: "investimento / conversas",
+      accent: kpi.custoConversa <= 8 ? "text-emerald-400" : kpi.custoConversa <= 15 ? "text-amber-400" : "text-rose-400",
+      icon: Target,
+      indicator: "bg-white/10 text-zinc-300 border-white/15",
+    },
+    {
+      label: "Taxa de Resposta",
+      value: pct(responseRate),
+      note: "conversas respondidas",
+      accent: "text-teal-300",
+      icon: Activity,
+      indicator: "bg-teal-500/20 text-teal-300 border-teal-500/30",
+    },
   ];
+
   const supportingKpis = [
     { label: "Primeiras respostas", value: n(kpi.primeiras) },
     { label: "Leads Meta", value: n(kpi.leads) },
@@ -259,14 +323,6 @@ export default function DashboardPage() {
     { label: "CPM", value: brl(kpi.cpm) },
     { label: "Frequência", value: kpi.frequency.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
   ];
-
-  const FUNNEL = [
-    { label: "Conexões por mensagem", value: kpi.connections },
-    { label: "Conversas iniciadas", value: kpi.conv },
-    { label: "Primeiras respostas", value: kpi.primeiras },
-    { label: "Conversas respondidas", value: kpi.respondidas },
-  ];
-  const funnelMax = Math.max(1, ...FUNNEL.map((f) => f.value));
 
   const chart = useMemo(() => daily.map((r) => ({
     d: r.date_start ? r.date_start.slice(5).split("-").reverse().join("/") : "",
@@ -290,277 +346,401 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1440px] space-y-6 p-4 sm:p-6 lg:p-10">
-        <div className="flex flex-col gap-5 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
+        
+        {/* Top Header Banner */}
+        <div className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-emerald-300/80">
-              <span className="h-2 w-2 rounded-full bg-emerald-300" /> Visão de performance
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Visão de Performance & Mídia</span>
             </div>
-            <h1 className="font-display text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">Dashboard</h1>
-            <p className="max-w-xl text-sm leading-6 text-muted-foreground">Acompanhe os indicadores mais importantes da unidade sem perder contexto sobre campanhas e atendimento.</p>
+            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Dashboard de Resultados
+            </h1>
+            <p className="max-w-xl text-sm leading-relaxed text-zinc-400 font-light">
+              Acompanhe os principais indicadores de investimento, geração de conversas e retorno de campanhas por unidade.
+            </p>
           </div>
-          <div className="rounded-2xl border border-border bg-surface/50 px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Unidade selecionada</p>
-            <p className="mt-1 text-sm font-medium text-foreground">{selectedClient?.name ?? "Selecione uma unidade"}</p>
+
+          <div className="rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-md px-4 py-3 shadow-lg">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Unidade ativa</p>
+            <p className="mt-0.5 text-sm font-semibold text-zinc-200 flex items-center gap-2">
+              <Building2 className="size-4 text-emerald-400 shrink-0" />
+              <span>{selectedClient?.name ?? "Selecione uma unidade"}</span>
+            </p>
           </div>
         </div>
 
-        <section className="rounded-3xl border border-border bg-surface/35 p-4 sm:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="text-xs font-medium text-muted-foreground">
-                <Popover open={periodMenuOpen} onOpenChange={handlePeriodMenu}>
-                  <PopoverTrigger asChild>
-                    <button type="button" aria-label="Selecionar período das métricas"
-                      className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-surface focus:outline-none focus:ring-1 focus:ring-ring">
-                      <CalendarRange className="size-4 text-emerald-300" />
-                      <span className="max-w-52 truncate">{periodLabel}</span>
-                      <ChevronDown className="size-4 text-muted-foreground" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border-border bg-[color:var(--color-surface)] p-0 text-foreground shadow-2xl">
-                    <div className="border-b border-border px-4 py-4">
-                      <p className="font-display text-base font-semibold">Período de análise</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Selecione um intervalo rápido ou defina as datas da sua análise.</p>
+        {/* Filter Control Deck */}
+        <section className="rounded-3xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-black/30">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              
+              {/* Period Filter */}
+              <Popover open={periodMenuOpen} onOpenChange={handlePeriodMenu}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Selecionar período das métricas"
+                    className="inline-flex min-h-11 items-center gap-2.5 rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-2.5 text-left text-xs font-medium text-zinc-200 transition-all hover:border-white/20 hover:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <CalendarRange className="size-4 text-emerald-400" />
+                    <span className="max-w-52 truncate">{periodLabel}</span>
+                    <ChevronDown className="size-3.5 text-zinc-500" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl">
+                  <div className="border-b border-white/10 px-5 py-4">
+                    <p className="font-display text-base font-bold">Período de análise</p>
+                    <p className="mt-1 text-xs leading-5 text-zinc-400">Selecione um intervalo pré-definido ou datas personalizadas.</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 p-4">
+                    {PERIOD_SHORTCUTS.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => selectPresetPeriod(item.value)}
+                        className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
+                          period === item.value
+                            ? "border-emerald-500 bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-950/40"
+                            : "border-white/10 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mx-4 border-t border-white/10 pt-4 pb-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-2.5">Intervalo Customizado</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <label className="space-y-1 text-xs text-zinc-400">
+                        <span>Data inicial</span>
+                        <input
+                          type="date"
+                          value={draftStart}
+                          max={draftEnd || undefined}
+                          onChange={(event) => setDraftStart(event.target.value)}
+                          className="h-10 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 text-xs text-white outline-none focus:border-emerald-500"
+                        />
+                      </label>
+                      <label className="space-y-1 text-xs text-zinc-400">
+                        <span>Data final</span>
+                        <input
+                          type="date"
+                          value={draftEnd}
+                          min={draftStart || undefined}
+                          onChange={(event) => setDraftEnd(event.target.value)}
+                          className="h-10 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 text-xs text-white outline-none focus:border-emerald-500"
+                        />
+                      </label>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 px-4 pt-4">
-                      {PERIOD_SHORTCUTS.map((item) => (
-                        <button key={item.value} type="button" onClick={() => selectPresetPeriod(item.value)}
-                          className={`rounded-xl border px-2 py-2 text-xs font-semibold transition-colors ${period === item.value ? "border-emerald-300 bg-emerald-300 text-emerald-950 shadow-sm" : "border-border bg-background/40 text-muted-foreground hover:bg-surface-2 hover:text-foreground"}`}>
-                          {item.value} dias
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mx-4 mt-4 border-t border-border pt-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Personalizado</p>
-                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="space-y-1.5 text-xs text-muted-foreground">
-                          <span>Data inicial</span>
-                          <input type="date" value={draftStart} max={draftEnd || undefined} onChange={(event) => setDraftStart(event.target.value)}
-                            className="h-10 w-full rounded-xl border border-border bg-background/60 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring" />
-                        </label>
-                        <label className="space-y-1.5 text-xs text-muted-foreground">
-                          <span>Data final</span>
-                          <input type="date" value={draftEnd} min={draftStart || undefined} onChange={(event) => setDraftEnd(event.target.value)}
-                            className="h-10 w-full rounded-xl border border-border bg-background/60 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring" />
-                        </label>
+                    {customRangeError && <p role="alert" className="mt-3 text-xs text-red-400">{customRangeError}</p>}
+                  </div>
+                  <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/10 bg-zinc-900/40 px-4 py-3">
+                    <button type="button" onClick={() => setPeriodMenuOpen(false)} className="rounded-xl px-3 py-2 text-xs font-medium text-zinc-400 transition hover:text-white">Cancelar</button>
+                    <button type="button" onClick={applyCustomRange} className="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-bold text-zinc-950 transition hover:bg-emerald-400">Aplicar período</button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Unit Filter */}
+              <Popover open={unitMenuOpen} onOpenChange={(isOpen) => { setUnitMenuOpen(isOpen); if (!isOpen) setUnitSearch(""); }}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Selecionar unidade das métricas"
+                    disabled={!unitMenu.canOpen}
+                    className="inline-flex min-h-11 items-center gap-2.5 rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-2.5 text-left text-xs font-medium text-zinc-200 transition-all hover:border-white/20 hover:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Building2 className="size-4 text-emerald-400" />
+                    <span className="max-w-52 truncate">{unitMenu.label}</span>
+                    <ChevronDown className="size-3.5 text-zinc-500" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl z-50">
+                  <div className="border-b border-white/10 px-5 py-4">
+                    <p className="font-display text-base font-bold">Unidades disponíveis</p>
+                    <p className="mt-1 text-xs leading-5 text-zinc-400">Selecione a unidade para filtrar as métricas.</p>
+                    {clientOpts.length > 5 && (
+                      <div className="mt-3">
+                        <input
+                          type="text"
+                          value={unitSearch}
+                          onChange={(e) => setUnitSearch(e.target.value)}
+                          placeholder="Filtrar unidade…"
+                          className="h-9 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500/60"
+                        />
                       </div>
-                      {customRangeError && <p role="alert" className="mt-3 text-xs text-red-300">{customRangeError}</p>}
+                    )}
+                  </div>
+                  {clientsLoading ? (
+                    <div className="flex items-center gap-3 px-4 py-6 text-sm text-zinc-400" aria-live="polite">
+                      <RefreshCw className="size-4 animate-spin text-emerald-400" /> Carregando unidades…
                     </div>
-                    <div className="mt-4 flex items-center justify-end gap-2 border-t border-border bg-background/20 px-4 py-3">
-                      <button type="button" onClick={() => setPeriodMenuOpen(false)} className="rounded-full px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">Cancelar</button>
-                      <button type="button" onClick={applyCustomRange} className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90">Aplicar período</button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="text-xs font-medium text-muted-foreground">
-                <Popover open={unitMenuOpen} onOpenChange={setUnitMenuOpen}>
-                  <PopoverTrigger asChild>
-                    <button type="button" aria-label="Selecionar unidade das métricas" disabled={!unitMenu.canOpen}
-                      className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-surface focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60">
-                      <Building2 className="size-4 text-sky-300" />
-                      <span className="max-w-52 truncate">{unitMenu.label}</span>
-                      <ChevronDown className="size-4 text-muted-foreground" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border-border bg-[color:var(--color-surface)] p-0 text-foreground shadow-2xl">
-                    <div className="border-b border-border px-4 py-4">
-                      <p className="font-display text-base font-semibold">Unidades disponíveis</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Selecione a unidade para consultar as métricas do período.</p>
-                    </div>
-                    {clientsLoading ? (
-                      <div className="flex items-center gap-3 px-4 py-6 text-sm text-muted-foreground" aria-live="polite">
-                        <RefreshCw className="size-4 animate-spin text-sky-300" /> Carregando unidades autorizadas…
-                      </div>
-                    ) : clientOpts.length === 0 ? (
-                      <p className="px-4 py-6 text-sm leading-6 text-muted-foreground">{unitMenu.emptyMessage}</p>
-                    ) : (
-                      <div className="max-h-64 overflow-y-auto p-2">
-                        {clientOpts.map((client) => {
+                  ) : clientOpts.length === 0 ? (
+                    <p className="px-4 py-6 text-sm leading-6 text-zinc-400">{unitMenu.emptyMessage}</p>
+                  ) : (
+                    <div className="max-h-64 overflow-y-auto p-2">
+                      {clientOpts
+                        .filter((c) => !unitSearch.trim() || c.name.toLowerCase().includes(unitSearch.toLowerCase()))
+                        .map((client) => {
                           const selected = client.id === selectedClientId;
                           return (
-                            <button key={client.id} type="button" onClick={() => selectUnit(client.id)}
-                              className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition-colors ${selected ? "bg-sky-300 text-slate-950 shadow-sm" : "text-foreground hover:bg-surface-2"}`}>
-                              <span className="truncate font-medium">{client.name}</span>
-                              {selected && <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-800">Selecionada</span>}
+                            <button
+                              key={client.id}
+                              type="button"
+                              onClick={() => {
+                                selectUnit(client.id);
+                                setUnitSearch("");
+                              }}
+                              className={`flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-left text-xs transition-all ${
+                                selected
+                                  ? "bg-emerald-500 text-zinc-950 font-bold shadow-md shadow-emerald-950/30"
+                                  : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                              }`}
+                            >
+                              <span className="truncate">{client.name}</span>
+                              {selected && <span className="shrink-0 text-[10px] uppercase tracking-wider text-zinc-900 font-extrabold">Ativa</span>}
                             </button>
                           );
                         })}
-                      </div>
-                    )}
-                  </PopoverContent>
-                </Popover>
-              </div>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
-            <button onClick={() => setRefreshIndex((value) => value + 1)} disabled={loading || clientsLoading || !selectedClientId}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Atualizar dados
+
+            {/* Refresh Button */}
+            <button
+              onClick={() => setRefreshIndex((value) => value + 1)}
+              disabled={loading || clientsLoading || !selectedClientId}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-5 text-xs font-semibold text-zinc-200 transition-all hover:bg-white/10 hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw className={`size-3.5 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
+              <span>Atualizar dados</span>
             </button>
           </div>
-          <p className="mt-4 border-t border-border/70 pt-3 text-xs text-muted-foreground">
-            {clientsLoading || loading ? "Atualizando métricas do Supabase…" : !selectedClientId ? "Selecione uma unidade para visualizar as métricas." : notSynced ? "Não há dados sincronizados no Supabase para este período." : "Dados carregados diretamente do Supabase."}
-          </p>
+
+          <div className="mt-3.5 flex items-center gap-2 border-t border-white/5 pt-3 text-xs text-zinc-500">
+            <span className="size-1.5 rounded-full bg-emerald-400/80" />
+            <span>
+              {clientsLoading || loading
+                ? "Sincronizando métricas mais recentes do Supabase…"
+                : !selectedClientId
+                ? "Selecione uma unidade para visualizar os resultados."
+                : notSynced
+                ? "Nenhuma sincronização recente encontrada para este intervalo."
+                : "Dados sincronizados e consolidados em tempo real."}
+            </span>
+          </div>
         </section>
 
         {error && (
-          <div className="rounded-2xl border border-[color:var(--color-destructive)]/30 bg-[color:var(--color-destructive)]/10 px-4 py-3 text-sm text-[color:var(--color-destructive)]">
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
             Erro ao buscar métricas: {error}
           </div>
         )}
 
-        {dashboardState ? <DashboardState {...dashboardState} /> : <>
-        <section className="overflow-hidden rounded-3xl border border-border bg-surface/25">
-          <div className="flex flex-col gap-1 border-b border-border/70 px-5 py-4 sm:px-6">
-            <h2 className="font-display text-lg font-semibold">Resumo operacional</h2>
-            <p className="text-sm text-muted-foreground">Quatro indicadores para orientar a leitura da semana.</p>
-          </div>
-          <div className="grid grid-cols-1 divide-y divide-border/70 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
-            {primaryKpis.map((k) => (
-              <div key={k.label} className="min-h-35 bg-background/75 p-5 sm:p-6">
-                <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{k.label}</div>
-                <div className={`mt-3 font-display text-3xl font-semibold tracking-[-0.03em] ${k.accent}`}>{k.value}</div>
-                <div className="mt-2 text-xs text-muted-foreground">{k.note}</div>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-border/70 bg-background/45 px-5 py-4 sm:px-6">
-            <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Métricas complementares</p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 xl:grid-cols-8">
-              {supportingKpis.map((k) => <div key={k.label}><p className="text-xs text-muted-foreground">{k.label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{k.value}</p></div>)}
-            </div>
-          </div>
-        </section>
-
-        {/* Gráficos linha 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Panel title="Conversas iniciadas por dia">
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
-                <defs>
-                  <linearGradient id="gConversas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={CHART.green} stopOpacity={0.45} />
-                    <stop offset="100%" stopColor={CHART.green} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
-                <YAxis tick={axisTick} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Area type="monotone" dataKey="conversas" stroke={CHART.green} strokeWidth={3} fill="url(#gConversas)"
-                  dot={{ r: 3, fill: CHART.green, strokeWidth: 0 }} activeDot={{ r: 5 }} name="Conversas" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </Panel>
-
-          <Panel title="Investimento x Conversas">
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
-                <YAxis yAxisId="l" tick={axisTick} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="r" orientation="right" tick={axisTick} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-                <Line yAxisId="l" type="monotone" dataKey="investimento" stroke={CHART.orange} strokeWidth={3}
-                  dot={{ r: 3, fill: CHART.orange, strokeWidth: 0 }} activeDot={{ r: 5 }} name="Investimento (R$)" />
-                <Line yAxisId="r" type="monotone" dataKey="conversas" stroke={CHART.green} strokeWidth={3}
-                  dot={{ r: 3, fill: CHART.green, strokeWidth: 0 }} activeDot={{ r: 5 }} name="Conversas" />
-              </LineChart>
-            </ResponsiveContainer>
-          </Panel>
-        </div>
-
-        {/* Gráficos linha 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Panel title="Custo por conversa" note="R$ por conversa iniciada">
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
-                <defs>
-                  <linearGradient id="gCusto" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={CHART.red} stopOpacity={0.4} />
-                    <stop offset="100%" stopColor={CHART.orange} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
-                <YAxis tick={axisTick} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(Number(v))} />
-                <Area type="monotone" dataKey="custo" stroke={CHART.red} strokeWidth={3} fill="url(#gCusto)"
-                  dot={{ r: 3, fill: CHART.red, strokeWidth: 0 }} activeDot={{ r: 5 }} name="Custo/conversa" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </Panel>
-
-          <Panel title="Funil de mensagens">
-            <div className="space-y-5">
-              {FUNNEL.map((f, i) => {
-                const funnelColors = [CHART.green, CHART.teal, CHART.blue, CHART.orange];
-                const c = funnelColors[i % funnelColors.length];
+        {dashboardState ? (
+          <DashboardState {...dashboardState} />
+        ) : (
+          <>
+            {/* Primary KPI Cards Grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {primaryKpis.map((k) => {
+                const Icon = k.icon;
                 return (
-                  <div key={f.label}>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-sm text-muted-foreground">{f.label}</span>
-                      <span className="font-display text-lg font-semibold tracking-[-0.01em]" style={{ color: c }}>{n(f.value)}</span>
+                  <div
+                    key={k.label}
+                    className="relative overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/50 p-6 backdrop-blur-xl shadow-xl shadow-black/30 transition-all duration-200 hover:border-white/20 hover:bg-zinc-900/80"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400 font-mono">
+                        {k.label}
+                      </span>
+                      <div className={`flex size-8 items-center justify-center rounded-xl border p-1.5 ${k.indicator}`}>
+                        <Icon className="size-4" />
+                      </div>
                     </div>
-                    <div className="mt-2 h-3 rounded-full bg-surface-2 overflow-hidden">
-                      <div className="h-full rounded-full transition-all"
-                        style={{ width: `${Math.round((f.value / funnelMax) * 100)}%`, background: `linear-gradient(90deg, ${c}, ${c}bb)` }} />
+                    <div className={`mt-3 font-display text-3xl font-bold tracking-tight ${k.accent}`}>
+                      {k.value}
+                    </div>
+                    <div className="mt-2 text-xs text-zinc-500 font-light">
+                      {k.note}
                     </div>
                   </div>
                 );
               })}
             </div>
-          </Panel>
-        </div>
 
-        {/* Desempenho por campanha */}
-        <Panel title="Desempenho por campanha" note="Resultados por campanha no período selecionado">
-          <div className="overflow-x-auto -m-2 p-2">
-            <table className="w-full text-xs min-w-[860px]">
-              <thead>
-                <tr className="text-muted-foreground border-b border-border">
-                  <th className="text-left font-medium py-3 pr-4">Campanha</th>
-                  <th className="text-right font-medium py-3 px-3">Investimento</th>
-                  <th className="text-right font-medium py-3 px-3">Conversas</th>
-                  <th className="text-right font-medium py-3 px-3">Custo/conversa</th>
-                  <th className="text-right font-medium py-3 px-3">Leads Meta</th>
-                  <th className="text-right font-medium py-3 px-3">Impressões</th>
-                  <th className="text-right font-medium py-3 px-3">Cliques</th>
-                  <th className="text-right font-medium py-3 px-3">CTR</th>
-                  <th className="text-right font-medium py-3 px-3">CPC</th>
-                  <th className="text-right font-medium py-3 px-3">CPM</th>
-                  <th className="text-right font-medium py-3 pl-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.length === 0 ? (
-                  <tr><td colSpan={11} className="py-8 text-center text-muted-foreground">Sem campanhas no período.</td></tr>
-                ) : campaigns.map((c) => {
-                  const custo = num(c.custo_por_conversa) || (num(c.total_conversas_iniciadas) > 0 ? num(c.total_spend) / num(c.total_conversas_iniciadas) : 0);
-                  const st = statusFor(custo);
-                  return (
-                    <tr key={c.campaign_name} className="border-b border-border/50 hover:bg-surface/40 transition-colors">
-                      <td className="py-3 pr-4 font-medium max-w-[280px]">{c.campaign_name}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{brl(num(c.total_spend))}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{n(num(c.total_conversas_iniciadas))}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{brl(custo)}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{n(num(c.total_leads_meta))}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{n(num(c.total_impressions))}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{n(num(c.total_clicks))}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{pct(num(c.avg_ctr))}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{brl(num(c.avg_cpc))}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{brl(num(c.avg_cpm))}</td>
-                      <td className="py-3 pl-3 text-right">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-medium ${STATUS_CLS[st]}`}>{st}</span>
-                      </td>
+            {/* Complementary Metrics Section */}
+            <section className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl p-5 sm:p-6 shadow-xl shadow-black/20">
+              <div className="flex items-center gap-2 mb-4">
+                <Layers className="size-4 text-emerald-400" />
+                <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400 font-mono">
+                  Métricas Complementares & Tráfego
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+                {supportingKpis.map((k) => (
+                  <div key={k.label} className="rounded-2xl border border-white/5 bg-zinc-950/60 p-3">
+                    <p className="text-[11px] text-zinc-500 truncate">{k.label}</p>
+                    <p className="mt-1 text-sm font-bold text-zinc-100 tabular-nums">{k.value}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Charts Row 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Panel title="Conversas iniciadas por dia" note="Evolução diária de leads" icon={TrendingUp}>
+                <ResponsiveContainer width="100%" height={270}>
+                  <AreaChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
+                    <defs>
+                      <linearGradient id="gConversas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={CHART.green} stopOpacity={0.45} />
+                        <stop offset="100%" stopColor={CHART.green} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
+                    <YAxis tick={axisTick} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Area
+                      type="monotone"
+                      dataKey="conversas"
+                      stroke={CHART.green}
+                      strokeWidth={3}
+                      fill="url(#gConversas)"
+                      dot={{ r: 3, fill: CHART.green, strokeWidth: 0 }}
+                      activeDot={{ r: 5 }}
+                      name="Conversas"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Panel>
+
+              <Panel title="Investimento x Conversas" note="Relação de custo e volume" icon={BarChart3}>
+                <ResponsiveContainer width="100%" height={270}>
+                  <LineChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
+                    <YAxis yAxisId="l" tick={axisTick} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="r" orientation="right" tick={axisTick} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                    <Line
+                      yAxisId="l"
+                      type="monotone"
+                      dataKey="investimento"
+                      stroke={CHART.orange}
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: CHART.orange, strokeWidth: 0 }}
+                      activeDot={{ r: 5 }}
+                      name="Investimento (R$)"
+                    />
+                    <Line
+                      yAxisId="r"
+                      type="monotone"
+                      dataKey="conversas"
+                      stroke={CHART.green}
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: CHART.green, strokeWidth: 0 }}
+                      activeDot={{ r: 5 }}
+                      name="Conversas"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Panel>
+            </div>
+
+            {/* Charts Row 2: Custo por conversa */}
+            <div>
+              <Panel title="Custo por conversa" note="R$ por conversa iniciada" icon={Target}>
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={chart} margin={{ left: -18, right: 8, top: 8 }}>
+                    <defs>
+                      <linearGradient id="gCusto" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={CHART.red} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={CHART.orange} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis dataKey="d" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
+                    <YAxis tick={axisTick} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => brl(Number(v))} />
+                    <Area
+                      type="monotone"
+                      dataKey="custo"
+                      stroke={CHART.red}
+                      strokeWidth={3}
+                      fill="url(#gCusto)"
+                      dot={{ r: 3, fill: CHART.red, strokeWidth: 0 }}
+                      activeDot={{ r: 5 }}
+                      name="Custo/conversa"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Panel>
+            </div>
+
+            {/* Campaigns Table Panel */}
+            <Panel title="Desempenho por campanha" note="Resultados detalhados no período selecionado" icon={Layers}>
+              <div className="overflow-x-auto -m-2 p-2">
+                <table className="w-full text-xs min-w-[860px]">
+                  <thead>
+                    <tr className="text-zinc-400 border-b border-white/10">
+                      <th className="text-left font-semibold py-3.5 pr-4 text-[11px] uppercase tracking-wider">Campanha</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">Investimento</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">Conversas</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">Custo/conv</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">Leads Meta</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">Impressões</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">Cliques</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">CTR</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">CPC</th>
+                      <th className="text-right font-semibold py-3.5 px-3 text-[11px] uppercase tracking-wider">CPM</th>
+                      <th className="text-right font-semibold py-3.5 pl-3 text-[11px] uppercase tracking-wider">Status</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-        </>}
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {campaigns.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="py-10 text-center text-zinc-500 font-light">
+                          Nenhuma campanha com dados registrada neste período.
+                        </td>
+                      </tr>
+                    ) : (
+                      campaigns.map((c) => {
+                        const custo = num(c.custo_por_conversa) || (num(c.total_conversas_iniciadas) > 0 ? num(c.total_spend) / num(c.total_conversas_iniciadas) : 0);
+                        const st = statusFor(custo);
+                        return (
+                          <tr key={c.campaign_name} className="hover:bg-white/[0.03] transition-colors">
+                            <td className="py-3.5 pr-4 font-semibold text-zinc-200 max-w-[280px] truncate">{c.campaign_name}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono text-zinc-300">{brl(num(c.total_spend))}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono font-semibold text-emerald-400">{n(num(c.total_conversas_iniciadas))}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono text-zinc-300">{brl(custo)}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono text-zinc-400">{n(num(c.total_leads_meta))}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono text-zinc-400">{n(num(c.total_impressions))}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono text-zinc-400">{n(num(c.total_clicks))}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono text-zinc-300">{pct(num(c.avg_ctr))}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono text-zinc-400">{brl(num(c.avg_cpc))}</td>
+                            <td className="py-3.5 px-3 text-right tabular-nums font-mono text-zinc-400">{brl(num(c.avg_cpm))}</td>
+                            <td className="py-3.5 pl-3 text-right">
+                              <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${STATUS_CLS[st]}`}>
+                                {st}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          </>
+        )}
       </div>
     </AppLayout>
   );

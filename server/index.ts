@@ -45,6 +45,16 @@ import { consumeExternalAiApiRateLimitSql, createExternalAiApiTokenSql, findExte
 import { getExternalAiCrmSummary, getExternalAiLeadSummary, getExternalAiMetrics, getExternalAiUnit, listExternalAiUnits } from "./externalAiApiData.js";
 import { createTalentAttachmentUrl, createTalentFormForClient, createTalentSubmission, deleteTalentFormForClient, getPublicTalentForm, getTalentFormForClient, listTalentFormsForClient, listTalentSubmissions, saveTalentForm, talentSlugFromUnitName, updateTalentSubmission, uploadTalentAttachment, uploadTalentLogo, type TalentField, type TalentFieldType, type TalentSubmissionStatus } from "./talentBankSupabaseStore.js";
 import { validateTalentSubmission, validateTalentUpload } from "./talentBankPolicy.js";
+import {
+  isMetaDirectEnabled,
+  getMetaDirectClients,
+  getMetaDirectDaily,
+  getMetaDirectCampaigns,
+  getMetaDirectOffers,
+  isUserAllowedForMetaAccount,
+  normalizeUnitString,
+  standardizeUnitDisplayName,
+} from "./metaDirectService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -498,7 +508,64 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   const talentIpHash = (req: express.Request) => { const ip = req.ip || req.socket.remoteAddress; return ip ? crypto.createHmac("sha256", JWT_SECRET).update(ip).digest("hex") : null; };
   const publicTalentAllowed = (req: express.Request) => { const key = talentIpHash(req) ?? "unknown"; const now = Date.now(); const bucket = publicTalentRate.get(key); if (!bucket || now - bucket.startedAt > 60 * 60_000) { publicTalentRate.set(key, { count: 1, startedAt: now }); return true; } bucket.count += 1; return bucket.count <= 12; };
   const trimText = (value: unknown, max: number) => typeof value === "string" ? value.trim().slice(0, max) : "";
-  async function talentClientAllowed(req: express.Request, clientId: string): Promise<{ id: string; name: string } | null> { const sb = getSupabaseForRequest(req); if (!sb || !req.claims) return null; const catalog = await listDashboardClientsFromSupabase(sb, req.claims); if (catalog.error) throw new Error(catalog.error); const client = catalog.clients.find((item) => item.id === clientId); return client ? { id: client.id, name: client.name } : null; }
+  async function talentClientAllowed(
+    req: express.Request,
+    clientId: string,
+  ): Promise<{ id: string; name: string } | null> {
+    if (!req.claims || req.claims.role === "none") return null;
+    const isFullAdmin = isAdminRole(req.claims.role) || req.claims.allowedClientIds.includes("*");
+
+    // 1. Admin geral tem acesso a qualquer unidade/cliente
+    if (isFullAdmin) {
+      if (isMetaDirectEnabled()) {
+        const metaClients = await getMetaDirectClients().catch(() => []);
+        const metaAcc = metaClients.find((m) => m.id === clientId || m.account_id === clientId);
+        if (metaAcc) return { id: metaAcc.id, name: metaAcc.name };
+      }
+      const sb = getSupabaseForRequest(req);
+      if (sb) {
+        try {
+          const { data: sbClient } = await sb.from("clients").select("id, name").eq("id", clientId).maybeSingle();
+          if (sbClient) return { id: sbClient.id, name: sbClient.name };
+        } catch {}
+      }
+      return { id: clientId, name: standardizeUnitDisplayName(clientId) || clientId };
+    }
+
+    // 2. Gestor com restrição de unidades (ex: Rosângela, Rogério, Bruna, Joice, etc.)
+    const sb = getSupabaseForRequest(req);
+    let authorizedClients: SupabaseDashboardClient[] = [];
+    if (sb) {
+      const catalog = await listDashboardClientsFromSupabase(sb, req.claims);
+      authorizedClients = catalog.clients || [];
+    }
+
+    if (isMetaDirectEnabled()) {
+      const metaClients = await getMetaDirectClients().catch(() => []);
+      const metaAcc = metaClients.find((m) => m.id === clientId || m.account_id === clientId);
+      if (metaAcc && isUserAllowedForMetaAccount(metaAcc, authorizedClients, req.claims)) {
+        return { id: metaAcc.id, name: metaAcc.name };
+      }
+    }
+
+    // Match direto por UUID ou nome autorizado
+    if (req.claims.allowedClientIds.includes(clientId)) {
+      const client = authorizedClients.find((c) => c.id === clientId);
+      return { id: clientId, name: client?.name || clientId };
+    }
+
+    const normalizedInput = normalizeUnitString(clientId);
+    if (normalizedInput) {
+      const matched = authorizedClients.find((c) => {
+        const cNorm = normalizeUnitString(c.name);
+        return cNorm === normalizedInput || cNorm.includes(normalizedInput) || normalizedInput.includes(cNorm);
+      });
+      if (matched) return { id: matched.id, name: matched.name };
+    }
+
+    return null;
+  }
+
   function talentManager(req: express.Request, res: express.Response): boolean { if (!req.claims || req.claims.role === "none") { res.status(403).json({ error: "Acesso restrito a gestores de unidade" }); return false; } return true; }
   function talentFieldPayload(value: unknown, index: number): Omit<TalentField, "id" | "formId"> | null { const item = value && typeof value === "object" ? value as Record<string, unknown> : {}; const fieldKey = trimText(item.fieldKey, 100).toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/(^_|_$)/g, ""); const type = trimText(item.fieldType, 20) as TalentFieldType; const label = trimText(item.label, 500); if (!fieldKey || !label || !allowedTalentTypes.includes(type)) return null; const options = Array.isArray(item.options) ? item.options.slice(0, 30).map((option) => option && typeof option === "object" ? option as Record<string, unknown> : {}).filter((option) => trimText(option.label, 120) && trimText(option.value, 120)).map((option) => ({ label: trimText(option.label, 120), value: trimText(option.value, 120) })) : []; return { fieldKey, label, placeholder: trimText(item.placeholder, 220) || null, helpText: trimText(item.helpText, 500) || null, fieldType: type, isRequired: item.isRequired === true, orderIndex: index, options, validationRules: item.validationRules && typeof item.validationRules === "object" && !Array.isArray(item.validationRules) ? item.validationRules as Record<string, unknown> : {} }; }
 
@@ -536,48 +603,133 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   app.get("/api/talent/admin/units", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
-    try { const sb = getSupabaseForRequest(req); if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; } const catalog = await listDashboardClientsFromSupabase(sb, req.claims!); if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades" }); return; } res.json({ units: catalog.clients }); }
-    catch (error) { console.error("[talent] Falha ao listar unidades:", error); res.status(503).json({ error: "Não foi possível carregar as unidades" }); }
+    try {
+      const isFullAdmin = req.claims && (isAdminRole(req.claims.role) || req.claims.allowedClientIds.includes("*"));
+
+      if (isMetaDirectEnabled()) {
+        const allMetaClients = await getMetaDirectClients();
+        let clients = allMetaClients;
+
+        if (!isFullAdmin) {
+          const sb = getSupabaseForRequest(req);
+          let authorizedClients: SupabaseDashboardClient[] = [];
+          if (sb && req.claims) {
+            const result = await listDashboardClientsFromSupabase(sb, req.claims);
+            authorizedClients = result.clients || [];
+          }
+          clients = allMetaClients.filter((metaAcc) =>
+            isUserAllowedForMetaAccount(metaAcc, authorizedClients, req.claims),
+          );
+        }
+
+        res.json({
+          units: clients.map((c) => ({
+            id: c.id,
+            name: c.name,
+            client_group: c.client_group,
+          })),
+        });
+        return;
+      }
+
+      const sb = getSupabaseForRequest(req);
+      if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
+      const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
+      if (catalog.error) { res.status(502).json({ error: catalog.error }); return; }
+      const units = catalog.clients.map((c) => ({
+        id: c.id,
+        name: standardizeUnitDisplayName(c.name) || c.name,
+      }));
+      res.json({ units });
+    } catch (error) {
+      console.error("[talent] Falha ao listar unidades:", error);
+      res.status(503).json({ error: "Não foi possível carregar as unidades" });
+    }
   });
 
   app.get("/api/talent/admin/form", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
     const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
-    if (!/^[0-9a-f-]{36}$/i.test(clientId)) { res.status(400).json({ error: "Selecione uma unidade válida" }); return; }
+    if (!clientId) { res.status(400).json({ error: "Selecione uma unidade válida" }); return; }
     const formId = typeof req.query.form_id === "string" ? req.query.form_id : undefined;
-    try { const client = await talentClientAllowed(req, clientId); if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } let form = await getTalentFormForClient(clientId, formId); if (!form && !formId) form = await createTalentFormForClient({ clientId, publicSlug: talentSlugFromUnitName(client.name, clientId), title: `Trabalhe Conosco — ${client.name}`, subtitle: "Faça parte do time Vida Card." }); res.json({ unit: client, form, forms: await listTalentFormsForClient(clientId) }); }
-    catch (error) { console.error("[talent] Falha ao carregar formulário administrativo:", error); res.status(503).json({ error: "Não foi possível carregar o formulário" }); }
+    try {
+      const client = await talentClientAllowed(req, clientId);
+      if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; }
+      let form = await getTalentFormForClient(client.id, formId);
+      if (!form && !formId) form = await createTalentFormForClient({ clientId: client.id, publicSlug: talentSlugFromUnitName(client.name, client.id), title: `Trabalhe Conosco — ${client.name}`, subtitle: "Faça parte do time Vida Card." });
+      res.json({ unit: client, form, forms: await listTalentFormsForClient(client.id) });
+    } catch (error) {
+      console.error("[talent] Falha ao carregar formulário administrativo:", error);
+      res.status(503).json({ error: "Não foi possível carregar o formulário" });
+    }
   });
 
   app.post("/api/talent/admin/forms", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
-    const payload = req.body as Record<string, unknown>; const clientId = trimText(payload.clientId, 36); const title = trimText(payload.title, 255) || "Novo formulário";
-    try { const client = await talentClientAllowed(req, clientId); if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const slug = `${talentSlugFromUnitName(client.name, clientId)}-${Date.now().toString(36)}`.slice(0, 120); const form = await createTalentFormForClient({ clientId, publicSlug: slug, title, subtitle: "Faça parte do time Vida Card." }); res.status(201).json({ form }); }
-    catch (error) { console.error("[talent] Falha ao criar formulário:", error); res.status(503).json({ error: "Não foi possível criar o formulário" }); }
+    const payload = req.body as Record<string, unknown>;
+    const clientId = trimText(payload.clientId, 100);
+    const title = trimText(payload.title, 255) || "Novo formulário";
+    try {
+      const client = await talentClientAllowed(req, clientId);
+      if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; }
+      const slug = `${talentSlugFromUnitName(client.name, client.id)}-${Date.now().toString(36)}`.slice(0, 120);
+      const form = await createTalentFormForClient({ clientId: client.id, publicSlug: slug, title, subtitle: "Faça parte do time Vida Card." });
+      res.status(201).json({ form });
+    } catch (error) {
+      console.error("[talent] Falha ao criar formulário:", error);
+      res.status(503).json({ error: "Não foi possível criar o formulário" });
+    }
   });
 
   app.put("/api/talent/admin/form", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
-    const payload = req.body as Record<string, unknown>; const clientId = trimText(payload.clientId, 36); const formId = trimText(payload.formId, 36); if (!/^[0-9a-f-]{36}$/i.test(clientId) || !/^[0-9a-f-]{36}$/i.test(formId)) { res.status(400).json({ error: "Formulário ou unidade inválidos" }); return; }
-    const fieldsRaw = Array.isArray(payload.fields) ? payload.fields : []; const fields = fieldsRaw.map(talentFieldPayload).filter((item): item is Omit<TalentField, "id" | "formId"> => Boolean(item)); if (fields.length !== fieldsRaw.length || new Set(fields.map((item) => item.fieldKey)).size !== fields.length) { res.status(400).json({ error: "Revise as perguntas: cada chave deve ser única e válida" }); return; }
-    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const form = await saveTalentForm({ clientId, formId, title: trimText(payload.title, 255) || "Trabalhe Conosco", subtitle: trimText(payload.subtitle, 1200) || "Faça parte do time Vida Card.", bannerUrl: trimText(payload.bannerUrl, 1000) || null, lgpdDisclaimer: trimText(payload.lgpdDisclaimer, 3000) || "Autorizo o tratamento dos meus dados para fins de recrutamento.", successTitle: trimText(payload.successTitle, 255) || "Candidatura enviada!", successMessage: trimText(payload.successMessage, 1200) || "Recebemos suas informações.", isPublished: payload.isPublished === true, fields }); res.json({ form }); }
-    catch (error) { console.error("[talent] Falha ao salvar formulário:", error); res.status(503).json({ error: "Não foi possível salvar o formulário" }); }
+    const payload = req.body as Record<string, unknown>;
+    const clientId = trimText(payload.clientId, 100);
+    const formId = trimText(payload.formId, 100);
+    if (!clientId || !formId) { res.status(400).json({ error: "Formulário ou unidade inválidos" }); return; }
+    const fieldsRaw = Array.isArray(payload.fields) ? payload.fields : [];
+    const fields = fieldsRaw.map(talentFieldPayload).filter((item): item is Omit<TalentField, "id" | "formId"> => Boolean(item));
+    if (fields.length !== fieldsRaw.length || new Set(fields.map((item) => item.fieldKey)).size !== fields.length) {
+      res.status(400).json({ error: "Revise as perguntas: cada chave deve ser única e válida" });
+      return;
+    }
+    try {
+      const client = await talentClientAllowed(req, clientId);
+      if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; }
+      const form = await saveTalentForm({
+        clientId: client.id,
+        formId,
+        title: trimText(payload.title, 255) || "Trabalhe Conosco",
+        subtitle: trimText(payload.subtitle, 1200) || "Faça parte do time Vida Card.",
+        bannerUrl: trimText(payload.bannerUrl, 1000) || null,
+        lgpdDisclaimer: trimText(payload.lgpdDisclaimer, 3000) || "Autorizo o tratamento dos meus dados para fins de recrutamento.",
+        successTitle: trimText(payload.successTitle, 255) || "Candidatura enviada!",
+        successMessage: trimText(payload.successMessage, 1200) || "Recebemos suas informações.",
+        isPublished: payload.isPublished === true,
+        fields,
+      });
+      res.json({ form });
+    } catch (error) {
+      console.error("[talent] Falha ao salvar formulário:", error);
+      res.status(503).json({ error: "Não foi possível salvar o formulário" });
+    }
   });
 
   app.delete("/api/talent/admin/forms/:id", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
     const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
     const formId = req.params.id;
-    if (!/^[0-9a-f-]{36}$/i.test(clientId) || !/^[0-9a-f-]{36}$/i.test(formId)) {
+    if (!clientId || !formId) {
       res.status(400).json({ error: "Formulário ou unidade inválidos" });
       return;
     }
     try {
-      if (!await talentClientAllowed(req, clientId)) {
+      const client = await talentClientAllowed(req, clientId);
+      if (!client) {
         res.status(403).json({ error: "Sem acesso a esta unidade" });
         return;
       }
-      await deleteTalentFormForClient(clientId, formId);
+      await deleteTalentFormForClient(client.id, formId);
       res.json({ ok: true });
     } catch (error) {
       console.error("[talent] Falha ao deletar formulário:", error);
@@ -589,7 +741,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     if (!talentManager(req, res)) return;
     const clientId = typeof req.body?.clientId === "string" && req.body.clientId ? req.body.clientId : (typeof req.query.client_id === "string" ? req.query.client_id : "");
     const formId = req.params.id;
-    if (!/^[0-9a-f-]{36}$/i.test(clientId) || !/^[0-9a-f-]{36}$/i.test(formId)) {
+    if (!clientId || !formId) {
       res.status(400).json({ error: "Formulário ou unidade inválidos" });
       return;
     }
@@ -603,12 +755,13 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       return;
     }
     try {
-      if (!await talentClientAllowed(req, clientId)) {
+      const client = await talentClientAllowed(req, clientId);
+      if (!client) {
         res.status(403).json({ error: "Sem acesso a esta unidade" });
         return;
       }
       const logoUrl = await uploadTalentLogo({
-        clientId,
+        clientId: client.id,
         formId,
         fileName: file.originalname,
         file: file.buffer,
@@ -623,23 +776,63 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   app.get("/api/talent/admin/submissions", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
-    const clientId = typeof req.query.client_id === "string" ? req.query.client_id : ""; const formId = typeof req.query.form_id === "string" ? req.query.form_id : undefined;
-    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const submissions = await listTalentSubmissions({ clientId, formId, search: typeof req.query.search === "string" ? req.query.search : undefined, status: typeof req.query.status === "string" ? req.query.status : undefined, limit: Number(req.query.limit ?? 200) }); res.json({ submissions }); }
-    catch (error) { console.error("[talent] Falha ao listar candidaturas:", error); res.status(503).json({ error: "Não foi possível carregar as candidaturas" }); }
+    const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
+    const formId = typeof req.query.form_id === "string" ? req.query.form_id : undefined;
+    try {
+      const client = await talentClientAllowed(req, clientId);
+      if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; }
+      const submissions = await listTalentSubmissions({
+        clientId: client.id,
+        formId,
+        search: typeof req.query.search === "string" ? req.query.search : undefined,
+        status: typeof req.query.status === "string" ? req.query.status : undefined,
+        limit: Number(req.query.limit ?? 200),
+      });
+      res.json({ submissions });
+    } catch (error) {
+      console.error("[talent] Falha ao listar candidaturas:", error);
+      res.status(503).json({ error: "Não foi possível carregar as candidaturas" });
+    }
   });
 
   app.patch("/api/talent/admin/submissions/:id", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
-    const payload = req.body as Record<string, unknown>; const clientId = trimText(payload.clientId, 36); const status = trimText(payload.status, 20) as TalentSubmissionStatus; if (!/^[0-9a-f-]{36}$/i.test(clientId) || !/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(400).json({ error: "Candidatura ou unidade inválida" }); return; }
-    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const result = await updateTalentSubmission({ id: req.params.id, clientId, status: allowedTalentStatuses.includes(status) ? status : undefined, notes: payload.notes === undefined ? undefined : trimText(payload.notes, 5000) || null }); if (!result) { res.status(404).json({ error: "Candidatura não encontrada" }); return; } res.json({ submission: result }); }
-    catch (error) { console.error("[talent] Falha ao atualizar candidatura:", error); res.status(503).json({ error: "Não foi possível atualizar a candidatura" }); }
+    const payload = req.body as Record<string, unknown>;
+    const clientId = trimText(payload.clientId, 100);
+    const status = trimText(payload.status, 20) as TalentSubmissionStatus;
+    if (!clientId || !req.params.id) { res.status(400).json({ error: "Candidatura ou unidade inválida" }); return; }
+    try {
+      const client = await talentClientAllowed(req, clientId);
+      if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; }
+      const result = await updateTalentSubmission({
+        id: req.params.id,
+        clientId: client.id,
+        status: allowedTalentStatuses.includes(status) ? status : undefined,
+        notes: payload.notes === undefined ? undefined : trimText(payload.notes, 5000) || null,
+      });
+      if (!result) { res.status(404).json({ error: "Candidatura não encontrada" }); return; }
+      res.json({ submission: result });
+    } catch (error) {
+      console.error("[talent] Falha ao atualizar candidatura:", error);
+      res.status(503).json({ error: "Não foi possível atualizar a candidatura" });
+    }
   });
 
   app.get("/api/talent/admin/submissions/:id/attachments/:index", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
     const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
-    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const candidates = await listTalentSubmissions({ clientId, limit: 500 }); const candidate = candidates.find((item) => item.id === req.params.id); const attachment = candidate?.attachments[Number(req.params.index)]; if (!attachment) { res.status(404).json({ error: "Currículo não encontrado" }); return; } res.json({ url: await createTalentAttachmentUrl(attachment.storageKey), fileName: attachment.fileName }); }
-    catch (error) { console.error("[talent] Falha ao assinar currículo:", error); res.status(503).json({ error: "Não foi possível abrir o currículo" }); }
+    try {
+      const client = await talentClientAllowed(req, clientId);
+      if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; }
+      const candidates = await listTalentSubmissions({ clientId: client.id, limit: 500 });
+      const candidate = candidates.find((item) => item.id === req.params.id);
+      const attachment = candidate?.attachments[Number(req.params.index)];
+      if (!attachment) { res.status(404).json({ error: "Currículo não encontrado" }); return; }
+      res.json({ url: await createTalentAttachmentUrl(attachment.storageKey), fileName: attachment.fileName });
+    } catch (error) {
+      console.error("[talent] Falha ao assinar currículo:", error);
+      res.status(503).json({ error: "Não foi possível abrir o currículo" });
+    }
   });
 
   // ─── Integrações externas de IA: administração (somente admins) ───────────
@@ -1358,13 +1551,64 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     }
   });
 
-  // ─── Métricas (Supabase / Meta Ads) ────────────────────────────────────────
+  // ─── Helper de Autorização Meta Direct por Usuário ────────────────────────
+  async function checkUserHasMetaAccountAccess(req: express.Request, clientId: string): Promise<boolean> {
+    if (!req.claims) return false;
+    if (isAdminRole(req.claims.role) || req.claims.allowedClientIds.includes("*")) {
+      return true;
+    }
+
+    const sb = getSupabaseForRequest(req);
+    let authorizedClients: SupabaseDashboardClient[] = [];
+    if (sb) {
+      const result = await listDashboardClientsFromSupabase(sb, req.claims);
+      authorizedClients = result.clients || [];
+    }
+
+    const allMeta = await getMetaDirectClients();
+    const targetAcc = allMeta.find((c) => c.id === clientId || c.account_id === clientId || `act_${c.account_id}` === clientId);
+    if (!targetAcc) return false;
+
+    return isUserAllowedForMetaAccount(targetAcc, authorizedClients, req.claims);
+  }
+
+  // ─── Métricas (Meta Ads Direct / Supabase) ────────────────────────────────
   app.get("/api/metrics/status", requireAuth, (_req, res) => {
-    res.json({ configured: isSupabaseConfigured() });
+    res.json({ configured: isMetaDirectEnabled() || isSupabaseConfigured() });
   });
 
-  // Lista de clients do Supabase — filtrada por acesso
+  // Lista de clients / unidades
   app.get("/api/metrics/clients", requireAuth, async (req, res) => {
+    const isFullAdmin = req.claims && (isAdminRole(req.claims.role) || req.claims.allowedClientIds.includes("*"));
+
+    if (isMetaDirectEnabled()) {
+      try {
+        const allMetaClients = await getMetaDirectClients();
+        if (isFullAdmin) {
+          res.json({ configured: true, clients: allMetaClients });
+          return;
+        }
+
+        const sb = getSupabaseForRequest(req);
+        let authorizedClients: SupabaseDashboardClient[] = [];
+        if (sb && req.claims) {
+          const result = await listDashboardClientsFromSupabase(sb, req.claims);
+          authorizedClients = result.clients || [];
+        }
+
+        const filteredClients = allMetaClients.filter((metaAcc) =>
+          isUserAllowedForMetaAccount(metaAcc, authorizedClients, req.claims),
+        );
+
+        res.json({ configured: true, clients: filteredClients });
+        return;
+      } catch (err: any) {
+        console.error("[meta-direct] Falha ao listar clientes:", err);
+        res.status(502).json({ error: err.message || "Não foi possível carregar as unidades na Meta" });
+        return;
+      }
+    }
+
     const sb = getSupabaseForRequest(req);
     if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const result = await listDashboardClientsFromSupabase(sb, req.claims!);
@@ -1372,11 +1616,29 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     res.json({ configured: true, clients: result.clients });
   });
 
-  // Métricas diárias — filtradas por acesso
+  // Métricas diárias
   app.get("/api/metrics/daily", requireAuth, async (req, res) => {
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+
+    if (isMetaDirectEnabled() && clientId) {
+      const allowed = await checkUserHasMetaAccountAccess(req, clientId);
+      if (!allowed) {
+        res.status(403).json({ error: "Sem acesso a essa unidade" });
+        return;
+      }
+      try {
+        const rows = await getMetaDirectDaily(clientId, start, end);
+        res.json({ configured: true, rows });
+        return;
+      } catch (err: any) {
+        console.error("[meta-direct] Falha ao carregar métricas diárias:", err);
+        res.status(502).json({ error: err.message || "Erro ao consultar métricas na Meta" });
+        return;
+      }
+    }
+
     const sb = getSupabaseForRequest(req);
     if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
-    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
 
     if (clientId && req.claims && !isAdmin(req.claims)) {
       if (!req.claims.allowedClientIds.includes(clientId)) {
@@ -1404,11 +1666,29 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     res.json({ configured: true, rows: data ?? [] });
   });
 
-  // Métricas por campanha — filtradas por acesso
+  // Métricas por campanha
   app.get("/api/metrics/campaigns", requireAuth, async (req, res) => {
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+
+    if (isMetaDirectEnabled() && clientId) {
+      const allowed = await checkUserHasMetaAccountAccess(req, clientId);
+      if (!allowed) {
+        res.status(403).json({ error: "Sem acesso a essa unidade" });
+        return;
+      }
+      try {
+        const rows = await getMetaDirectCampaigns(clientId, start, end);
+        res.json({ configured: true, rows });
+        return;
+      } catch (err: any) {
+        console.error("[meta-direct] Falha ao carregar campanhas:", err);
+        res.status(502).json({ error: err.message || "Erro ao consultar campanhas na Meta" });
+        return;
+      }
+    }
+
     const sb = getSupabaseForRequest(req);
     if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
-    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
 
     if (clientId && req.claims && !isAdmin(req.claims)) {
       if (!req.claims.allowedClientIds.includes(clientId)) {
@@ -1443,9 +1723,27 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   // ─── Offers / Anúncios (view vw_meta_ads_offer_ads) ────────────────────────
   app.get("/api/metrics/offers", requireAuth, async (req, res) => {
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+
+    if (isMetaDirectEnabled() && clientId) {
+      const allowed = await checkUserHasMetaAccountAccess(req, clientId);
+      if (!allowed) {
+        res.status(403).json({ error: "Sem acesso a essa unidade" });
+        return;
+      }
+      try {
+        const rows = await getMetaDirectOffers(clientId, start, end);
+        res.json({ configured: true, rows });
+        return;
+      } catch (err: any) {
+        console.error("[meta-direct] Falha ao carregar anúncios:", err);
+        res.status(502).json({ error: err.message || "Erro ao consultar anúncios na Meta" });
+        return;
+      }
+    }
+
     const sb = getSupabaseForRequest(req);
     if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
-    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
     const selectionError = validateMetricsClientSelection(clientId, req.claims);
     if (selectionError) { res.status(selectionError.status).json({ error: selectionError.error }); return; }
     let q = sb.from("vw_meta_ads_offer_ads").select("*");
@@ -1457,11 +1755,29 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     res.json({ configured: true, rows: data ?? [] });
   });
 
-  // Tenta a RPC fn_offers_by_period se existir, senão fallback para a view
+  // Tenta a RPC fn_offers_by_period se existir, senão fallback para a view ou Meta Direct
   app.get("/api/metrics/offers-rpc", requireAuth, async (req, res) => {
+    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+
+    if (isMetaDirectEnabled() && clientId) {
+      const allowed = await checkUserHasMetaAccountAccess(req, clientId);
+      if (!allowed) {
+        res.status(403).json({ error: "Sem acesso a essa unidade" });
+        return;
+      }
+      try {
+        const rows = await getMetaDirectOffers(clientId, start, end);
+        res.json({ configured: true, rows });
+        return;
+      } catch (err: any) {
+        console.error("[meta-direct] Falha ao carregar anúncios (rpc):", err);
+        res.status(502).json({ error: err.message || "Erro ao consultar anúncios na Meta" });
+        return;
+      }
+    }
+
     const sb = getSupabaseForRequest(req);
     if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
-    const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
     const selectionError = validateMetricsClientSelection(clientId, req.claims);
     if (selectionError) { res.status(selectionError.status).json({ error: selectionError.error }); return; }
     const { data, error } = await sb.rpc("fn_offers_by_period", {
@@ -1496,8 +1812,37 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     res.json({ configured: true, rows: data ?? [] });
   });
 
-  // ─── Units (lista dinâmica de unidades/clientes do Supabase) ──────────────
+  // ─── Units (lista dinâmica de unidades/clientes) ─────────────────────────
   app.get("/api/metrics/units", requireAuth, async (req, res) => {
+    const isFullAdmin = req.claims && (isAdminRole(req.claims.role) || req.claims.allowedClientIds.includes("*"));
+
+    if (isMetaDirectEnabled()) {
+      try {
+        const allMetaClients = await getMetaDirectClients();
+        let clients = allMetaClients;
+
+        if (!isFullAdmin) {
+          const sb = getSupabaseForRequest(req);
+          let authorizedClients: SupabaseDashboardClient[] = [];
+          if (sb && req.claims) {
+            const result = await listDashboardClientsFromSupabase(sb, req.claims);
+            authorizedClients = result.clients || [];
+          }
+          clients = allMetaClients.filter((metaAcc) =>
+            isUserAllowedForMetaAccount(metaAcc, authorizedClients, req.claims),
+          );
+        }
+
+        const units = clients.map((c) => c.name);
+        res.json({ configured: true, units, clients });
+        return;
+      } catch (err: any) {
+        console.error("[meta-direct] Falha ao listar units:", err);
+        res.status(502).json({ error: err.message || "Não foi possível carregar as unidades na Meta" });
+        return;
+      }
+    }
+
     const sb = getSupabaseForRequest(req);
     if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
     const result = await listDashboardClientsFromSupabase(sb, req.claims!);

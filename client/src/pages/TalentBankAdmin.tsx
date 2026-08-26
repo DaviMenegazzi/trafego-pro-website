@@ -13,6 +13,7 @@ import {
   Loader2,
   Plus,
   Save,
+  Search,
   Settings2,
   Sparkles,
   Users,
@@ -40,12 +41,21 @@ function authHeaders(): HeadersInit {
   };
 }
 
+function normalizeUnitKey(s: string) {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 export default function TalentBankAdmin() {
   const [, setLocation] = useLocation();
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
 
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+  const [unitSearch, setUnitSearch] = useState("");
   const [forms, setForms] = useState<TalentForm[]>([]);
   const [activeForm, setActiveForm] = useState<TalentForm | null>(null);
   const [activeTab, setActiveTab] = useState<"builder" | "candidates">("builder");
@@ -86,10 +96,23 @@ export default function TalentBankAdmin() {
       setUnits(availableUnits);
 
       if (availableUnits.length > 0) {
-        const initial =
-          selectedClientId && availableUnits.some((u) => u.id === selectedClientId)
-            ? selectedClientId
-            : availableUnits[0].id;
+        let initial = availableUnits[0].id;
+        if (selectedClientId) {
+          const directMatch = availableUnits.find((u) => u.id === selectedClientId);
+          if (directMatch) {
+            initial = directMatch.id;
+          } else {
+            const ctxClient = clients.find((c) => c.id === selectedClientId);
+            if (ctxClient) {
+              const ctxNorm = normalizeUnitKey(ctxClient.name);
+              const nameMatch = availableUnits.find((u) => {
+                const uNorm = normalizeUnitKey(u.name);
+                return uNorm === ctxNorm || uNorm.includes(ctxNorm) || ctxNorm.includes(uNorm);
+              });
+              if (nameMatch) initial = nameMatch.id;
+            }
+          }
+        }
         setSelectedUnitId(initial);
       }
     } catch {
@@ -97,7 +120,7 @@ export default function TalentBankAdmin() {
     } finally {
       setLoadingUnits(false);
     }
-  }, [selectedClientId, setLocation]);
+  }, [selectedClientId, clients, setLocation]);
 
   useEffect(() => {
     void fetchUnits();
@@ -105,10 +128,22 @@ export default function TalentBankAdmin() {
 
   // Sync with global client context when changed from outside
   useEffect(() => {
-    if (selectedClientId && units.some((u) => u.id === selectedClientId)) {
-      setSelectedUnitId(selectedClientId);
+    if (!selectedClientId || units.length === 0) return;
+    const directMatch = units.find((u) => u.id === selectedClientId);
+    if (directMatch) {
+      setSelectedUnitId(directMatch.id);
+      return;
     }
-  }, [selectedClientId, units]);
+    const ctxClient = clients.find((c) => c.id === selectedClientId);
+    if (ctxClient) {
+      const ctxNorm = normalizeUnitKey(ctxClient.name);
+      const nameMatch = units.find((u) => {
+        const uNorm = normalizeUnitKey(u.name);
+        return uNorm === ctxNorm || uNorm.includes(ctxNorm) || ctxNorm.includes(uNorm);
+      });
+      if (nameMatch) setSelectedUnitId(nameMatch.id);
+    }
+  }, [selectedClientId, units, clients]);
 
   // ─── 2. Load Forms for selected Unit ────────────────────────────────────────
   const fetchForms = useCallback(
@@ -191,7 +226,21 @@ export default function TalentBankAdmin() {
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleSelectUnit = (unitId: string) => {
     setSelectedUnitId(unitId);
-    setSelectedClientId(unitId);
+    const targetUnit = units.find((u) => u.id === unitId);
+    if (targetUnit) {
+      const targetNorm = normalizeUnitKey(targetUnit.name);
+      const matchCtx = clients.find((c) => {
+        const cNorm = normalizeUnitKey(c.name);
+        return cNorm === targetNorm || cNorm.includes(targetNorm) || targetNorm.includes(cNorm);
+      });
+      if (matchCtx) {
+        setSelectedClientId(matchCtx.id);
+      } else {
+        setSelectedClientId(unitId);
+      }
+    } else {
+      setSelectedClientId(unitId);
+    }
     setActiveForm(null); // Return to forms list view on unit change
   };
 
@@ -325,6 +374,12 @@ export default function TalentBankAdmin() {
     [units, selectedUnitId]
   );
 
+  const filteredUnits = useMemo(() => {
+    if (!unitSearch.trim()) return units;
+    const q = normalizeUnitKey(unitSearch);
+    return units.filter((u) => normalizeUnitKey(u.name).includes(q));
+  }, [units, unitSearch]);
+
   return (
     <AppLayout>
       <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
@@ -359,32 +414,46 @@ export default function TalentBankAdmin() {
               </PopoverTrigger>
               <PopoverContent
                 align="end"
-                className="w-72 rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl"
+                className="w-72 rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl z-50"
               >
-                <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                  Unidades Disponíveis
+                <div className="p-2 border-b border-white/5">
+                  <div className="relative">
+                    <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <input
+                      type="text"
+                      placeholder="Buscar unidade..."
+                      value={unitSearch}
+                      onChange={(e) => setUnitSearch(e.target.value)}
+                      className="w-full bg-zinc-900 border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50"
+                    />
+                  </div>
                 </div>
-                <div className="max-h-60 overflow-y-auto space-y-1">
-                  {units.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => {
-                        handleSelectUnit(u.id);
-                        setUnitDropdownOpen(false);
-                      }}
-                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
-                        u.id === selectedUnitId
-                          ? "bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20"
-                          : "text-zinc-300 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      <span className="truncate">{u.name}</span>
-                      {u.id === selectedUnitId && (
-                        <Check className="size-3.5 text-emerald-400 shrink-0" />
-                      )}
-                    </button>
-                  ))}
+                <div className="max-h-60 overflow-y-auto space-y-1 p-1">
+                  {filteredUnits.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-zinc-500">Nenhuma unidade encontrada</div>
+                  ) : (
+                    filteredUnits.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          handleSelectUnit(u.id);
+                          setUnitDropdownOpen(false);
+                          setUnitSearch("");
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
+                          u.id === selectedUnitId
+                            ? "bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20"
+                            : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        <span className="truncate">{u.name}</span>
+                        {u.id === selectedUnitId && (
+                          <Check className="size-3.5 text-emerald-400 shrink-0" />
+                        )}
+                      </button>
+                    ))
+                  )}
                 </div>
               </PopoverContent>
             </Popover>

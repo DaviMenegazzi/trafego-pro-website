@@ -43,7 +43,7 @@ import { validateSocialMediaUpload } from "./socialMediaUploadPolicy.js";
 import { createExternalAiApiToken, EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE, externalAiApiTokenPrefix, hasExternalAiApiScope, hashExternalAiApiToken, isExternalAiApiTokenActive, isExternalAiApiUnitAllowed, resolveExternalAiApiDateRange, validateExternalAiApiTokenDraft, type ExternalAiApiScope } from "./externalAiApiPolicy.js";
 import { consumeExternalAiApiRateLimitSql, createExternalAiApiTokenSql, findExternalAiApiTokenByHashSql, listExternalAiApiTokensSql, recordExternalAiApiAuditSql, revokeExternalAiApiTokenSql, type ExternalAiApiToken } from "./externalAiApiSql.js";
 import { getExternalAiCrmSummary, getExternalAiLeadSummary, getExternalAiMetrics, getExternalAiUnit, listExternalAiUnits } from "./externalAiApiData.js";
-import { createTalentAttachmentUrl, createTalentFormForClient, createTalentSubmission, getPublicTalentForm, getTalentFormForClient, listTalentSubmissions, saveTalentForm, talentSlugFromUnitName, updateTalentSubmission, uploadTalentAttachment, type TalentField, type TalentFieldType, type TalentSubmissionStatus } from "./talentBankSupabaseStore.js";
+import { createTalentAttachmentUrl, createTalentFormForClient, createTalentSubmission, getPublicTalentForm, getTalentFormForClient, listTalentFormsForClient, listTalentSubmissions, saveTalentForm, talentSlugFromUnitName, updateTalentSubmission, uploadTalentAttachment, type TalentField, type TalentFieldType, type TalentSubmissionStatus } from "./talentBankSupabaseStore.js";
 import { validateTalentSubmission, validateTalentUpload } from "./talentBankPolicy.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -544,8 +544,16 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     if (!talentManager(req, res)) return;
     const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
     if (!/^[0-9a-f-]{36}$/i.test(clientId)) { res.status(400).json({ error: "Selecione uma unidade válida" }); return; }
-    try { const client = await talentClientAllowed(req, clientId); if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } let form = await getTalentFormForClient(clientId); if (!form) form = await createTalentFormForClient({ clientId, publicSlug: talentSlugFromUnitName(client.name, clientId), title: `Trabalhe Conosco — ${client.name}`, subtitle: "Faça parte do time Vida Card." }); res.json({ unit: client, form }); }
+    const formId = typeof req.query.form_id === "string" ? req.query.form_id : undefined;
+    try { const client = await talentClientAllowed(req, clientId); if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } let form = await getTalentFormForClient(clientId, formId); if (!form && !formId) form = await createTalentFormForClient({ clientId, publicSlug: talentSlugFromUnitName(client.name, clientId), title: `Trabalhe Conosco — ${client.name}`, subtitle: "Faça parte do time Vida Card." }); res.json({ unit: client, form, forms: await listTalentFormsForClient(clientId) }); }
     catch (error) { console.error("[talent] Falha ao carregar formulário administrativo:", error); res.status(503).json({ error: "Não foi possível carregar o formulário" }); }
+  });
+
+  app.post("/api/talent/admin/forms", requireAuth, async (req, res) => {
+    if (!talentManager(req, res)) return;
+    const payload = req.body as Record<string, unknown>; const clientId = trimText(payload.clientId, 36); const title = trimText(payload.title, 255) || "Novo formulário";
+    try { const client = await talentClientAllowed(req, clientId); if (!client) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const slug = `${talentSlugFromUnitName(client.name, clientId)}-${Date.now().toString(36)}`.slice(0, 120); const form = await createTalentFormForClient({ clientId, publicSlug: slug, title, subtitle: "Faça parte do time Vida Card." }); res.status(201).json({ form }); }
+    catch (error) { console.error("[talent] Falha ao criar formulário:", error); res.status(503).json({ error: "Não foi possível criar o formulário" }); }
   });
 
   app.put("/api/talent/admin/form", requireAuth, async (req, res) => {
@@ -558,8 +566,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
 
   app.get("/api/talent/admin/submissions", requireAuth, async (req, res) => {
     if (!talentManager(req, res)) return;
-    const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
-    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const submissions = await listTalentSubmissions({ clientId, search: typeof req.query.search === "string" ? req.query.search : undefined, status: typeof req.query.status === "string" ? req.query.status : undefined, limit: Number(req.query.limit ?? 200) }); res.json({ submissions }); }
+    const clientId = typeof req.query.client_id === "string" ? req.query.client_id : ""; const formId = typeof req.query.form_id === "string" ? req.query.form_id : undefined;
+    try { if (!await talentClientAllowed(req, clientId)) { res.status(403).json({ error: "Sem acesso a esta unidade" }); return; } const submissions = await listTalentSubmissions({ clientId, formId, search: typeof req.query.search === "string" ? req.query.search : undefined, status: typeof req.query.status === "string" ? req.query.status : undefined, limit: Number(req.query.limit ?? 200) }); res.json({ submissions }); }
     catch (error) { console.error("[talent] Falha ao listar candidaturas:", error); res.status(503).json({ error: "Não foi possível carregar as candidaturas" }); }
   });
 

@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS public.talent_forms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id UUID NOT NULL UNIQUE,
+  client_id UUID NOT NULL,
   public_slug VARCHAR(120) NOT NULL UNIQUE,
   title VARCHAR(255) NOT NULL DEFAULT 'Trabalhe Conosco',
   subtitle TEXT NOT NULL DEFAULT 'Faça parte do time Vida Card.',

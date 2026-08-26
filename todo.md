@@ -756,6 +756,16 @@
 - [x] Exibir pop-up de sucesso com o link público copiável após salvar um formulário publicado
 - [ ] Cobrir os ajustes de construtor e publicação em testes e validação visual
 
+## Correções de candidatos e múltiplos formulários
+
+- [x] Corrigir a listagem de candidatos para exibir somente as candidaturas do formulário selecionado
+- [x] Corrigir a exportação para preservar todas as respostas e os dados básicos do candidato
+- [x] Remover a restrição de um formulário por unidade sem afetar formulários já criados
+- [x] Criar seleção, criação e gestão de múltiplos formulários dentro de cada unidade
+- [x] Manter links públicos, publicação e candidaturas isolados por formulário
+- [x] Cobrir persistência, listagem e exportação por formulário em testes Vitest
+- [ ] Validar no navegador a criação, candidatura, listagem e exportação de mais de um formulário
+
 ## Supabase separado para Banco de Talentos
 
 - [x] Preservar o Supabase da dashboard somente como fonte de autorizações de usuário e unidade

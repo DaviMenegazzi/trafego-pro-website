@@ -8,9 +8,9 @@ import {
   ArrowRight,
   ShieldCheck,
   Sparkles,
-  BarChart3,
+  TrendingUp,
   UsersRound,
-  Inbox,
+  BarChart3,
   CheckCircle2,
   Loader2,
   AlertCircle,
@@ -45,7 +45,7 @@ export default function Login() {
         setCurrentWordIndex((prev) => (prev + 1) % ROTATING_WORDS.length);
         setFadeState("in");
       }, 300);
-    }, 3200);
+    }, 3000);
 
     return () => clearInterval(timer);
   }, []);
@@ -106,35 +106,42 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-zinc-950 text-white flex flex-col justify-between selection:bg-white/20 selection:text-white relative overflow-hidden font-sans">
-      {/* Background Ambient Neutral Glows & Grid Pattern */}
+    <div className="min-h-screen w-full bg-zinc-950 text-white flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200 relative overflow-hidden font-sans">
+      {/* Background Ambient Glows (Emerald & Slate) */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        {/* Subtle top ambient glow */}
+        {/* Ambient Top Emerald Glow */}
         <div
-          className="absolute -top-32 left-1/2 -translate-x-1/2 size-[800px] rounded-full opacity-20 blur-[150px]"
+          className="absolute -top-40 -left-40 size-[700px] rounded-full opacity-20 blur-[140px]"
           style={{
-            background: "radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(161, 161, 170, 0.05) 50%, transparent 80%)",
+            background: "radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.1) 60%, transparent 80%)",
           }}
         />
-        {/* Geometric subtle dot pattern */}
+        {/* Ambient Bottom Slate/Emerald Glow */}
+        <div
+          className="absolute -bottom-40 -right-40 size-[650px] rounded-full opacity-15 blur-[140px]"
+          style={{
+            background: "radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(30, 41, 59, 0.4) 60%, transparent 80%)",
+          }}
+        />
+        {/* Subtle geometric dot grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: "radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)",
-            backgroundSize: "36px 36px",
+            backgroundSize: "32px 32px",
           }}
         />
       </div>
 
       {/* Main Content: Clean Centered Split Area */}
       <main className="relative z-10 flex-1 flex items-center justify-center max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 md:py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center w-full max-w-5xl">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center w-full max-w-5xl">
           
-          {/* Left Column: Clean Animated Headline & Universal Overview */}
+          {/* Left Column: Clean Animated Headline & Platform Highlights */}
           <div className="hidden lg:flex lg:col-span-6 flex-col justify-center space-y-8 pr-2">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1 text-xs font-medium text-zinc-300 backdrop-blur-md">
-                <span className="size-1.5 rounded-full bg-zinc-400 animate-pulse" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-400 backdrop-blur-md">
+                <Sparkles className="size-3.5 animate-pulse" />
                 <span>Central de Gestão & Performance</span>
               </div>
 
@@ -142,10 +149,10 @@ export default function Login() {
               <h1 className="font-display text-4xl xl:text-5xl font-bold tracking-tight text-zinc-100 leading-[1.2]">
                 Sua plataforma para impulsionar{" "}
                 <span
-                  className={`inline-block text-white transition-all duration-300 font-extrabold border-b-2 border-zinc-500 pb-0.5 ${
+                  className={`inline-block bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200 bg-clip-text text-transparent transition-all duration-300 font-extrabold pb-0.5 border-b-2 border-emerald-500/50 ${
                     fadeState === "in"
-                      ? "opacity-100 translate-y-0"
-                      : "opacity-0 -translate-y-1"
+                      ? "opacity-100 translate-y-0 scale-100"
+                      : "opacity-0 -translate-y-1 scale-95"
                   }`}
                 >
                   {ROTATING_WORDS[currentWordIndex]}
@@ -154,59 +161,59 @@ export default function Login() {
               </h1>
 
               <p className="text-sm xl:text-base text-zinc-400 leading-relaxed font-light max-w-lg">
-                Um ambiente unificado e intuitivo para acompanhar métricas, gerenciar processos e tomar decisões com agilidade.
+                Um ambiente integrado para acompanhar métricas de tráfego, gerenciar processos e potencializar suas operações com agilidade.
               </p>
             </div>
 
-            {/* Clean Feature List (Neutral & Generic) */}
+            {/* Feature Highlights with Slate & Emerald Accents */}
             <div className="space-y-3 pt-2">
-              <div className="flex items-center gap-3.5 rounded-2xl border border-white/5 bg-zinc-900/30 p-3.5 backdrop-blur-sm transition hover:border-white/10 hover:bg-zinc-900/50">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-zinc-300 shrink-0">
-                  <BarChart3 className="size-4" />
+              <div className="flex items-center gap-3.5 rounded-2xl border border-white/5 bg-zinc-900/40 p-3.5 backdrop-blur-sm transition hover:border-emerald-500/30 hover:bg-zinc-900/70">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
+                  <TrendingUp className="size-4" />
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-zinc-200">Painéis de Indicadores & Métricas</h4>
-                  <p className="text-[11px] text-zinc-500">Acompanhamento consolidado e filtros inteligentes.</p>
+                  <p className="text-[11px] text-zinc-400">Acompanhamento consolidado de dados e performance.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3.5 rounded-2xl border border-white/5 bg-zinc-900/30 p-3.5 backdrop-blur-sm transition hover:border-white/10 hover:bg-zinc-900/50">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-zinc-300 shrink-0">
+              <div className="flex items-center gap-3.5 rounded-2xl border border-white/5 bg-zinc-900/40 p-3.5 backdrop-blur-sm transition hover:border-emerald-500/30 hover:bg-zinc-900/70">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-300 shrink-0">
                   <UsersRound className="size-4" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-zinc-200">Banco de Talentos & Vagas</h4>
-                  <p className="text-[11px] text-zinc-500">Gestão de formulários e funil de seleção de candidatos.</p>
+                  <h4 className="text-xs font-semibold text-zinc-200">Banco de Talentos Inteligente</h4>
+                  <p className="text-[11px] text-zinc-400">Formulários customizados e funil de seleção de candidatos.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3.5 rounded-2xl border border-white/5 bg-zinc-900/30 p-3.5 backdrop-blur-sm transition hover:border-white/10 hover:bg-zinc-900/50">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-zinc-300 shrink-0">
-                  <Inbox className="size-4" />
+              <div className="flex items-center gap-3.5 rounded-2xl border border-white/5 bg-zinc-900/40 p-3.5 backdrop-blur-sm transition hover:border-emerald-500/30 hover:bg-zinc-900/70">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-300 shrink-0">
+                  <BarChart3 className="size-4" />
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-zinc-200">Retorno Comercial & Qualificação</h4>
-                  <p className="text-[11px] text-zinc-500">Acompanhamento de atendimentos e feedbacks operacionais.</p>
+                  <p className="text-[11px] text-zinc-400">Feedbacks estruturados e acompanhamento operacional.</p>
                 </div>
               </div>
             </div>
 
             {/* Bottom Proof Note */}
             <div className="flex items-center gap-2.5 pt-2 text-xs text-zinc-500 border-t border-white/5">
-              <ShieldCheck className="size-4 text-zinc-400 shrink-0" />
+              <ShieldCheck className="size-4 text-emerald-400 shrink-0" />
               <span>Acesso seguro com permissões personalizadas para o seu perfil.</span>
             </div>
           </div>
 
-          {/* Right Column: Clean Neutral Glass Card */}
+          {/* Right Column: Modern Glass Card with Slate/Zinc & Emerald Touch */}
           <div className="lg:col-span-6 flex justify-center">
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900/50 p-8 sm:p-10 backdrop-blur-2xl shadow-2xl shadow-black/80 relative">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900/60 p-8 sm:p-10 backdrop-blur-2xl shadow-2xl shadow-black/80 relative">
               
               {/* Card Header */}
               <div className="mb-7">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="size-2 rounded-full bg-zinc-400" />
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+                  <div className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-emerald-400">
                     Acesso à Plataforma
                   </span>
                 </div>
@@ -235,7 +242,7 @@ export default function Login() {
                     Usuário ou E-mail
                   </label>
                   <div className="relative group">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-zinc-200 transition-colors">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-emerald-400 transition-colors">
                       <User className="size-4" />
                     </div>
                     <input
@@ -247,7 +254,7 @@ export default function Login() {
                       autoFocus={!identifier}
                       autoComplete="username"
                       disabled={loading}
-                      className="w-full rounded-2xl border border-white/10 bg-zinc-950/90 pl-10 pr-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-400 focus:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-white/10 transition-all duration-200"
+                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-950/80 pl-10 pr-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/60 focus:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -260,7 +267,7 @@ export default function Login() {
                     </label>
                   </div>
                   <div className="relative group">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-zinc-200 transition-colors">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-emerald-400 transition-colors">
                       <Lock className="size-4" />
                     </div>
                     <input
@@ -271,7 +278,7 @@ export default function Login() {
                       required
                       autoComplete="current-password"
                       disabled={loading}
-                      className="w-full rounded-2xl border border-white/10 bg-zinc-950/90 pl-10 pr-11 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-400 focus:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-white/10 transition-all duration-200"
+                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-950/80 pl-10 pr-11 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/60 focus:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                     />
                     <button
                       type="button"
@@ -296,7 +303,7 @@ export default function Login() {
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="size-4 rounded-md border-zinc-700 bg-zinc-950 text-white accent-white focus:ring-0 focus:ring-offset-0"
+                      className="size-4 rounded-md border-zinc-700 bg-zinc-950 text-emerald-500 accent-emerald-500 focus:ring-0 focus:ring-offset-0"
                     />
                     <span className="text-xs text-zinc-400 hover:text-zinc-300 transition">
                       Lembrar meu usuário
@@ -308,12 +315,12 @@ export default function Login() {
                   </span>
                 </div>
 
-                {/* Submit Button (Neutral White/Zinc Theme) */}
+                {/* Submit Button (Modern Emerald Gradient Accent) */}
                 <div className="pt-2">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="group relative flex w-full items-center justify-center gap-2 rounded-2xl bg-white p-3.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-lg shadow-white/5 transition-all duration-200"
+                    className="group relative flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 p-3.5 text-sm font-bold text-zinc-950 hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-lg shadow-emerald-950/50 hover:shadow-emerald-500/20 transition-all duration-200"
                   >
                     {loading ? (
                       <>
@@ -340,7 +347,7 @@ export default function Login() {
         </div>
       </main>
 
-      {/* Footer (Neutral, No Unit/Specific Brand) */}
+      {/* Footer (Clean & Neutral) */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-white/5 text-[11px] text-zinc-500">
         <div>
           © {new Date().getFullYear()} Tráfego Pro · Todos os direitos reservados.

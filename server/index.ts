@@ -380,9 +380,16 @@ function requireExternalAiToken(scope?: ExternalAiApiScope) {
 }
 
 function externalAiUnitId(req: express.Request, res: express.Response): string | null {
-  const unitId = typeof req.query.unit_id === "string" ? req.query.unit_id : "";
-  if (!/^[0-9a-f-]{36}$/i.test(unitId)) { res.status(400).json({ error: "Informe unit_id como UUID" }); return null; }
-  if (!req.externalAiToken || !isExternalAiApiUnitAllowed(req.externalAiToken.unitIds, unitId)) { req.externalAiOutcome = "unit_denied"; res.status(403).json({ error: "O token não possui acesso a esta unidade" }); return null; }
+  const unitId = typeof req.query.unit_id === "string" ? req.query.unit_id.trim() : "";
+  if (!/^[0-9a-f-]{36}$|^act_[0-9]+$|^[a-z0-9_-]{3,64}$/i.test(unitId)) {
+    res.status(400).json({ error: "Informe um unit_id válido" });
+    return null;
+  }
+  if (!req.externalAiToken || !isExternalAiApiUnitAllowed(req.externalAiToken.unitIds, unitId)) {
+    req.externalAiOutcome = "unit_denied";
+    res.status(403).json({ error: "O token não possui acesso a esta unidade" });
+    return null;
+  }
   return unitId;
 }
 
@@ -838,30 +845,65 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   // ─── Integrações externas de IA: administração (somente admins) ───────────
   app.get("/api/external-ai/tokens", requireAuth, requireSupabaseAdmin, async (req, res) => {
     try {
-      const sb = getSupabaseForRequest(req);
-      if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
-      const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
-      if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades autorizadas" }); return; }
+      let units: Array<{ id: string; name: string; client_group?: string | null }> = [];
+      if (isMetaDirectEnabled()) {
+        const allMetaClients = await getMetaDirectClients();
+        units = allMetaClients.map((c) => ({ id: c.id, name: c.name, client_group: c.client_group }));
+      } else {
+        const sb = getSupabaseForRequest(req);
+        if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
+        const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
+        if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades autorizadas" }); return; }
+        units = catalog.clients;
+      }
       const tokens = await listExternalAiApiTokensSql(req.claims!.id);
-      res.json({ scopes: ["metrics:read", "leads:summary:read", "crm:summary:read"], rateLimitPerMinute: EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE, units: catalog.clients, tokens: tokens.map(({ tokenHash: _hash, ...token }) => token) });
-    } catch (error) { console.error("[external-ai] Falha ao listar tokens:", error); res.status(503).json({ error: "Não foi possível carregar os tokens externos" }); }
+      res.json({
+        scopes: ["metrics:read", "leads:summary:read", "crm:summary:read"],
+        rateLimitPerMinute: EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE,
+        units,
+        tokens: tokens.map(({ tokenHash: _hash, ...token }) => token),
+      });
+    } catch (error) {
+      console.error("[external-ai] Falha ao listar tokens:", error);
+      res.status(503).json({ error: "Não foi possível carregar os tokens externos" });
+    }
   });
 
   app.post("/api/external-ai/tokens", requireAuth, requireSupabaseAdmin, async (req, res) => {
     const validated = validateExternalAiApiTokenDraft(req.body as Record<string, unknown>);
     if (!validated.ok) { res.status(400).json({ error: validated.error }); return; }
     try {
-      const sb = getSupabaseForRequest(req);
-      if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
-      const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
-      if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades autorizadas" }); return; }
-      const permitted = new Set(catalog.clients.map((unit) => unit.id));
-      if (!validated.value.unitIds.every((unitId) => permitted.has(unitId))) { res.status(403).json({ error: "O token só pode incluir unidades autorizadas" }); return; }
+      let permitted: Set<string>;
+      if (isMetaDirectEnabled()) {
+        const allMeta = await getMetaDirectClients();
+        permitted = new Set(allMeta.map((c) => c.id));
+      } else {
+        const sb = getSupabaseForRequest(req);
+        if (!sb) { res.status(401).json({ error: "Sessão Supabase expirada" }); return; }
+        const catalog = await listDashboardClientsFromSupabase(sb, req.claims!);
+        if (catalog.error) { res.status(502).json({ error: "Não foi possível carregar as unidades autorizadas" }); return; }
+        permitted = new Set(catalog.clients.map((unit) => unit.id));
+      }
+      if (!validated.value.unitIds.every((unitId) => permitted.has(unitId))) {
+        res.status(403).json({ error: "O token só pode incluir unidades autorizadas" });
+        return;
+      }
       const rawToken = createExternalAiApiToken();
-      const token = await createExternalAiApiTokenSql({ ownerUserId: req.claims!.id, name: validated.value.name, tokenPrefix: externalAiApiTokenPrefix(rawToken), tokenHash: hashExternalAiApiToken(rawToken), scopes: validated.value.scopes, unitIds: validated.value.unitIds, expiresAt: validated.value.expiresAt });
+      const token = await createExternalAiApiTokenSql({
+        ownerUserId: req.claims!.id,
+        name: validated.value.name,
+        tokenPrefix: externalAiApiTokenPrefix(rawToken),
+        tokenHash: hashExternalAiApiToken(rawToken),
+        scopes: validated.value.scopes,
+        unitIds: validated.value.unitIds,
+        expiresAt: validated.value.expiresAt,
+      });
       const { tokenHash: _hash, ...metadata } = token;
       res.status(201).json({ token: rawToken, metadata });
-    } catch (error) { console.error("[external-ai] Falha ao criar token:", error); res.status(503).json({ error: "Não foi possível criar o token externo" }); }
+    } catch (error) {
+      console.error("[external-ai] Falha ao criar token:", error);
+      res.status(503).json({ error: "Não foi possível criar o token externo" });
+    }
   });
 
   app.delete("/api/external-ai/tokens/:id", requireAuth, requireSupabaseAdmin, async (req, res) => {

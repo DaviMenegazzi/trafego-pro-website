@@ -1,5 +1,6 @@
 import { listEvolutionInstancesSupabase, listEvolutionLeadsForAiClassificationSupabase, type EvolutionCrmStage } from "./evolutionSupabaseStore.js";
 import { getAuthedSupabase } from "./supabase.js";
+import { isMetaDirectEnabled, getMetaDirectClients, getMetaDirectDaily } from "./metaDirectService.js";
 
 type MetricRow = Record<string, unknown>;
 type MetricTotals = { spend: number; conversationsStarted: number; metaLeads: number; impressions: number; clicks: number };
@@ -22,6 +23,14 @@ export function summarizeExternalAiMetrics(rows: MetricRow[], start: string, end
 
 export async function listExternalAiUnits(unitIds: string[]): Promise<Array<{ id: string; name: string }>> {
   if (!unitIds.length) return [];
+  if (isMetaDirectEnabled()) {
+    const allMeta = await getMetaDirectClients().catch(() => []);
+    const idSet = new Set(unitIds);
+    const matched = allMeta.filter((c) => idSet.has(c.id) || idSet.has(c.account_id));
+    if (matched.length > 0) {
+      return matched.map((c) => ({ id: c.id, name: c.name }));
+    }
+  }
   const sb = await getAuthedSupabase();
   if (!sb) throw new Error("Leitura técnica do Supabase não configurada");
   const { data, error } = await sb.from("clients").select("id,name").in("id", unitIds).order("name");
@@ -30,12 +39,21 @@ export async function listExternalAiUnits(unitIds: string[]): Promise<Array<{ id
 }
 
 export async function getExternalAiUnit(unitId: string): Promise<{ id: string; name: string }> {
+  if (isMetaDirectEnabled()) {
+    const allMeta = await getMetaDirectClients().catch(() => []);
+    const matched = allMeta.find((c) => c.id === unitId || c.account_id === unitId);
+    if (matched) return { id: matched.id, name: matched.name };
+  }
   const units = await listExternalAiUnits([unitId]);
   if (!units[0]) throw new Error("Unidade não encontrada ou não autorizada");
   return units[0];
 }
 
 export async function getExternalAiMetrics(unitId: string, start: string, end: string) {
+  if (isMetaDirectEnabled()) {
+    const daily = await getMetaDirectDaily(unitId, start, end);
+    return summarizeExternalAiMetrics(daily as unknown as MetricRow[], start, end);
+  }
   const sb = await getAuthedSupabase();
   if (!sb) throw new Error("Leitura técnica do Supabase não configurada");
   const { data, error } = await sb.from("vw_meta_ads_daily_summary").select("date_start,total_spend,total_conversas_iniciadas,total_leads_meta,total_impressions,impressions,total_clicks,clicks").eq("client_id", unitId).gte("date_start", start).lte("date_start", end).order("date_start", { ascending: true });

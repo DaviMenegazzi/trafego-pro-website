@@ -34,8 +34,10 @@ export function parseExternalAiApiScopes(value: unknown): ExternalAiApiScope[] {
   return Array.from(new Set(strings(value).filter(isExternalAiApiScope)));
 }
 
+const UNIT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^act_[0-9]+$|^[a-z0-9_-]{3,64}$/i;
+
 export function parseExternalAiApiUnitIds(value: unknown): string[] {
-  return Array.from(new Set(strings(value).filter((item) => UUID.test(item))));
+  return Array.from(new Set(strings(value).filter((item) => UNIT_ID_PATTERN.test(item))));
 }
 
 export function validateExternalAiApiTokenDraft(input: { name?: unknown; scopes?: unknown; unitIds?: unknown; expiresAt?: unknown }, now = new Date()): { ok: true; value: { name: string; scopes: ExternalAiApiScope[]; unitIds: string[]; expiresAt: Date } } | { ok: false; error: string } {

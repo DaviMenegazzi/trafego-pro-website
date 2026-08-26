@@ -773,6 +773,25 @@
 - [ ] Reduzir controles concorrentes e tornar o estado de publicação inequívoco
 - [ ] Validar a jornada reorganizada com os fluxos de formulário, candidato e exportação
 
+## Sincronização e publicação de eventos
+
+- [x] Verificar branch local, commits remotos e arquivos de eventos pendentes
+- [ ] Sincronizar as alterações corretas sem sobrescrever trabalho concorrente
+- [ ] Validar os eventos atualizados antes de publicar
+- [ ] Publicar e confirmar a versão com os eventos corrigidos
+
+## Contas Meta na integração de IA externa
+
+- [x] Mapear a resolução atual de unidades e contas exibidas na integração de IA
+- [x] Usar a lista de contas autorizadas pelo token Meta como fonte de seleção da integração
+- [x] Preservar escopos, revogação, auditoria e limite de acesso dos tokens externos
+- [x] Cobrir a resolução de contas Meta em testes e publicar a correção
+
+## Reaproveitamento do token Meta existente
+
+- [x] Usar a mesma variável de token Meta já consumida pela dashboard na integração de IA externa
+- [x] Validar que a lista de contas carregada pela IA corresponde à lista da dashboard
+
 ## Supabase separado para Banco de Talentos
 
 - [x] Preservar o Supabase da dashboard somente como fonte de autorizações de usuário e unidade

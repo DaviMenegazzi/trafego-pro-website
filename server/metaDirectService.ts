@@ -110,7 +110,10 @@ export function clearMetaCache(): void {
 
 // ─── Token & Config ──────────────────────────────────────────────────────────
 export function getMetaDirectToken(): string | null {
-  return process.env.META_DIRECT_TOKEN || null;
+  // META_ADS_VALIDATION_TOKEN é o token Meta de leitura já validado e usado
+  // pela dashboard. META_DIRECT_TOKEN permanece como substituição explícita
+  // caso seja necessário separar os acessos no futuro.
+  return process.env.META_DIRECT_TOKEN || process.env.META_ADS_VALIDATION_TOKEN || null;
 }
 
 export function isMetaDirectEnabled(): boolean {

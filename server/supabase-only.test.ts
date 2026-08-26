@@ -42,7 +42,9 @@ describe("Dashboard com Supabase como fonte exclusiva", () => {
 
   it("não permite consulta de unidades com JWT local sem sessão Supabase quando Meta Direct estiver desativado", async () => {
     const originalToken = process.env.META_DIRECT_TOKEN;
+    const originalValidationToken = process.env.META_ADS_VALIDATION_TOKEN;
     delete process.env.META_DIRECT_TOKEN;
+    delete process.env.META_ADS_VALIDATION_TOKEN;
     try {
       const response = await fetch(`${baseUrl}/api/metrics/clients`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -52,6 +54,7 @@ describe("Dashboard com Supabase como fonte exclusiva", () => {
       await expect(response.json()).resolves.toEqual({ error: "Sessão Supabase expirada" });
     } finally {
       if (originalToken) process.env.META_DIRECT_TOKEN = originalToken;
+      if (originalValidationToken) process.env.META_ADS_VALIDATION_TOKEN = originalValidationToken;
     }
   });
 });

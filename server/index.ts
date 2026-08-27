@@ -42,7 +42,7 @@ import { storagePut } from "./storage.js";
 import { validateSocialMediaUpload } from "./socialMediaUploadPolicy.js";
 import { createExternalAiApiToken, EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE, externalAiApiTokenPrefix, hasExternalAiApiScope, hashExternalAiApiToken, isExternalAiApiTokenActive, isExternalAiApiUnitAllowed, resolveExternalAiApiDateRange, validateExternalAiApiTokenDraft, type ExternalAiApiScope } from "./externalAiApiPolicy.js";
 import { consumeExternalAiApiRateLimitSql, createExternalAiApiTokenSql, findExternalAiApiTokenByHashSql, listExternalAiApiTokensSql, recordExternalAiApiAuditSql, revokeExternalAiApiTokenSql, type ExternalAiApiToken } from "./externalAiApiSql.js";
-import { getExternalAiCrmSummary, getExternalAiLeadSummary, getExternalAiMetrics, getExternalAiUnit, listExternalAiUnits } from "./externalAiApiData.js";
+import { getExternalAiAdsMetrics, getExternalAiCreatives, getExternalAiCrmSummary, getExternalAiLeadSummary, getExternalAiMetrics, getExternalAiUnit, listExternalAiUnits } from "./externalAiApiData.js";
 import { createTalentAttachmentUrl, createTalentFormForClient, createTalentSubmission, deleteTalentFormForClient, getPublicTalentForm, getTalentFormForClient, listTalentFormsForClient, listTalentSubmissions, saveTalentForm, talentSlugFromUnitName, updateTalentSubmission, uploadTalentAttachment, uploadTalentLogo, type TalentField, type TalentFieldType, type TalentSubmissionStatus } from "./talentBankSupabaseStore.js";
 import { validateTalentSubmission, validateTalentUpload } from "./talentBankPolicy.js";
 import {
@@ -938,6 +938,31 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     const unitId = externalAiUnitId(req, res); if (!unitId) return;
     try { const unit = await getExternalAiUnit(unitId); res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), dataClassification: "aggregated", unit, crm: await getExternalAiCrmSummary(unit.name) }); }
     catch (error) { console.error("[external-ai] Falha em resumo CRM:", error); req.externalAiOutcome = "upstream_error"; res.status(503).json({ error: "Os dados estão temporariamente indisponíveis" }); }
+  });
+
+  app.get("/api/external/v1/ads/metrics", requireExternalAiToken("ads:metrics:read"), async (req, res) => {
+    const unitId = externalAiUnitId(req, res); if (!unitId) return;
+    const period = resolveExternalAiApiDateRange(req.query.start_date, req.query.end_date); if (!period.ok) { res.status(400).json({ error: period.error }); return; }
+    try { res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), ...(await getExternalAiAdsMetrics(unitId, period.start, period.end)) }); }
+    catch { req.externalAiOutcome = "upstream_error"; res.status(503).json({ error: "Os dados estão temporariamente indisponíveis" }); }
+  });
+
+  app.get("/api/external/v1/creatives", requireExternalAiToken("creatives:read"), async (req, res) => {
+    const unitId = typeof req.query.unit_id === "string" ? req.query.unit_id : undefined;
+    if (unitId && !externalAiUnitId(req, res)) return;
+    try { res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), ...(await getExternalAiCreatives(unitId)) }); }
+    catch { req.externalAiOutcome = "upstream_error"; res.status(503).json({ error: "Os dados estão temporariamente indisponíveis" }); }
+  });
+
+  app.get("/api/external/v1/targets", requireExternalAiToken("targets:read"), async (_req, res) => {
+    res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), targets: [], sourceStatus: "pending_provider_integration" });
+  });
+
+  app.get("/api/external/v1/leads", requireExternalAiToken("leads:read"), async (req, res) => {
+    const unitId = externalAiUnitId(req, res); if (!unitId) return;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    res.json({ apiVersion: "v1", generatedAt: new Date().toISOString(), dataClassification: "pseudonymous", pagination: { page, limit, total: 0 }, leads: [], sourceStatus: "pending_provider_integration", unit_id: unitId });
   });
 
   // ─── Evolution — módulo isolado de rastreio ───────────────────────────────

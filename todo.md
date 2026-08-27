@@ -799,6 +799,24 @@
 - [x] Preservar autorização por unidade e exibir o link atualizado após a alteração
 - [x] Cobrir o fluxo de alteração de slug em teste e publicar a melhoria
 
+## Otimização da API externa de IA
+
+- [x] Mapear as fontes reais para métricas de mídia, CRM, criativos, metas e leads individuais
+- [x] Definir escopos adicionais e o contrato paginado para dados granulares
+- [ ] Adicionar métricas de alcance, frequência, visualizações de página e vídeo ao endpoint de métricas
+- [ ] Permitir granularidade por unidade, campanha e anúncio com filtro de plataforma
+- [ ] Adicionar valores financeiros e estágios detalhados ao resumo de CRM quando disponíveis
+- [x] Criar endpoint paginado de leads sem expor telefones, mensagens ou dados pessoais desnecessários
+- [x] Criar endpoint de catálogo de criativos com apenas metadados disponíveis
+- [x] Criar endpoint de metas e orçamentos por unidade e período após persistir a configuração
+- [ ] Cobrir escopo, paginação, privacidade e respostas ausentes em Vitest
+- [x] Documentar campos disponíveis e dependências de dados pendentes
+
+## Contrato de fontes futuras da API externa
+
+- [x] Retornar campos financeiros, metas e etapas indisponíveis como nulos ou listas vazias, com indicação explícita da fonte pendente
+- [x] Não fabricar métricas, valores de venda ou estados de CRM ausentes
+
 ## Supabase separado para Banco de Talentos
 
 - [x] Preservar o Supabase da dashboard somente como fonte de autorizações de usuário e unidade

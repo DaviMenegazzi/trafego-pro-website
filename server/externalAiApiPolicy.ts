@@ -1,6 +1,14 @@
 import crypto from "crypto";
 
-export const EXTERNAL_AI_API_SCOPES = ["metrics:read", "leads:summary:read", "crm:summary:read"] as const;
+export const EXTERNAL_AI_API_SCOPES = [
+  "metrics:read",
+  "ads:metrics:read",
+  "leads:summary:read",
+  "leads:read",
+  "crm:summary:read",
+  "creatives:read",
+  "targets:read",
+] as const;
 export type ExternalAiApiScope = (typeof EXTERNAL_AI_API_SCOPES)[number];
 export const EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE = 60;
 

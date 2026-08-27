@@ -1,6 +1,6 @@
 import { listEvolutionInstancesSupabase, listEvolutionLeadsForAiClassificationSupabase, type EvolutionCrmStage } from "./evolutionSupabaseStore.js";
 import { getAuthedSupabase } from "./supabase.js";
-import { isMetaDirectEnabled, getMetaDirectClients, getMetaDirectDaily } from "./metaDirectService.js";
+import { isMetaDirectEnabled, getMetaDirectClients, getMetaDirectDaily, getMetaDirectOffers } from "./metaDirectService.js";
 
 type MetricRow = Record<string, unknown>;
 type MetricTotals = { spend: number; conversationsStarted: number; metaLeads: number; impressions: number; clicks: number };
@@ -82,4 +82,17 @@ export async function getExternalAiLeadSummary(unitName: string) {
 export async function getExternalAiCrmSummary(unitName: string) {
   const { instanceCount, leads } = await unitEvolutionLeads(unitName);
   return { instanceCount, totalLeads: leads.length, stages: Object.fromEntries(crmStages.map((stage) => [stage, leads.filter((lead) => lead.crmStage === stage).length])) as Record<EvolutionCrmStage, number> };
+}
+
+export async function getExternalAiAdsMetrics(unitId: string, start: string, end: string) {
+  if (!isMetaDirectEnabled()) return { data: [], sourceStatus: "pending_provider_integration" };
+  const unit = await getExternalAiUnit(unitId);
+  const rows = await getMetaDirectOffers(unitId, start, end);
+  return { sourceStatus: "meta", data: rows.map((row) => ({ date: row.date_start, platform: "meta", account_id: row.account_id, unit_id: unit.id, unit_name: unit.name, campaign_id: row.campaign_id, campaign_name: row.campaign_name, adset_id: row.adset_id, adset_name: row.adset_name, ad_id: row.ad_id, ad_name: row.ad_name, creative_id: row.creative_id, spend: row.total_spend, impressions: row.total_impressions, reach: row.alcance, clicks: row.total_clicks, landing_page_views: null, video_views: null, frequency: row.frequency, leads: row.total_leads_meta, qualified_leads: null, contacted_leads: null, scheduled_leads: null, attended_leads: null, sales: null, revenue: null })) };
+}
+
+export async function getExternalAiCreatives(unitId?: string) {
+  if (!unitId || !isMetaDirectEnabled()) return { creatives: [], sourceStatus: "pending_provider_integration" };
+  const rows = await getMetaDirectOffers(unitId);
+  return { sourceStatus: "meta", creatives: rows.map((row) => ({ creative_id: row.creative_id, ad_id: row.ad_id, creative_name: row.creative_name, format: null, angle: null, hook: null, offer: row.offer_name, cta: null })) };
 }

@@ -290,6 +290,7 @@ export default function TalentBankAdmin() {
           lgpdDisclaimer: formToSave.lgpdDisclaimer,
           successTitle: formToSave.successTitle,
           successMessage: formToSave.successMessage,
+          publicSlug: formToSave.publicSlug,
           isPublished: formToSave.isPublished,
           fields: formToSave.fields,
         }),

@@ -792,6 +792,13 @@
 - [x] Usar a mesma variável de token Meta já consumida pela dashboard na integração de IA externa
 - [x] Validar que a lista de contas carregada pela IA corresponde à lista da dashboard
 
+## Edição de slug do formulário
+
+- [x] Adicionar ação visual ao lado do link público para editar o slug do formulário
+- [x] Validar formato e unicidade do slug antes de salvar
+- [x] Preservar autorização por unidade e exibir o link atualizado após a alteração
+- [x] Cobrir o fluxo de alteração de slug em teste e publicar a melhoria
+
 ## Supabase separado para Banco de Talentos
 
 - [x] Preservar o Supabase da dashboard somente como fonte de autorizações de usuário e unidade

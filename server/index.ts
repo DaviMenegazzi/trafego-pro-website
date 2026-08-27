@@ -712,6 +712,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
         lgpdDisclaimer: trimText(payload.lgpdDisclaimer, 3000) || "Autorizo o tratamento dos meus dados para fins de recrutamento.",
         successTitle: trimText(payload.successTitle, 255) || "Candidatura enviada!",
         successMessage: trimText(payload.successMessage, 1200) || "Recebemos suas informações.",
+        publicSlug: safeTalentSlug(trimText(payload.publicSlug, 120) || "") ? trimText(payload.publicSlug, 120)!.toLowerCase() : "",
         isPublished: payload.isPublished === true,
         fields,
       });

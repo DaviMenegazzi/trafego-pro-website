@@ -141,6 +141,7 @@ export async function saveTalentForm(input: {
   lgpdDisclaimer: string;
   successTitle: string;
   successMessage: string;
+  publicSlug: string;
   isPublished: boolean;
   fields: Array<Omit<TalentField, "id" | "formId"> & { id?: string }>;
 }): Promise<TalentForm> {
@@ -149,6 +150,7 @@ export async function saveTalentForm(input: {
   const { error: formError } = await sb
     .from("talent_forms")
     .update({
+      ...(input.publicSlug ? { public_slug: input.publicSlug } : {}),
       title: input.title,
       subtitle: input.subtitle,
       banner_url: input.bannerUrl,
@@ -345,5 +347,4 @@ export async function uploadTalentLogo(input: {
   const base64 = input.file.toString("base64");
   return `data:${input.mimeType};base64,${base64}`;
 }
-
 

@@ -32,6 +32,7 @@ import {
   Image as ImageIcon,
   Trash2,
   AlertTriangle,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { TalentField, TalentForm } from "./types";
@@ -180,6 +181,17 @@ export function TalentFormBuilder({
     setCopiedLink(true);
     toast.success("Link público copiado para a área de transferência!");
     setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleEditSlug = async () => {
+    const next = window.prompt("Defina o final do link público", form.publicSlug);
+    if (next === null || next.trim() === form.publicSlug) return;
+    const publicSlug = next.trim().toLowerCase();
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(publicSlug)) {
+      toast.error("Use apenas letras minúsculas, números e hífens no slug.");
+      return;
+    }
+    await onSave({ ...form, publicSlug });
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -410,6 +422,14 @@ export function TalentFormBuilder({
                 ) : (
                   <Copy className="size-3.5" />
                 )}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleEditSlug()}
+                className="rounded p-1 text-zinc-400 hover:text-white transition"
+                title="Editar link público"
+              >
+                <Pencil className="size-3.5" />
               </button>
             </div>
             <a

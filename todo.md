@@ -817,6 +817,12 @@
 - [x] Adicionar entre três e oito palavras-chave focadas à meta tag da página inicial
 - [x] Validar a presença da meta tag no HTML gerado
 
+## Saldo disponível Meta na API externa
+
+- [x] Consultar o saldo disponível real da conta Meta autorizada
+- [x] Incluir `availableFunds` na resposta de `/api/external/v1/metrics`
+- [ ] Cobrir o saldo e a indisponibilidade da fonte em testes
+
 ## Contrato de fontes futuras da API externa
 
 - [x] Retornar campos financeiros, metas e etapas indisponíveis como nulos ou listas vazias, com indicação explícita da fonte pendente

@@ -1,6 +1,6 @@
 import { listEvolutionInstancesSupabase, listEvolutionLeadsForAiClassificationSupabase, type EvolutionCrmStage } from "./evolutionSupabaseStore.js";
 import { getAuthedSupabase } from "./supabase.js";
-import { isMetaDirectEnabled, getMetaDirectClients, getMetaDirectDaily, getMetaDirectOffers } from "./metaDirectService.js";
+import { isMetaDirectEnabled, getMetaDirectClients, getMetaDirectDaily, getMetaDirectOffers, getMetaDirectAvailableFunds } from "./metaDirectService.js";
 
 type MetricRow = Record<string, unknown>;
 type MetricTotals = { spend: number; conversationsStarted: number; metaLeads: number; impressions: number; clicks: number };
@@ -51,14 +51,14 @@ export async function getExternalAiUnit(unitId: string): Promise<{ id: string; n
 
 export async function getExternalAiMetrics(unitId: string, start: string, end: string) {
   if (isMetaDirectEnabled()) {
-    const daily = await getMetaDirectDaily(unitId, start, end);
-    return summarizeExternalAiMetrics(daily as unknown as MetricRow[], start, end);
+    const [daily, availableFunds] = await Promise.all([getMetaDirectDaily(unitId, start, end), getMetaDirectAvailableFunds(unitId)]);
+    return { ...summarizeExternalAiMetrics(daily as unknown as MetricRow[], start, end), availableFunds };
   }
   const sb = await getAuthedSupabase();
   if (!sb) throw new Error("Leitura técnica do Supabase não configurada");
   const { data, error } = await sb.from("vw_meta_ads_daily_summary").select("date_start,total_spend,total_conversas_iniciadas,total_leads_meta,total_impressions,impressions,total_clicks,clicks").eq("client_id", unitId).gte("date_start", start).lte("date_start", end).order("date_start", { ascending: true });
   if (error) throw new Error(error.message);
-  return summarizeExternalAiMetrics((data ?? []) as MetricRow[], start, end);
+  return { ...summarizeExternalAiMetrics((data ?? []) as MetricRow[], start, end), availableFunds: null };
 }
 
 const crmStages: EvolutionCrmStage[] = ["lead_not_responded", "lead_responded", "follow_up", "lead_replied", "negotiation", "closed_won", "closed_lost"];

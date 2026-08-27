@@ -829,6 +829,13 @@
 - [x] Não usar o balance pós-pago como availableFunds em contas pré-pagas
 - [x] Expor a indisponibilidade do saldo pré-pago de forma explícita quando a Meta não o retornar
 
+## Correção de extração de saldo Meta
+
+- [ ] Solicitar `balance`, `spend_cap`, `amount_spent` e `funding_source_details` na conta Meta
+- [ ] Priorizar `funding_source_details.amount` para contas pré-pagas
+- [ ] Calcular saldo por limite de gastos ou balance normalizado quando os créditos não estiverem disponíveis
+- [ ] Evitar retorno nulo silencioso e testar as alternativas de saldo
+
 ## Contrato de fontes futuras da API externa
 
 - [x] Retornar campos financeiros, metas e etapas indisponíveis como nulos ou listas vazias, com indicação explícita da fonte pendente

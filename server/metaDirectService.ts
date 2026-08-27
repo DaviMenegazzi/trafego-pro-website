@@ -417,12 +417,17 @@ export async function getMetaDirectAvailableFunds(accountId: string): Promise<nu
   const cacheKey = `meta:available-funds:${actId}`;
   const cached = getCached<number | null>(cacheKey);
   if (cached !== null) return cached;
-  const response = await fetch(`${GRAPH_API_BASE}/${actId}?fields=funding_source_details,available_funds&access_token=${encodeURIComponent(token)}`);
+  const response = await fetch(`${GRAPH_API_BASE}/${actId}?fields=balance,spend_cap,amount_spent,funding_source_details,available_funds&access_token=${encodeURIComponent(token)}`);
   if (!response.ok) return null;
-  const data = await response.json() as { available_funds?: string | number; funding_source_details?: Record<string, unknown> };
+  const data = await response.json() as { available_funds?: string | number; balance?: string | number; spend_cap?: string | number; amount_spent?: string | number; funding_source_details?: Record<string, unknown> };
   const funding = data.funding_source_details ?? {};
-  const candidates = [data.available_funds, funding.available_funds, funding.available_balance, funding.prepaid_balance, funding.remaining_balance];
-  const value = candidates.map(Number).find(Number.isFinite) ?? null;
+  const credits = [data.available_funds, funding.amount, funding.available_funds, funding.available_balance, funding.prepaid_balance, funding.remaining_balance]
+    .map(Number).find(Number.isFinite);
+  const spendCap = Number(data.spend_cap);
+  const amountSpent = Number(data.amount_spent);
+  const capRemaining = Number.isFinite(spendCap) && Number.isFinite(amountSpent) && spendCap > 0 ? (spendCap - amountSpent) / 100 : null;
+  const rawBalance = Number(data.balance);
+  const value = credits ?? capRemaining ?? (Number.isFinite(rawBalance) ? rawBalance / 100 : null);
   setCached(cacheKey, value, 5 * 60 * 1000);
   return value;
 }

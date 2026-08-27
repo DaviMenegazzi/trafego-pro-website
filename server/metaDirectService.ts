@@ -409,7 +409,7 @@ export async function getMetaDirectDaily(
   return rows;
 }
 
-/** Retorna o saldo disponível informado pela Meta para a conta de anúncios. */
+/** Retorna apenas créditos disponíveis de contas pré-pagas, nunca saldo pós-pago. */
 export async function getMetaDirectAvailableFunds(accountId: string): Promise<number | null> {
   const token = getMetaDirectToken();
   if (!token || !accountId) return null;
@@ -417,11 +417,12 @@ export async function getMetaDirectAvailableFunds(accountId: string): Promise<nu
   const cacheKey = `meta:available-funds:${actId}`;
   const cached = getCached<number | null>(cacheKey);
   if (cached !== null) return cached;
-  const response = await fetch(`${GRAPH_API_BASE}/${actId}?fields=balance&access_token=${encodeURIComponent(token)}`);
+  const response = await fetch(`${GRAPH_API_BASE}/${actId}?fields=funding_source_details,available_funds&access_token=${encodeURIComponent(token)}`);
   if (!response.ok) return null;
-  const data = await response.json() as { balance?: string | number };
-  const balance = Number(data.balance);
-  const value = Number.isFinite(balance) ? balance : null;
+  const data = await response.json() as { available_funds?: string | number; funding_source_details?: Record<string, unknown> };
+  const funding = data.funding_source_details ?? {};
+  const candidates = [data.available_funds, funding.available_funds, funding.available_balance, funding.prepaid_balance, funding.remaining_balance];
+  const value = candidates.map(Number).find(Number.isFinite) ?? null;
   setCached(cacheKey, value, 5 * 60 * 1000);
   return value;
 }

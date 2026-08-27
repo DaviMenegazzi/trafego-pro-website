@@ -823,6 +823,12 @@
 - [x] Incluir `availableFunds` na resposta de `/api/external/v1/metrics`
 - [ ] Cobrir o saldo e a indisponibilidade da fonte em testes
 
+## Saldo de contas Meta pré-pagas
+
+- [x] Priorizar dados de financiamento/créditos da Meta para contas pré-pagas
+- [x] Não usar o balance pós-pago como availableFunds em contas pré-pagas
+- [x] Expor a indisponibilidade do saldo pré-pago de forma explícita quando a Meta não o retornar
+
 ## Contrato de fontes futuras da API externa
 
 - [x] Retornar campos financeiros, metas e etapas indisponíveis como nulos ou listas vazias, com indicação explícita da fonte pendente

@@ -836,6 +836,12 @@
 - [ ] Calcular saldo por limite de gastos ou balance normalizado quando os créditos não estiverem disponíveis
 - [ ] Evitar retorno nulo silencioso e testar as alternativas de saldo
 
+## Diagnóstico de saldo Meta nulo
+
+- [ ] Registrar de forma segura o status, código e campos da resposta Meta para a conta indicada
+- [ ] Distinguir falha de permissão, campo indisponível e ausência de saldo pré-pago na resposta
+- [ ] Corrigir o tratamento e apresentar um estado observável na API externa
+
 ## Contrato de fontes futuras da API externa
 
 - [x] Retornar campos financeiros, metas e etapas indisponíveis como nulos ou listas vazias, com indicação explícita da fonte pendente

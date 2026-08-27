@@ -417,11 +417,12 @@ export async function getMetaDirectAvailableFunds(accountId: string): Promise<nu
   const cacheKey = `meta:available-funds:${actId}`;
   const cached = getCached<number | null>(cacheKey);
   if (cached !== null) return cached;
-  const response = await fetch(`${GRAPH_API_BASE}/${actId}?fields=balance,spend_cap,amount_spent,funding_source_details,available_funds&access_token=${encodeURIComponent(token)}`);
+  const response = await fetch(`${GRAPH_API_BASE}/${actId}?fields=balance,spend_cap,amount_spent,funding_source_details&access_token=${encodeURIComponent(token)}`);
   if (!response.ok) return null;
-  const data = await response.json() as { available_funds?: string | number; balance?: string | number; spend_cap?: string | number; amount_spent?: string | number; funding_source_details?: Record<string, unknown> };
+  const data = await response.json() as { balance?: string | number; spend_cap?: string | number; amount_spent?: string | number; funding_source_details?: Record<string, unknown> };
   const funding = data.funding_source_details ?? {};
-  const credits = [data.available_funds, funding.amount, funding.available_funds, funding.available_balance, funding.prepaid_balance, funding.remaining_balance]
+  const display = typeof funding.display_string === "string" ? Number(funding.display_string.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")) : NaN;
+  const credits = [display, funding.amount, funding.available_funds, funding.available_balance, funding.prepaid_balance, funding.remaining_balance]
     .map(Number).find(Number.isFinite);
   const spendCap = Number(data.spend_cap);
   const amountSpent = Number(data.amount_spent);

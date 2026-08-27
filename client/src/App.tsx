@@ -18,6 +18,7 @@ import DashboardFeedbackLeads, { StandaloneFeedbackLeads } from "./pages/Dashboa
 import DashboardFeedbackLeadsList from "./pages/DashboardFeedbackLeadsList";
 import DashboardUsuarios from "./pages/DashboardUsuarios";
 import DashboardExternalAiTokens from "./pages/DashboardExternalAiTokens";
+import AdminMetricsOverview from "./pages/AdminMetricsOverview";
 import TalentPublicForm from "./pages/TalentPublicForm";
 import TalentBankAdmin from "./pages/TalentBankAdmin";
 import EvolutionAdmin from "./pages/EvolutionAdmin";
@@ -51,6 +52,10 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/usuarios/"} component={DashboardUsuarios} />
       <Route path={"/dashboard/integracoes-ia"} component={DashboardExternalAiTokens} />
       <Route path={"/dashboard/integracoes-ia/"} component={DashboardExternalAiTokens} />
+      <Route path={"/admin/metricas"} component={AdminMetricsOverview} />
+      <Route path={"/admin/metricas/"} component={AdminMetricsOverview} />
+      <Route path={"/dashboard/metricas"} component={AdminMetricsOverview} />
+      <Route path={"/dashboard/metricas/"} component={AdminMetricsOverview} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

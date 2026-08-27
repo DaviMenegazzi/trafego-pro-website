@@ -21,6 +21,7 @@ import {
   Tag,
   ChevronDown,
   Building2,
+  BarChart3,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
@@ -57,6 +58,7 @@ const NAV_BASE = [
 ];
 
 const NAV_ADMIN_ONLY = [
+  { to: "/admin/metricas", label: "Métricas da Rede", icon: BarChart3 },
   { to: "/dashboard/feedback-leads/list", label: "Feedbacks enviados", icon: Inbox },
   { to: "/dashboard/usuarios", label: "Usuários", icon: ShieldCheck },
   { to: "/dashboard/integracoes-ia", label: "Integrações de IA", icon: Link2 },

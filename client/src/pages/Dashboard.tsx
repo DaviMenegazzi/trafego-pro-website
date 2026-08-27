@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { DashboardState } from "@/components/DashboardState";
+import { DeepAnalyticsAccordion } from "@/components/DeepAnalyticsAccordion";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
@@ -590,6 +591,9 @@ export default function DashboardPage() {
                 ))}
               </div>
             </section>
+
+            {/* Análise Profunda e Projeções (Sanfona Inteligente) */}
+            <DeepAnalyticsAccordion unitId={selectedClientId} unitName={selectedClient?.name} />
 
             {/* Charts Row 1 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

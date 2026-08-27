@@ -55,6 +55,11 @@ import {
   normalizeUnitString,
   standardizeUnitDisplayName,
 } from "./metaDirectService.js";
+import {
+  buildGlobalAnalyticsReport,
+  buildPredictiveUnitProfile,
+  type DailyMetric,
+} from "./trafficAnalyticsEngine.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -913,6 +918,139 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       if (!await revokeExternalAiApiTokenSql(req.params.id, req.claims!.id)) { res.status(404).json({ error: "Token não encontrado ou já revogado" }); return; }
       res.json({ ok: true });
     } catch (error) { console.error("[external-ai] Falha ao revogar token:", error); res.status(503).json({ error: "Não foi possível revogar o token" }); }
+  });
+
+  // ─── Análise Estatística Preditiva e Diagnósticos (Dashboard e Admin) ───────
+  app.get("/api/analytics/predictive", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const unitId = typeof req.query.unit_id === "string" ? req.query.unit_id.trim() : "";
+      if (!unitId) {
+        res.status(400).json({ error: "Informe o unit_id da unidade" });
+        return;
+      }
+
+      const allClients = isMetaDirectEnabled() ? await getMetaDirectClients().catch(() => []) : [];
+      const clientObj = allClients.find((c) => c.id === unitId || c.account_id === unitId);
+      const unitName = clientObj?.name || unitId;
+
+      const metaAllowed = req.claims?.role === "admin" || (clientObj ? isUserAllowedForMetaAccount(clientObj, [], req.claims) : false);
+      if (!metaAllowed) {
+        res.status(403).json({ error: "Acesso não autorizado para esta unidade" });
+        return;
+      }
+
+      const now = new Date();
+      const end = now.toISOString().slice(0, 10);
+      const startDate = new Date(now.getTime() - 30 * 86_400_000);
+      const start = startDate.toISOString().slice(0, 10);
+
+      let dailyMetrics: DailyMetric[] = [];
+
+      if (isMetaDirectEnabled()) {
+        const metaDaily = await getMetaDirectDaily(unitId, start, end);
+        dailyMetrics = metaDaily.map((d) => ({
+          date: d.date_start,
+          spend: d.total_spend,
+          leads: (d.total_conversas_iniciadas || 0) + (d.total_leads_meta || 0),
+          impressions: d.total_impressions || 0,
+          clicks: d.total_clicks || 0,
+          cpl: (d.total_conversas_iniciadas || 0) + (d.total_leads_meta || 0) > 0
+            ? d.total_spend / ((d.total_conversas_iniciadas || 0) + (d.total_leads_meta || 0))
+            : 0,
+        }));
+      } else {
+        const sb = getSupabaseForRequest(req);
+        if (sb) {
+          const { data } = await sb
+            .from("vw_meta_ads_daily_summary")
+            .select("date_start,total_spend,total_conversas_iniciadas,total_leads_meta,total_impressions,total_clicks")
+            .eq("client_id", unitId)
+            .gte("date_start", start)
+            .lte("date_start", end)
+            .order("date_start", { ascending: true });
+          
+          if (Array.isArray(data)) {
+            dailyMetrics = data.map((d) => {
+              const sp = Number(d.total_spend || 0);
+              const ld = Number(d.total_conversas_iniciadas || 0) + Number(d.total_leads_meta || 0);
+              return {
+                date: String(d.date_start),
+                spend: sp,
+                leads: ld,
+                impressions: Number(d.total_impressions || 0),
+                clicks: Number(d.total_clicks || 0),
+                cpl: ld > 0 ? sp / ld : 0,
+              };
+            });
+          }
+        }
+      }
+
+      const customTarget = typeof req.query.target === "string" ? Number(req.query.target) : undefined;
+      const profile = buildPredictiveUnitProfile(unitId, unitName, dailyMetrics, customTarget, now);
+      res.json(profile);
+    } catch (error) {
+      console.error("[analytics] Falha ao processar análise preditiva:", error);
+      res.status(500).json({ error: "Não foi possível gerar a análise preditiva" });
+    }
+  });
+
+  app.get("/api/analytics/overview", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const allClients = isMetaDirectEnabled() ? await getMetaDirectClients().catch(() => []) : [];
+      if (allClients.length === 0) {
+        res.json({
+          timestamp: new Date().toISOString(),
+          date: new Date().toISOString().slice(0, 10),
+          totalUnits: 0,
+          daysLeftInMonth: 1,
+          totalMonthSpend: 0,
+          totalMonthLeads: 0,
+          avgNetworkCpl: 0,
+          totalNetworkTarget: 0,
+          networkGoalPacePct: 0,
+          summary: { criticalUnitsCount: 0, warningUnitsCount: 0, healthyUnitsCount: 0 },
+          rankedProfiles: [],
+          whatsAppConsolidatedReport: "Sem unidades cadastradas.",
+        });
+        return;
+      }
+
+      const now = new Date();
+      const end = now.toISOString().slice(0, 10);
+      const start = new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+
+      const isAdmin = req.claims?.role === "admin";
+      const allowedClients = isAdmin
+        ? allClients
+        : allClients.filter((c) => isUserAllowedForMetaAccount(c, [], req.claims));
+
+      const profiles = await Promise.all(
+        allowedClients.map(async (c) => {
+          let dailyMetrics: DailyMetric[] = [];
+          if (isMetaDirectEnabled()) {
+            const metaDaily = await getMetaDirectDaily(c.id, start, end).catch(() => []);
+            dailyMetrics = metaDaily.map((d) => ({
+              date: d.date_start,
+              spend: d.total_spend,
+              leads: (d.total_conversas_iniciadas || 0) + (d.total_leads_meta || 0),
+              impressions: d.total_impressions || 0,
+              clicks: d.total_clicks || 0,
+              cpl: (d.total_conversas_iniciadas || 0) + (d.total_leads_meta || 0) > 0
+                ? d.total_spend / ((d.total_conversas_iniciadas || 0) + (d.total_leads_meta || 0))
+                : 0,
+            }));
+          }
+          return buildPredictiveUnitProfile(c.id, c.name, dailyMetrics, undefined, now);
+        })
+      );
+
+      const report = buildGlobalAnalyticsReport(profiles, now);
+      res.json(report);
+    } catch (error) {
+      console.error("[analytics] Falha ao processar visão geral analítica:", error);
+      res.status(500).json({ error: "Não foi possível carregar a visão geral analítica" });
+    }
   });
 
   // ─── API externa: apenas agregados, sem PII e sem qualquer escrita ─────────

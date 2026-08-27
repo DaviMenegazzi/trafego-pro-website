@@ -812,6 +812,11 @@
 - [ ] Cobrir escopo, paginação, privacidade e respostas ausentes em Vitest
 - [x] Documentar campos disponíveis e dependências de dados pendentes
 
+## SEO da página inicial
+
+- [x] Adicionar entre três e oito palavras-chave focadas à meta tag da página inicial
+- [x] Validar a presença da meta tag no HTML gerado
+
 ## Contrato de fontes futuras da API externa
 
 - [x] Retornar campos financeiros, metas e etapas indisponíveis como nulos ou listas vazias, com indicação explícita da fonte pendente

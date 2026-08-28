@@ -1,7 +1,10 @@
 import "./env.js";
+import { resilientFetch } from "./resilientFetch.js";
 
 const GRAPH_API_BASE = "https://graph.facebook.com/v21.0";
-const CACHE_TTL_MS = 15 * 60 * 1000; // lista de contas raramente muda; reduzir chamadas à Meta
+export const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos de cache em memória para métricas
+export const CLIENTS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutos para lista de clientes/contas
+export const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos de cooldown em rate limit
 
 export type MetaDashboardClient = {
   id: string;
@@ -79,15 +82,16 @@ export type MetaOfferRow = {
   frequency: number;
 };
 
-// ─── Cache em Memória ────────────────────────────────────────────────────────
+// ─── Cache em Memória & In-Flight Request Coalescing ─────────────────────────
 type CacheEntry<T> = {
   data: T;
   expiresAt: number;
 };
 
 const memoryCache = new Map<string, CacheEntry<any>>();
-let pendingMetaClients: Promise<MetaDashboardClient[]> | null = null;
-let metaCircuitOpenUntil = 0;
+const inFlightPromises = new Map<string, Promise<any>>();
+let lastKnownClientsSnapshot: MetaDashboardClient[] | null = null;
+let metaRateLimitSuspendedUntil = 0;
 
 export function getCached<T>(key: string): T | null {
   const entry = memoryCache.get(key);
@@ -108,6 +112,92 @@ export function setCached<T>(key: string, data: T, ttlMs: number = CACHE_TTL_MS)
 
 export function clearMetaCache(): void {
   memoryCache.clear();
+  inFlightPromises.clear();
+}
+
+/**
+ * Agrupa requisições simultâneas com a mesma chave em uma única Promise em andamento.
+ */
+export async function dedupeInFlight<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const existing = inFlightPromises.get(key);
+  if (existing) {
+    return existing as Promise<T>;
+  }
+
+  const promise = (async () => {
+    try {
+      return await fn();
+    } finally {
+      inFlightPromises.delete(key);
+    }
+  })();
+
+  inFlightPromises.set(key, promise);
+  return promise;
+}
+
+export function getLastKnownClients(): MetaDashboardClient[] | null {
+  return lastKnownClientsSnapshot;
+}
+
+// ─── Rate Limit & Circuit Breaker ───────────────────────────────────────────
+export class MetaRateLimitError extends Error {
+  readonly isRateLimit = true;
+  readonly retryAfterMs: number;
+
+  constructor(message: string, retryAfterMs = DEFAULT_RATE_LIMIT_COOLDOWN_MS) {
+    super(message);
+    this.name = "MetaRateLimitError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+export function isMetaRateLimitError(err: any): boolean {
+  if (!err) return false;
+  if (err instanceof MetaRateLimitError || err.isRateLimit) return true;
+
+  const msg = String(err.message || err.error?.message || err).toLowerCase();
+  const code = Number(err.code || err.error?.code || 0);
+  const subcode = Number(err.error_subcode || err.error?.error_subcode || 0);
+
+  return (
+    code === 17 ||
+    code === 80004 ||
+    code === 613 ||
+    code === 4 ||
+    code === 32 ||
+    subcode === 2446079 ||
+    msg.includes("too many calls") ||
+    msg.includes("wait a bit and try again") ||
+    msg.includes("rate limit") ||
+    msg.includes("request limit reached") ||
+    msg.includes("calls to this api have exceeded") ||
+    msg.includes("reduce the amount of data")
+  );
+}
+
+export function triggerMetaRateLimitCooldown(
+  reason?: string,
+  cooldownMs = DEFAULT_RATE_LIMIT_COOLDOWN_MS,
+): void {
+  metaRateLimitSuspendedUntil = Date.now() + cooldownMs;
+  console.warn(
+    `[meta-direct] Meta Graph API Rate Limit acionado (${reason || "Muitas chamadas simultâneas"}). Suspendendo chamadas diretas por ${Math.round(
+      cooldownMs / 1000,
+    )}s e ativando fallback no Supabase.`,
+  );
+}
+
+export function isMetaDirectSuspended(): boolean {
+  return Date.now() < metaRateLimitSuspendedUntil;
+}
+
+export function getMetaDirectSuspensionRemainingMs(): number {
+  return Math.max(0, metaRateLimitSuspendedUntil - Date.now());
+}
+
+export function clearMetaRateLimitCooldown(): void {
+  metaRateLimitSuspendedUntil = 0;
 }
 
 // ─── Token & Config ──────────────────────────────────────────────────────────
@@ -119,17 +209,14 @@ export function getMetaDirectToken(): string | null {
 }
 
 export function isMetaDirectEnabled(): boolean {
-  return Boolean(getMetaDirectToken()) && Date.now() >= metaCircuitOpenUntil;
+  return Boolean(getMetaDirectToken());
 }
 
-function openMetaCircuitForRateLimit(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/too many calls|rate limit/i.test(message)) {
-    metaCircuitOpenUntil = Date.now() + 5 * 60 * 1000;
-  }
+export function isMetaDirectActive(): boolean {
+  return isMetaDirectEnabled() && !isMetaDirectSuspended();
 }
 
-function normalizeAccountId(raw: string): string {
+export function normalizeAccountId(raw: string): string {
   const trimmed = raw.trim();
   return trimmed.startsWith("act_") ? trimmed : `act_${trimmed}`;
 }
@@ -255,23 +342,28 @@ export function isUserAllowedForMetaAccount(
   }
 
   const allowedIds = claims.allowedClientIds || [];
-  if (allowedIds.includes(metaAcc.id) || (metaAcc.account_id && allowedIds.includes(metaAcc.account_id))) {
+  if (
+    allowedIds.includes(metaAcc.id) ||
+    (metaAcc.account_id && allowedIds.includes(metaAcc.account_id)) ||
+    (metaAcc.account_id && allowedIds.includes(`act_${metaAcc.account_id}`))
+  ) {
     return true;
   }
 
+  const metaStd = standardizeUnitDisplayName(metaAcc.name);
   const metaNorm = normalizeUnitString(metaAcc.name);
-  if (!metaNorm) return false;
+  if (!metaNorm && !metaStd) return false;
 
   for (const authClient of authorizedClients) {
     if (allowedIds.includes(String(authClient.id))) {
+      const authStd = standardizeUnitDisplayName(authClient.name);
       const authNorm = normalizeUnitString(authClient.name);
-      if (authNorm) {
-        if (metaNorm === authNorm || metaNorm.includes(authNorm) || authNorm.includes(metaNorm)) {
-          return true;
-        }
-        if (metaNorm.includes("barreiro") && authNorm.includes("barreiro")) {
-          return true;
-        }
+
+      if (
+        (metaStd && authStd && metaStd === authStd) ||
+        (metaNorm && authNorm && metaNorm === authNorm)
+      ) {
+        return true;
       }
     }
   }
@@ -283,6 +375,7 @@ export function isUserAllowedForMetaAccount(
 
 /**
  * Lista todas as contas de anúncio às quais o token tem acesso.
+ * Agrupa chamadas simultâneas (coalescing) e utiliza cache ampliado.
  */
 async function fetchMetaDirectClients(): Promise<MetaDashboardClient[]> {
   const token = getMetaDirectToken();
@@ -292,80 +385,105 @@ async function fetchMetaDirectClients(): Promise<MetaDashboardClient[]> {
   const cached = getCached<MetaDashboardClient[]>(cacheKey);
   if (cached) return cached;
 
-  let allAccounts: any[] = [];
-  let nextUrl: string | null = `${GRAPH_API_BASE}/me/adaccounts?fields=id,name,account_id,account_status,amount_spent&limit=100&access_token=${encodeURIComponent(token)}`;
-
-  while (nextUrl) {
-    const res: Response = await fetch(nextUrl);
-    if (!res.ok) {
-      const err: any = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || "Falha ao consultar contas de anúncio na Meta");
+  if (isMetaDirectSuspended()) {
+    if (lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0) {
+      return lastKnownClientsSnapshot;
     }
-    const data: any = await res.json();
-    if (Array.isArray(data.data)) {
-      allAccounts = allAccounts.concat(data.data);
-    }
-    nextUrl = data.paging?.next || null;
+    throw new MetaRateLimitError(
+      "Integração Meta temporariamente suspensa por limite de requisições da Meta (cooldown ativo)",
+    );
   }
 
-  // Deduplicação inteligente de contas (ex: Alegrete e Santo Ângelo que possuem contas reservas/antigas sem gasto)
-  const dedupMap = new Map<string, { client: MetaDashboardClient; amountSpent: number }>();
+  return dedupeInFlight(cacheKey, async () => {
+    // Dupla verificação no cache após adquirir a trava in-flight
+    const doubleCheck = getCached<MetaDashboardClient[]>(cacheKey);
+    if (doubleCheck) return doubleCheck;
 
-  for (const acc of allAccounts) {
-    if (!acc.name) continue;
-    const isVidaCard = acc.name.toLowerCase().includes("vida card");
-    const standardizedName = isVidaCard ? standardizeUnitDisplayName(acc.name) : acc.name.trim();
-    const key = standardizedName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
-    const spent = Number(acc.amount_spent ?? 0);
+    try {
+      let allAccounts: any[] = [];
+      let nextUrl: string | null = `${GRAPH_API_BASE}/me/adaccounts?fields=id,name,account_id,account_status,amount_spent&limit=100&access_token=${encodeURIComponent(token)}`;
 
-    const clientObj: MetaDashboardClient = {
-      id: acc.id,
-      name: standardizedName,
-      client_group: isVidaCard ? "Vida Card" : "Outros Clientes",
-      account_id: acc.account_id,
-      status: Number(acc.account_status ?? 1),
-    };
+      while (nextUrl) {
+        const res: Response = await resilientFetch(nextUrl);
+        if (!res.ok) {
+          const errData: any = await res.json().catch(() => ({}));
+          const errMsg = errData.error?.message || "Falha ao consultar contas de anúncio na Meta";
+          if (isMetaRateLimitError(errData.error || errMsg)) {
+            triggerMetaRateLimitCooldown(errMsg);
+            if (lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0) {
+              return lastKnownClientsSnapshot;
+            }
+            throw new MetaRateLimitError(errMsg);
+          }
+          throw new Error(errMsg);
+        }
+        const data: any = await res.json();
+        if (data.error && isMetaRateLimitError(data.error)) {
+          triggerMetaRateLimitCooldown(data.error.message);
+          if (lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0) {
+            return lastKnownClientsSnapshot;
+          }
+          throw new MetaRateLimitError(data.error.message);
+        }
+        if (Array.isArray(data.data)) {
+          allAccounts = allAccounts.concat(data.data);
+        }
+        nextUrl = data.paging?.next || null;
+      }
 
-    const existing = dedupMap.get(key);
-    if (!existing || spent > existing.amountSpent) {
-      dedupMap.set(key, { client: clientObj, amountSpent: spent });
+      // Deduplicação inteligente de contas (ex: contas reservas/antigas sem gasto)
+      const dedupMap = new Map<string, { client: MetaDashboardClient; amountSpent: number }>();
+
+      for (const acc of allAccounts) {
+        if (!acc.name) continue;
+        const isVidaCard = acc.name.toLowerCase().includes("vida card");
+        const standardizedName = isVidaCard ? standardizeUnitDisplayName(acc.name) : acc.name.trim();
+        const key = standardizedName
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]/g, "");
+        const spent = Number(acc.amount_spent ?? 0);
+
+        const clientObj: MetaDashboardClient = {
+          id: acc.id,
+          name: standardizedName,
+          client_group: isVidaCard ? "Vida Card" : "Outros Clientes",
+          account_id: acc.account_id,
+          status: Number(acc.account_status ?? 1),
+        };
+
+        const existing = dedupMap.get(key);
+        if (!existing || spent > existing.amountSpent) {
+          dedupMap.set(key, { client: clientObj, amountSpent: spent });
+        }
+      }
+
+      const clients: MetaDashboardClient[] = Array.from(dedupMap.values())
+        .map((item) => item.client)
+        .sort((a, b) => {
+          if (a.client_group === "Vida Card" && b.client_group !== "Vida Card") return -1;
+          if (a.client_group !== "Vida Card" && b.client_group === "Vida Card") return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+      setCached(cacheKey, clients, CLIENTS_CACHE_TTL_MS);
+      lastKnownClientsSnapshot = clients;
+      return clients;
+    } catch (err: any) {
+      if (isMetaRateLimitError(err)) {
+        triggerMetaRateLimitCooldown(err.message);
+        if (lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0) {
+          return lastKnownClientsSnapshot;
+        }
+      }
+      throw err;
     }
-  }
-
-  const clients: MetaDashboardClient[] = Array.from(dedupMap.values())
-    .map((item) => item.client)
-    .sort((a, b) => {
-      // Vida Card primeiro, depois ordem alfabética
-      if (a.client_group === "Vida Card" && b.client_group !== "Vida Card") return -1;
-      if (a.client_group !== "Vida Card" && b.client_group === "Vida Card") return 1;
-      return a.name.localeCompare(b.name);
-    });
-
-  setCached(cacheKey, clients, 10 * 60 * 1000); // 10 minutos para lista de clientes
-  return clients;
+  });
 }
 
 /**
- * Coalesce requisições concorrentes à Meta. A dashboard pede o catálogo em
- * vários pontos durante o carregamento; sem este bloqueio, elas podem exceder
- * o limite da Graph API e tornar a página indisponível.
- */
-export async function getMetaDirectClients(): Promise<MetaDashboardClient[]> {
-  const cached = getCached<MetaDashboardClient[]>("meta:clients:all");
-  if (cached) return cached;
-  if (!pendingMetaClients) {
-    pendingMetaClients = fetchMetaDirectClients()
-      .catch((error) => {
-        openMetaCircuitForRateLimit(error);
-        throw error;
-      })
-      .finally(() => { pendingMetaClients = null; });
-  }
-  return pendingMetaClients;
-}
-
-/**
- * Métricas Diárias da Conta para o Período
+ * Métricas Diárias da Conta para o Período com agrupamento in-flight e circuit breaker.
  */
 export async function getMetaDirectDaily(
   accountId: string,
@@ -380,61 +498,87 @@ export async function getMetaDirectDaily(
   const cached = getCached<MetaDailyRow[]>(cacheKey);
   if (cached) return cached;
 
-  let timeFilter = "";
-  if (start && end) {
-    timeFilter = `&time_range=${encodeURIComponent(JSON.stringify({ since: start, until: end }))}`;
-  } else {
-    timeFilter = `&date_preset=last_30d`;
+  if (isMetaDirectSuspended()) {
+    throw new MetaRateLimitError("Meta Direct temporariamente suspenso por rate limit");
   }
 
-  const url = `${GRAPH_API_BASE}/${actId}/insights?time_increment=1${timeFilter}&fields=date_start,date_stop,spend,impressions,clicks,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type&limit=100&access_token=${encodeURIComponent(token)}`;
+  return dedupeInFlight(cacheKey, async () => {
+    const doubleCheck = getCached<MetaDailyRow[]>(cacheKey);
+    if (doubleCheck) return doubleCheck;
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || "Falha ao consultar métricas diárias na Meta");
-  }
+    let timeFilter = "";
+    if (start && end) {
+      timeFilter = `&time_range=${encodeURIComponent(JSON.stringify({ since: start, until: end }))}`;
+    } else {
+      timeFilter = `&date_preset=last_30d`;
+    }
 
-  const data = await res.json();
-  const rawList: any[] = Array.isArray(data.data) ? data.data : [];
+    const url = `${GRAPH_API_BASE}/${actId}/insights?time_increment=1${timeFilter}&fields=date_start,date_stop,spend,impressions,clicks,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type&limit=100&access_token=${encodeURIComponent(token)}`;
 
-  const rows: MetaDailyRow[] = rawList.map((item) => {
-    const spend = Number(item.spend || 0);
-    const impressions = Number(item.impressions || 0);
-    const clicks = Number(item.clicks || 0);
-    const reach = Number(item.reach || 0);
-    const frequency = Number(item.frequency || 0);
-    const ctr = Number(item.ctr || (impressions > 0 ? (clicks / impressions) * 100 : 0));
-    const cpc = Number(item.cpc || (clicks > 0 ? spend / clicks : 0));
-    const cpm = Number(item.cpm || (impressions > 0 ? (spend / impressions) * 1000 : 0));
+    try {
+      const res = await resilientFetch(url);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error?.message || "Falha ao consultar métricas diárias na Meta";
+        if (isMetaRateLimitError(errData.error || errMsg)) {
+          triggerMetaRateLimitCooldown(errMsg);
+          throw new MetaRateLimitError(errMsg);
+        }
+        throw new Error(errMsg);
+      }
 
-    const actions = parseMetaActions(item.actions);
-    const custoPorConversa = actions.conversasIniciadas > 0 ? spend / actions.conversasIniciadas : 0;
+      const data = await res.json();
+      if (data.error && isMetaRateLimitError(data.error)) {
+        triggerMetaRateLimitCooldown(data.error.message);
+        throw new MetaRateLimitError(data.error.message);
+      }
 
-    return {
-      date_start: item.date_start,
-      date_stop: item.date_stop,
-      client_id: actId,
-      total_spend: spend,
-      total_conversas_iniciadas: actions.conversasIniciadas,
-      total_messaging_connections: actions.messagingConnections,
-      total_leads_meta: actions.leadsMeta,
-      total_impressions: impressions,
-      total_clicks: clicks,
-      avg_ctr: ctr,
-      avg_cpc: cpc,
-      avg_cpm: cpm,
-      custo_por_conversa: custoPorConversa,
-      reach,
-      frequency,
-    };
+      const rawList: any[] = Array.isArray(data.data) ? data.data : [];
+
+      const rows: MetaDailyRow[] = rawList.map((item) => {
+        const spend = Number(item.spend || 0);
+        const impressions = Number(item.impressions || 0);
+        const clicks = Number(item.clicks || 0);
+        const reach = Number(item.reach || 0);
+        const frequency = Number(item.frequency || 0);
+        const ctr = Number(item.ctr || (impressions > 0 ? (clicks / impressions) * 100 : 0));
+        const cpc = Number(item.cpc || (clicks > 0 ? spend / clicks : 0));
+        const cpm = Number(item.cpm || (impressions > 0 ? (spend / impressions) * 1000 : 0));
+
+        const actions = parseMetaActions(item.actions);
+        const custoPorConversa = actions.conversasIniciadas > 0 ? spend / actions.conversasIniciadas : 0;
+
+        return {
+          date_start: item.date_start,
+          date_stop: item.date_stop,
+          client_id: actId,
+          total_spend: spend,
+          total_conversas_iniciadas: actions.conversasIniciadas,
+          total_messaging_connections: actions.messagingConnections,
+          total_leads_meta: actions.leadsMeta,
+          total_impressions: impressions,
+          total_clicks: clicks,
+          avg_ctr: ctr,
+          avg_cpc: cpc,
+          avg_cpm: cpm,
+          custo_por_conversa: custoPorConversa,
+          reach,
+          frequency,
+        };
+      });
+
+      // Ordena cronologicamente
+      rows.sort((a, b) => a.date_start.localeCompare(b.date_start));
+
+      setCached(cacheKey, rows, CACHE_TTL_MS);
+      return rows;
+    } catch (err: any) {
+      if (isMetaRateLimitError(err)) {
+        triggerMetaRateLimitCooldown(err.message);
+      }
+      throw err;
+    }
   });
-
-  // Ordena cronologicamente
-  rows.sort((a, b) => a.date_start.localeCompare(b.date_start));
-
-  setCached(cacheKey, rows);
-  return rows;
 }
 
 /** Retorna apenas créditos disponíveis de contas pré-pagas, nunca saldo pós-pago. */
@@ -462,7 +606,7 @@ export async function getMetaDirectAvailableFunds(accountId: string): Promise<nu
 }
 
 /**
- * Resumo por Campanha no Período
+ * Resumo por Campanha no Período com agrupamento in-flight e circuit breaker.
  */
 export async function getMetaDirectCampaigns(
   accountId: string,
@@ -477,56 +621,86 @@ export async function getMetaDirectCampaigns(
   const cached = getCached<MetaCampaignRow[]>(cacheKey);
   if (cached) return cached;
 
-  let insightsSubquery = "";
-  if (start && end) {
-    insightsSubquery = `insights.time_range(${JSON.stringify({ since: start, until: end })}){spend,impressions,clicks,cpc,cpm,ctr,actions,cost_per_action_type}`;
-  } else {
-    insightsSubquery = `insights.date_preset(last_30d){spend,impressions,clicks,cpc,cpm,ctr,actions,cost_per_action_type}`;
+  if (isMetaDirectSuspended()) {
+    throw new MetaRateLimitError("Meta Direct temporariamente suspenso por rate limit");
   }
 
-  const url = `${GRAPH_API_BASE}/${actId}/campaigns?fields=id,name,status,effective_status,${insightsSubquery}&limit=100&access_token=${encodeURIComponent(token)}`;
+  return dedupeInFlight(cacheKey, async () => {
+    const doubleCheck = getCached<MetaCampaignRow[]>(cacheKey);
+    if (doubleCheck) return doubleCheck;
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || "Falha ao consultar campanhas na Meta");
-  }
+    let insightsSubquery = "";
+    if (start && end) {
+      insightsSubquery = `insights.time_range(${JSON.stringify({ since: start, until: end })}){spend,impressions,clicks,cpc,cpm,ctr,actions,cost_per_action_type}`;
+    } else {
+      insightsSubquery = `insights.date_preset(last_30d){spend,impressions,clicks,cpc,cpm,ctr,actions,cost_per_action_type}`;
+    }
 
-  const data = await res.json();
-  const rawList: any[] = Array.isArray(data.data) ? data.data : [];
+    const url = `${GRAPH_API_BASE}/${actId}/campaigns?fields=id,name,status,effective_status,${insightsSubquery}&limit=100&access_token=${encodeURIComponent(token)}`;
 
-  const rows: MetaCampaignRow[] = rawList.map((c) => {
-    const ins = c.insights?.data?.[0] || {};
-    const spend = Number(ins.spend || 0);
-    const impressions = Number(ins.impressions || 0);
-    const clicks = Number(ins.clicks || 0);
-    const ctr = Number(ins.ctr || (impressions > 0 ? (clicks / impressions) * 100 : 0));
-    const cpc = Number(ins.cpc || (clicks > 0 ? spend / clicks : 0));
-    const cpm = Number(ins.cpm || (impressions > 0 ? (spend / impressions) * 1000 : 0));
+    try {
+      const res = await resilientFetch(url);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error?.message || "Falha ao consultar campanhas na Meta";
+        if (isMetaRateLimitError(errData.error || errMsg)) {
+          triggerMetaRateLimitCooldown(errMsg);
+          throw new MetaRateLimitError(errMsg);
+        }
+        throw new Error(errMsg);
+      }
 
-    const actions = parseMetaActions(ins.actions);
-    const custoPorConversa = actions.conversasIniciadas > 0 ? spend / actions.conversasIniciadas : null;
+      const data = await res.json();
+      if (data.error && isMetaRateLimitError(data.error)) {
+        triggerMetaRateLimitCooldown(data.error.message);
+        throw new MetaRateLimitError(data.error.message);
+      }
 
-    return {
-      campaign_id: c.id,
-      campaign_name: c.name,
-      status: c.effective_status || c.status || "ACTIVE",
-      total_spend: spend,
-      total_conversas_iniciadas: actions.conversasIniciadas,
-      custo_por_conversa: custoPorConversa,
-      total_impressions: impressions,
-      total_clicks: clicks,
-      avg_ctr: ctr,
-      avg_cpc: cpc,
-      avg_cpm: cpm,
-    };
+      const rawList: any[] = Array.isArray(data.data) ? data.data : [];
+
+      const rows: MetaCampaignRow[] = rawList.map((c) => {
+        const ins = c.insights?.data?.[0] || {};
+        const spend = Number(ins.spend || 0);
+        const impressions = Number(ins.impressions || 0);
+        const clicks = Number(ins.clicks || 0);
+        const ctr = Number(ins.ctr || (impressions > 0 ? (clicks / impressions) * 100 : 0));
+        const cpc = Number(ins.cpc || (clicks > 0 ? spend / clicks : 0));
+        const cpm = Number(ins.cpm || (impressions > 0 ? (spend / impressions) * 1000 : 0));
+
+        const actions = parseMetaActions(ins.actions);
+        const custoPorConversa = actions.conversasIniciadas > 0 ? spend / actions.conversasIniciadas : null;
+
+        return {
+          campaign_id: c.id,
+          campaign_name: c.name,
+          status: c.effective_status || c.status || "ACTIVE",
+          total_spend: spend,
+          total_conversas_iniciadas: actions.conversasIniciadas,
+          custo_por_conversa: custoPorConversa,
+          total_impressions: impressions,
+          total_clicks: clicks,
+          avg_ctr: ctr,
+          avg_cpc: cpc,
+          avg_cpm: cpm,
+        };
+      });
+
+      // Ordena por conversas iniciadas desc, depois investimento desc
+      rows.sort(
+        (a, b) =>
+          b.total_conversas_iniciadas - a.total_conversas_iniciadas ||
+          b.total_spend - a.total_spend,
+      );
+
+      setCached(cacheKey, rows, CACHE_TTL_MS);
+      return rows;
+    } catch (err: any) {
+      if (isMetaRateLimitError(err)) {
+        triggerMetaRateLimitCooldown(err.message);
+      }
+      throw err;
+    }
   });
-
-  // Ordena por conversas iniciadas desc, depois investimento desc
-  rows.sort((a, b) => b.total_conversas_iniciadas - a.total_conversas_iniciadas || b.total_spend - a.total_spend);
-
-  setCached(cacheKey, rows);
-  return rows;
 }
 
 export function extractBestCreativeImageUrl(creative?: any): string | null {
@@ -564,7 +738,7 @@ export function extractBestCreativeImageUrl(creative?: any): string | null {
 }
 
 /**
- * Anúncios & Criativos no Período
+ * Anúncios & Criativos no Período com agrupamento in-flight e circuit breaker.
  */
 export async function getMetaDirectOffers(
   accountId: string,
@@ -579,84 +753,114 @@ export async function getMetaDirectOffers(
   const cached = getCached<MetaOfferRow[]>(cacheKey);
   if (cached) return cached;
 
-  let insightsSubquery = "";
-  if (start && end) {
-    insightsSubquery = `insights.time_range(${JSON.stringify({ since: start, until: end })}){spend,impressions,clicks,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type,date_start,date_stop}`;
-  } else {
-    insightsSubquery = `insights.date_preset(last_30d){spend,impressions,clicks,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type,date_start,date_stop}`;
+  if (isMetaDirectSuspended()) {
+    throw new MetaRateLimitError("Meta Direct temporariamente suspenso por rate limit");
   }
 
-  const url = `${GRAPH_API_BASE}/${actId}/ads?fields=id,name,status,effective_status,campaign{id,name},adset{id,name},creative{id,name,image_url,thumbnail_url,object_story_spec,asset_feed_spec},${insightsSubquery}&limit=100&access_token=${encodeURIComponent(token)}`;
+  return dedupeInFlight(cacheKey, async () => {
+    const doubleCheck = getCached<MetaOfferRow[]>(cacheKey);
+    if (doubleCheck) return doubleCheck;
 
-  const res: Response = await fetch(url);
-  if (!res.ok) {
-    const err: any = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || "Falha ao consultar anúncios na Meta");
-  }
+    let insightsSubquery = "";
+    if (start && end) {
+      insightsSubquery = `insights.time_range(${JSON.stringify({ since: start, until: end })}){spend,impressions,clicks,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type,date_start,date_stop}`;
+    } else {
+      insightsSubquery = `insights.date_preset(last_30d){spend,impressions,clicks,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type,date_start,date_stop}`;
+    }
 
-  const data: any = await res.json();
-  const rawList: any[] = Array.isArray(data.data) ? data.data : [];
+    const url = `${GRAPH_API_BASE}/${actId}/ads?fields=id,name,status,effective_status,campaign{id,name},adset{id,name},creative{id,name,image_url,thumbnail_url,object_story_spec,asset_feed_spec},${insightsSubquery}&limit=100&access_token=${encodeURIComponent(token)}`;
 
-  const rows: MetaOfferRow[] = rawList.map((ad) => {
-    const ins = ad.insights?.data?.[0] || {};
-    const spend = Number(ins.spend || 0);
-    const impressions = Number(ins.impressions || 0);
-    const clicks = Number(ins.clicks || 0);
-    const reach = Number(ins.reach || 0);
-    const frequency = Number(ins.frequency || 0);
-    const ctr = Number(ins.ctr || (impressions > 0 ? (clicks / impressions) * 100 : 0));
-    const cpc = Number(ins.cpc || (clicks > 0 ? spend / clicks : 0));
-    const cpm = Number(ins.cpm || (impressions > 0 ? (spend / impressions) * 1000 : 0));
+    try {
+      const res: Response = await resilientFetch(url);
+      if (!res.ok) {
+        const errData: any = await res.json().catch(() => ({}));
+        const errMsg = errData.error?.message || "Falha ao consultar anúncios na Meta";
+        if (isMetaRateLimitError(errData.error || errMsg)) {
+          triggerMetaRateLimitCooldown(errMsg);
+          throw new MetaRateLimitError(errMsg);
+        }
+        throw new Error(errMsg);
+      }
 
-    const actions = parseMetaActions(ins.actions);
-    const custoPorConversa = actions.conversasIniciadas > 0 ? spend / actions.conversasIniciadas : null;
-    const cplMeta = actions.leadsMeta > 0 ? spend / actions.leadsMeta : null;
+      const data: any = await res.json();
+      if (data.error && isMetaRateLimitError(data.error)) {
+        triggerMetaRateLimitCooldown(data.error.message);
+        throw new MetaRateLimitError(data.error.message);
+      }
 
-    const perf = calculatePerformanceStatus(spend, actions.conversasIniciadas);
-    const statusFormatado = (ad.effective_status || ad.status) === "ACTIVE" ? "Ativa" : "Pausada";
+      const rawList: any[] = Array.isArray(data.data) ? data.data : [];
 
-    const imageUrl = extractBestCreativeImageUrl(ad.creative);
+      const rows: MetaOfferRow[] = rawList.map((ad) => {
+        const ins = ad.insights?.data?.[0] || {};
+        const spend = Number(ins.spend || 0);
+        const impressions = Number(ins.impressions || 0);
+        const clicks = Number(ins.clicks || 0);
+        const reach = Number(ins.reach || 0);
+        const frequency = Number(ins.frequency || 0);
+        const ctr = Number(ins.ctr || (impressions > 0 ? (clicks / impressions) * 100 : 0));
+        const cpc = Number(ins.cpc || (clicks > 0 ? spend / clicks : 0));
+        const cpm = Number(ins.cpm || (impressions > 0 ? (spend / impressions) * 1000 : 0));
 
-    return {
-      id: ad.id,
-      account_id: actId,
-      date_start: ins.date_start || start || null,
-      date_stop: ins.date_stop || end || null,
-      synced_at: new Date().toISOString(),
-      campaign_id: ad.campaign?.id || null,
-      campaign_name: ad.campaign?.name || null,
-      adset_id: ad.adset?.id || null,
-      adset_name: ad.adset?.name || null,
-      ad_id: ad.id,
-      ad_name: ad.name,
-      creative_id: ad.creative?.id || null,
-      creative_name: ad.creative?.name || null,
-      offer_name: ad.name,
-      offer_status: ad.status || null,
-      status_formatado: statusFormatado,
-      performance_status: perf.status,
-      performance_reason: perf.reason,
-      ad_image_url: imageUrl,
-      total_spend: spend,
-      total_conversas_iniciadas: actions.conversasIniciadas,
-      total_messaging_connections: actions.messagingConnections,
-      total_leads_meta: actions.leadsMeta,
-      alcance: reach,
-      total_impressions: impressions,
-      total_clicks: clicks,
-      total_link_clicks: actions.linkClicks,
-      avg_ctr: ctr,
-      avg_cpc: cpc,
-      avg_cpm: cpm,
-      custo_por_conversa: custoPorConversa,
-      cpl_meta: cplMeta,
-      frequency,
-    };
+        const actions = parseMetaActions(ins.actions);
+        const custoPorConversa = actions.conversasIniciadas > 0 ? spend / actions.conversasIniciadas : null;
+        const cplMeta = actions.leadsMeta > 0 ? spend / actions.leadsMeta : null;
+
+        const perf = calculatePerformanceStatus(spend, actions.conversasIniciadas);
+        const statusFormatado = (ad.effective_status || ad.status) === "ACTIVE" ? "Ativa" : "Pausada";
+
+        const imageUrl = extractBestCreativeImageUrl(ad.creative);
+
+        return {
+          id: ad.id,
+          account_id: actId,
+          date_start: ins.date_start || start || null,
+          date_stop: ins.date_stop || end || null,
+          synced_at: new Date().toISOString(),
+          campaign_id: ad.campaign?.id || null,
+          campaign_name: ad.campaign?.name || null,
+          adset_id: ad.adset?.id || null,
+          adset_name: ad.adset?.name || null,
+          ad_id: ad.id,
+          ad_name: ad.name,
+          creative_id: ad.creative?.id || null,
+          creative_name: ad.creative?.name || null,
+          offer_name: ad.name,
+          offer_status: ad.status || null,
+          status_formatado: statusFormatado,
+          performance_status: perf.status,
+          performance_reason: perf.reason,
+          ad_image_url: imageUrl,
+          total_spend: spend,
+          total_conversas_iniciadas: actions.conversasIniciadas,
+          total_messaging_connections: actions.messagingConnections,
+          total_leads_meta: actions.leadsMeta,
+          alcance: reach,
+          total_impressions: impressions,
+          total_clicks: clicks,
+          total_link_clicks: actions.linkClicks,
+          avg_ctr: ctr,
+          avg_cpc: cpc,
+          avg_cpm: cpm,
+          custo_por_conversa: custoPorConversa,
+          cpl_meta: cplMeta,
+          frequency,
+        };
+      });
+
+      // Ordena por conversas desc, depois gasto desc
+      rows.sort(
+        (a, b) =>
+          (b.total_conversas_iniciadas ?? 0) - (a.total_conversas_iniciadas ?? 0) ||
+          (b.total_spend ?? 0) - (a.total_spend ?? 0),
+      );
+
+      setCached(cacheKey, rows, CACHE_TTL_MS);
+      return rows;
+    } catch (err: any) {
+      if (isMetaRateLimitError(err)) {
+        triggerMetaRateLimitCooldown(err.message);
+      }
+      throw err;
+    }
   });
-
-  // Ordena por conversas desc, depois gasto desc
-  rows.sort((a, b) => (b.total_conversas_iniciadas ?? 0) - (a.total_conversas_iniciadas ?? 0) || (b.total_spend ?? 0) - (a.total_spend ?? 0));
-
-  setCached(cacheKey, rows);
-  return rows;
 }

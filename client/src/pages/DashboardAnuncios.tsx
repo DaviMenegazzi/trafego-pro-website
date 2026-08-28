@@ -19,6 +19,7 @@ import {
   Tag, DollarSign, MessageSquare, Coins, Target, Search, Filter, Check,
   Sparkles, ImageOff, ArrowUpDown, HelpCircle, LayoutGrid, LayoutList,
   ChevronDown, RefreshCw, Building2, TrendingUp, BarChart3, Layers, CalendarRange,
+  Database, Clock, AlertTriangle,
 } from "lucide-react";
 
 function useAuthGuard() {
@@ -258,6 +259,10 @@ export default function DashboardAnunciosPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [dataSource, setDataSource] = useState<"meta_direct" | "supabase" | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState<boolean>(false);
+  const [cooldownRemainingSeconds, setCooldownRemainingSeconds] = useState<number | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [groupByCreative, setGroupByCreative] = useState(true);
@@ -309,6 +314,11 @@ export default function DashboardAnunciosPage() {
         if (!isMounted) return;
         if (!res.ok) throw new Error(data.error || "Não foi possível carregar os anúncios");
         setConfigured(data.configured !== false);
+        setDataSource(data.source || null);
+        setIsRateLimited(Boolean(data.rateLimited));
+        setCooldownRemainingSeconds(data.cooldownRemainingSeconds ?? null);
+        setLastSyncedAt(data.lastSyncedAt || null);
+
         if (Array.isArray(data.rows)) setRows(data.rows);
         else setRows([]);
         if (data.error) setError(data.error);
@@ -430,6 +440,69 @@ export default function DashboardAnunciosPage() {
             </p>
           </div>
         </div>
+
+        {/* Status / Fallback Alert Banner */}
+        {dataSource === "supabase" && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 text-zinc-200 backdrop-blur-xl shadow-lg shadow-black/20 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="rounded-xl bg-amber-500/20 p-2.5 text-amber-400 border border-amber-500/30 shrink-0 mt-0.5">
+                  <Database className="size-5" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-display font-bold text-amber-300 text-sm tracking-tight">
+                      Exibindo anúncios do Banco de Dados (Supabase)
+                    </span>
+                    {isRateLimited ? (
+                      <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300 border border-amber-500/30">
+                        Rate limit da Meta API ativo
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-sky-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300 border border-sky-500/30">
+                        Modo Banco de Dados
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-300 font-light leading-relaxed max-w-3xl">
+                    {isRateLimited
+                      ? "A Meta Graph API atingiu o limite temporário de requisições. Para manter a visualização de criativos 100% disponível, os dados foram carregados diretamente do banco de dados."
+                      : "Os dados de anúncios estão sendo carregados a partir do banco de dados oficial do Supabase."}
+                  </p>
+                  {lastSyncedAt && (
+                    <p className="text-xs text-amber-200/90 flex items-center gap-1.5 pt-0.5 font-mono">
+                      <Clock className="size-3.5 text-amber-400 shrink-0" />
+                      <span>Data da última atualização no banco: <strong>{new Date(lastSyncedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</strong></span>
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="sm:text-right shrink-0 rounded-2xl bg-zinc-950/70 border border-white/10 p-3 self-start sm:self-auto min-w-44">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">Retorno ao vivo</span>
+                <span className="text-xs font-semibold text-amber-300 flex items-center sm:justify-end gap-1.5 mt-1">
+                  <RefreshCw className={`size-3 text-amber-400 ${isRateLimited ? "animate-spin" : ""}`} />
+                  {isRateLimited && cooldownRemainingSeconds && cooldownRemainingSeconds > 0
+                    ? `Em ~${Math.max(1, Math.ceil(cooldownRemainingSeconds / 60))} min`
+                    : "No próximo carregamento"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {dataSource === "meta_direct" && !isRateLimited && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-2.5 text-xs text-emerald-300 backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="font-medium">Dados de anúncios sincronizados em tempo real via Meta Graph API</span>
+            </div>
+            {lastSyncedAt && (
+              <span className="text-[11px] text-emerald-400/70 font-mono hidden sm:inline">
+                Sincronizado agora às {new Date(lastSyncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Filter Control Deck */}
         <section className="rounded-3xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-black/30">

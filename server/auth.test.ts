@@ -1,22 +1,21 @@
 import { describe, it, expect } from "vitest";
-import crypto from "crypto";
+import jwt from "jsonwebtoken";
 
-// ─── Replicate the JWT logic from server/index.ts ────────────────────────────
 const JWT_SECRET = "test-fixture-signing-key";
 
-function signToken(payload: object): string {
-  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify({ ...payload, iat: Date.now() })).toString("base64url");
-  const sig = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
-  return `${header}.${body}.${sig}`;
+function signToken(payload: object, expiresIn: string = "2h"): string {
+  return jwt.sign(payload, JWT_SECRET, {
+    algorithm: "HS256",
+    expiresIn,
+  });
 }
 
 function verifyToken(token: string): Record<string, unknown> | null {
   try {
-    const [header, body, sig] = token.split(".");
-    const expected = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
-    if (sig !== expected) return null;
-    return JSON.parse(Buffer.from(body, "base64url").toString());
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: ["HS256"],
+    });
+    return typeof decoded === "object" && decoded !== null ? (decoded as Record<string, unknown>) : null;
   } catch {
     return null;
   }
@@ -30,6 +29,7 @@ describe("JWT auth helpers", () => {
     expect(payload).not.toBeNull();
     expect(payload?.email).toBe("admin@example.test");
     expect(payload?.role).toBe("admin");
+    expect(payload?.exp).toBeDefined();
   });
 
   it("returns null for a tampered token", () => {
@@ -40,6 +40,11 @@ describe("JWT auth helpers", () => {
 
   it("returns null for a completely invalid token", () => {
     expect(verifyToken("not.a.valid.token")).toBeNull();
+  });
+
+  it("rejects an expired token", () => {
+    const expiredToken = signToken({ email: "admin@example.test", role: "admin" }, "-1s");
+    expect(verifyToken(expiredToken)).toBeNull();
   });
 
   it("rejects non-admin role", () => {

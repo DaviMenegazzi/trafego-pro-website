@@ -1,6 +1,6 @@
 import { listEvolutionInstancesSupabase, listEvolutionLeadsForAiClassificationSupabase, type EvolutionCrmStage } from "./evolutionSupabaseStore.js";
 import { getAuthedSupabase } from "./supabase.js";
-import { isMetaDirectEnabled, getMetaDirectClients, getMetaDirectDaily, getMetaDirectOffers, getMetaDirectAvailableFunds } from "./metaDirectService.js";
+import { isMetaDirectActive, isMetaDirectEnabled, getMetaDirectClients, getMetaDirectDaily, getMetaDirectOffers, getMetaDirectAvailableFunds } from "./metaDirectService.js";
 
 type MetricRow = Record<string, unknown>;
 type MetricTotals = { spend: number; conversationsStarted: number; metaLeads: number; impressions: number; clicks: number };
@@ -23,7 +23,7 @@ export function summarizeExternalAiMetrics(rows: MetricRow[], start: string, end
 
 export async function listExternalAiUnits(unitIds: string[]): Promise<Array<{ id: string; name: string }>> {
   if (!unitIds.length) return [];
-  if (isMetaDirectEnabled()) {
+  if (isMetaDirectActive()) {
     const allMeta = await getMetaDirectClients().catch(() => []);
     const idSet = new Set(unitIds);
     const matched = allMeta.filter((c) => idSet.has(c.id) || idSet.has(c.account_id));
@@ -39,7 +39,7 @@ export async function listExternalAiUnits(unitIds: string[]): Promise<Array<{ id
 }
 
 export async function getExternalAiUnit(unitId: string): Promise<{ id: string; name: string }> {
-  if (isMetaDirectEnabled()) {
+  if (isMetaDirectActive()) {
     const allMeta = await getMetaDirectClients().catch(() => []);
     const matched = allMeta.find((c) => c.id === unitId || c.account_id === unitId);
     if (matched) return { id: matched.id, name: matched.name };
@@ -50,9 +50,16 @@ export async function getExternalAiUnit(unitId: string): Promise<{ id: string; n
 }
 
 export async function getExternalAiMetrics(unitId: string, start: string, end: string) {
-  if (isMetaDirectEnabled()) {
-    const [daily, availableFunds] = await Promise.all([getMetaDirectDaily(unitId, start, end), getMetaDirectAvailableFunds(unitId)]);
-    return { ...summarizeExternalAiMetrics(daily as unknown as MetricRow[], start, end), availableFunds };
+  if (isMetaDirectActive()) {
+    try {
+      const [daily, availableFunds] = await Promise.all([
+        getMetaDirectDaily(unitId, start, end),
+        getMetaDirectAvailableFunds(unitId).catch(() => null),
+      ]);
+      return { ...summarizeExternalAiMetrics(daily as unknown as MetricRow[], start, end), availableFunds };
+    } catch (err: any) {
+      console.warn("[external-ai] Falha ao consultar métricas Meta, usando Supabase:", err.message);
+    }
   }
   const sb = await getAuthedSupabase();
   if (!sb) throw new Error("Leitura técnica do Supabase não configurada");
@@ -85,14 +92,22 @@ export async function getExternalAiCrmSummary(unitName: string) {
 }
 
 export async function getExternalAiAdsMetrics(unitId: string, start: string, end: string) {
-  if (!isMetaDirectEnabled()) return { data: [], sourceStatus: "pending_provider_integration" };
-  const unit = await getExternalAiUnit(unitId);
-  const rows = await getMetaDirectOffers(unitId, start, end);
-  return { sourceStatus: "meta", data: rows.map((row) => ({ date: row.date_start, platform: "meta", account_id: row.account_id, unit_id: unit.id, unit_name: unit.name, campaign_id: row.campaign_id, campaign_name: row.campaign_name, adset_id: row.adset_id, adset_name: row.adset_name, ad_id: row.ad_id, ad_name: row.ad_name, creative_id: row.creative_id, spend: row.total_spend, impressions: row.total_impressions, reach: row.alcance, clicks: row.total_clicks, landing_page_views: null, video_views: null, frequency: row.frequency, leads: row.total_leads_meta, qualified_leads: null, contacted_leads: null, scheduled_leads: null, attended_leads: null, sales: null, revenue: null })) };
+  if (!isMetaDirectActive()) return { data: [], sourceStatus: "pending_provider_integration" };
+  try {
+    const unit = await getExternalAiUnit(unitId);
+    const rows = await getMetaDirectOffers(unitId, start, end);
+    return { sourceStatus: "meta", data: rows.map((row) => ({ date: row.date_start, platform: "meta", account_id: row.account_id, unit_id: unit.id, unit_name: unit.name, campaign_id: row.campaign_id, campaign_name: row.campaign_name, adset_id: row.adset_id, adset_name: row.adset_name, ad_id: row.ad_id, ad_name: row.ad_name, creative_id: row.creative_id, spend: row.total_spend, impressions: row.total_impressions, reach: row.alcance, clicks: row.total_clicks, landing_page_views: null, video_views: null, frequency: row.frequency, leads: row.total_leads_meta, qualified_leads: null, contacted_leads: null, scheduled_leads: null, attended_leads: null, sales: null, revenue: null })) };
+  } catch {
+    return { data: [], sourceStatus: "pending_provider_integration" };
+  }
 }
 
 export async function getExternalAiCreatives(unitId?: string) {
-  if (!unitId || !isMetaDirectEnabled()) return { creatives: [], sourceStatus: "pending_provider_integration" };
-  const rows = await getMetaDirectOffers(unitId);
-  return { sourceStatus: "meta", creatives: rows.map((row) => ({ creative_id: row.creative_id, ad_id: row.ad_id, creative_name: row.creative_name, format: null, angle: null, hook: null, offer: row.offer_name, cta: null })) };
+  if (!unitId || !isMetaDirectActive()) return { creatives: [], sourceStatus: "pending_provider_integration" };
+  try {
+    const rows = await getMetaDirectOffers(unitId);
+    return { sourceStatus: "meta", creatives: rows.map((row) => ({ creative_id: row.creative_id, ad_id: row.ad_id, creative_name: row.creative_name, format: null, angle: null, hook: null, offer: row.offer_name, cta: null })) };
+  } catch {
+    return { creatives: [], sourceStatus: "pending_provider_integration" };
+  }
 }

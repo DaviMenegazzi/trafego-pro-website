@@ -27,6 +27,9 @@ import {
   Layers,
   BarChart3,
   PieChart as PieChartIcon,
+  Database,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 
 // ─── Paleta de destaque dos gráficos ─────────────────────────────────────────
@@ -155,6 +158,10 @@ export default function DashboardPage() {
   const [daily, setDaily] = useState<DailyRow[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [dataSource, setDataSource] = useState<"meta_direct" | "supabase" | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState<boolean>(false);
+  const [cooldownRemainingSeconds, setCooldownRemainingSeconds] = useState<number | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
@@ -223,14 +230,19 @@ export default function DashboardPage() {
     setLoading(true); setError(null);
     Promise.all([
       fetch(`/api/metrics/daily?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
-        .then((response) => readMetricsResponse<{ configured?: boolean; rows?: DailyRow[]; error?: string }>(response, "Não foi possível carregar as métricas diárias")),
+        .then((response) => readMetricsResponse<{ configured?: boolean; rows?: DailyRow[]; source?: "meta_direct" | "supabase"; rateLimited?: boolean; cooldownRemainingSeconds?: number; lastSyncedAt?: string | null; error?: string }>(response, "Não foi possível carregar as métricas diárias")),
       fetch(`/api/metrics/campaigns?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
-        .then((response) => readMetricsResponse<{ rows?: CampaignRow[]; error?: string }>(response, "Não foi possível carregar as campanhas")),
+        .then((response) => readMetricsResponse<{ rows?: CampaignRow[]; source?: "meta_direct" | "supabase"; rateLimited?: boolean; cooldownRemainingSeconds?: number; lastSyncedAt?: string | null; error?: string }>(response, "Não foi possível carregar as campanhas")),
     ])
       .then(([d, c]) => {
         if (!isCurrentRequest()) return;
         const ok = d.configured !== false;
         setConfigured(ok);
+        setDataSource(d.source || c.source || null);
+        setIsRateLimited(Boolean(d.rateLimited || c.rateLimited));
+        setCooldownRemainingSeconds(d.cooldownRemainingSeconds ?? c.cooldownRemainingSeconds ?? null);
+        setLastSyncedAt(d.lastSyncedAt || c.lastSyncedAt || null);
+
         if (ok && Array.isArray(d.rows) && d.rows.length > 0) setDaily(d.rows);
         else if (ok) setDaily([]);
         if (ok && Array.isArray(c.rows)) setCampaigns(c.rows);
@@ -371,6 +383,69 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
+
+        {/* Status / Fallback Alert Banner */}
+        {dataSource === "supabase" && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 text-zinc-200 backdrop-blur-xl shadow-lg shadow-black/20 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="rounded-xl bg-amber-500/20 p-2.5 text-amber-400 border border-amber-500/30 shrink-0 mt-0.5">
+                  <Database className="size-5" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-display font-bold text-amber-300 text-sm tracking-tight">
+                      Exibindo dados do Banco de Dados (Supabase)
+                    </span>
+                    {isRateLimited ? (
+                      <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300 border border-amber-500/30">
+                        Rate limit da Meta API ativo
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-sky-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300 border border-sky-500/30">
+                        Modo Banco de Dados
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-300 font-light leading-relaxed max-w-3xl">
+                    {isRateLimited
+                      ? "A Meta Graph API atingiu o limite temporário de requisições. Para manter a visualização 100% disponível sem falhas, os dados foram carregados com segurança a partir do banco de dados."
+                      : "Os dados desta unidade estão sendo carregados a partir do banco de dados oficial do Supabase."}
+                  </p>
+                  {lastSyncedAt && (
+                    <p className="text-xs text-amber-200/90 flex items-center gap-1.5 pt-0.5 font-mono">
+                      <Clock className="size-3.5 text-amber-400 shrink-0" />
+                      <span>Data da última atualização no banco: <strong>{new Date(lastSyncedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</strong></span>
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="sm:text-right shrink-0 rounded-2xl bg-zinc-950/70 border border-white/10 p-3 self-start sm:self-auto min-w-44">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">Retorno ao vivo</span>
+                <span className="text-xs font-semibold text-amber-300 flex items-center sm:justify-end gap-1.5 mt-1">
+                  <RefreshCw className={`size-3 text-amber-400 ${isRateLimited ? "animate-spin" : ""}`} />
+                  {isRateLimited && cooldownRemainingSeconds && cooldownRemainingSeconds > 0
+                    ? `Em ~${Math.max(1, Math.ceil(cooldownRemainingSeconds / 60))} min`
+                    : "No próximo carregamento"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {dataSource === "meta_direct" && !isRateLimited && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-2.5 text-xs text-emerald-300 backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="font-medium">Dados sincronizados em tempo real via Meta Graph API</span>
+            </div>
+            {lastSyncedAt && (
+              <span className="text-[11px] text-emerald-400/70 font-mono hidden sm:inline">
+                Sincronizado agora às {new Date(lastSyncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Filter Control Deck */}
         <section className="rounded-3xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-black/30">
@@ -520,19 +595,6 @@ export default function DashboardPage() {
               <RefreshCw className={`size-3.5 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
               <span>Atualizar dados</span>
             </button>
-          </div>
-
-          <div className="mt-3.5 flex items-center gap-2 border-t border-white/5 pt-3 text-xs text-zinc-500">
-            <span className="size-1.5 rounded-full bg-emerald-400/80" />
-            <span>
-              {clientsLoading || loading
-                ? "Sincronizando métricas mais recentes do Supabase…"
-                : !selectedClientId
-                ? "Selecione uma unidade para visualizar os resultados."
-                : notSynced
-                ? "Nenhuma sincronização recente encontrada para este intervalo."
-                : "Dados sincronizados e consolidados em tempo real."}
-            </span>
           </div>
         </section>
 

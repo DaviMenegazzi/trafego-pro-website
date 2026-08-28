@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { extractEvolutionOrigin, type EvolutionOrigin } from "./evolutionOrigin.js";
+import { maskPiiInText } from "./dataRetentionPolicy.js";
 
 export type NormalizedEvolutionEvent = {
   fingerprint: string;
@@ -92,7 +93,8 @@ export function normalizeEvolutionWebhook(payload: unknown): NormalizedEvolution
   const direction: NormalizedEvolutionEvent["direction"] = isMessage
     ? (fromMe ? "outgoing" : "incoming")
     : "system";
-  const messageText = extractMessageText(message);
+  const rawMessageText = extractMessageText(message);
+  const messageText = rawMessageText ? maskPiiInText(rawMessageText) : null;
   const origin = extractEvolutionOrigin(root, data, message);
   const timestamp = parseOccurredAt(data.messageTimestamp);
   const contactUpdate = extractContactUpdate(eventType, instanceName, data, root);

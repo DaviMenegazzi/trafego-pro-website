@@ -6,14 +6,22 @@ import {
   setCached,
   clearMetaCache,
   isMetaDirectEnabled,
+  isMetaDirectActive,
   isUserAllowedForMetaAccount,
   normalizeUnitString,
   extractBestCreativeImageUrl,
+  dedupeInFlight,
+  isMetaRateLimitError,
+  triggerMetaRateLimitCooldown,
+  isMetaDirectSuspended,
+  clearMetaRateLimitCooldown,
+  getLastKnownClients,
 } from "./metaDirectService.js";
 
 describe("metaDirectService", () => {
   beforeEach(() => {
     clearMetaCache();
+    clearMetaRateLimitCooldown();
   });
 
   describe("parseMetaActions", () => {
@@ -111,6 +119,59 @@ describe("metaDirectService", () => {
     });
   });
 
+  describe("In-Flight Request Coalescing (dedupeInFlight)", () => {
+    it("agrupa múltiplas requisições simultâneas em uma única execução", async () => {
+      let callCount = 0;
+      const fakeFetch = async () => {
+        callCount++;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return { data: "success" };
+      };
+
+      // Dispara 5 chamadas simultâneas com a mesma chave
+      const promises = [
+        dedupeInFlight("clients:catalog", fakeFetch),
+        dedupeInFlight("clients:catalog", fakeFetch),
+        dedupeInFlight("clients:catalog", fakeFetch),
+        dedupeInFlight("clients:catalog", fakeFetch),
+        dedupeInFlight("clients:catalog", fakeFetch),
+      ];
+
+      const results = await Promise.all(promises);
+
+      // Todos devem receber a mesma resposta
+      expect(results).toHaveLength(5);
+      expect(results.every((r) => r.data === "success")).toBe(true);
+
+      // A função executou apenas UMA vez
+      expect(callCount).toBe(1);
+    });
+  });
+
+  describe("Rate Limit & Circuit Breaker", () => {
+    it("detecta erro de rate limit da Meta por código 17, 80004 e mensagens características", () => {
+      expect(isMetaRateLimitError({ code: 17 })).toBe(true);
+      expect(isMetaRateLimitError({ code: 80004 })).toBe(true);
+      expect(isMetaRateLimitError({ error: { code: 613 } })).toBe(true);
+      expect(
+        isMetaRateLimitError(new Error("There have been too many calls to this ad-account. Wait a bit and try again.")),
+      ).toBe(true);
+      expect(isMetaRateLimitError(new Error("User request limit reached"))).toBe(true);
+      expect(isMetaRateLimitError(new Error("Erro de banco de dados comum"))).toBe(false);
+    });
+
+    it("ativa o circuit breaker de suspensão e bloqueia chamadas ativas", () => {
+      expect(isMetaDirectSuspended()).toBe(false);
+
+      triggerMetaRateLimitCooldown("Teste de rate limit", 5000);
+      expect(isMetaDirectSuspended()).toBe(true);
+      expect(isMetaDirectActive()).toBe(false);
+
+      clearMetaRateLimitCooldown();
+      expect(isMetaDirectSuspended()).toBe(false);
+    });
+  });
+
   describe("Permission & Unit Normalization Filtering", () => {
     const metaIjui = { id: "act_2853331541612919", name: "Vida Card Ijuí", account_id: "2853331541612919" };
     const metaSantaMaria = { id: "act_1778679539198076", name: "Vida Card Santa Maria", account_id: "1778679539198076" };
@@ -130,10 +191,10 @@ describe("metaDirectService", () => {
 
     it("permite acesso apenas à unidade vinculada ao client_viewer (ex: Rosângela de Ijuí)", () => {
       const rosangelaClaims = { role: "client_viewer", allowedClientIds: ["client-ijui-id"] };
-      
+
       // Deve ter acesso a Ijuí
       expect(isUserAllowedForMetaAccount(metaIjui, authorizedClients, rosangelaClaims)).toBe(true);
-      
+
       // NÃO deve ter acesso a Santa Maria ou Barreiro
       expect(isUserAllowedForMetaAccount(metaSantaMaria, authorizedClients, rosangelaClaims)).toBe(false);
       expect(isUserAllowedForMetaAccount(metaBarreiro, authorizedClients, rosangelaClaims)).toBe(false);

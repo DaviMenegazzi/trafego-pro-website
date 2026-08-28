@@ -47,13 +47,18 @@ export function getSupabase(): SupabaseClient | null {
  */
 export function getSupabaseForAccessToken(accessToken: string | undefined): SupabaseClient | null {
   if (!accessToken) return null;
-  if (SERVICE_KEY) return baseClient();
-  if (!SUPABASE_URL || !PUBLISHABLE_KEY) return null;
+  const clientKey = PUBLISHABLE_KEY || SERVICE_KEY;
+  if (!SUPABASE_URL || !clientKey) return null;
 
-  return createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+  return createClient(SUPABASE_URL, clientKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
+}
+
+// Client com privilégio elevado (service_role) reservado estritamente para jobs de sistema.
+export function getServiceSupabase(): SupabaseClient | null {
+  return baseClient();
 }
 
 // Client autorizado para leitura protegida por RLS.

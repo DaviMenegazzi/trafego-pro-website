@@ -1,7 +1,7 @@
 import "./env.js";
 
 const GRAPH_API_BASE = "https://graph.facebook.com/v21.0";
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos de cache em memória
+const CACHE_TTL_MS = 15 * 60 * 1000; // lista de contas raramente muda; reduzir chamadas à Meta
 
 export type MetaDashboardClient = {
   id: string;
@@ -86,6 +86,8 @@ type CacheEntry<T> = {
 };
 
 const memoryCache = new Map<string, CacheEntry<any>>();
+let pendingMetaClients: Promise<MetaDashboardClient[]> | null = null;
+let metaCircuitOpenUntil = 0;
 
 export function getCached<T>(key: string): T | null {
   const entry = memoryCache.get(key);
@@ -117,7 +119,14 @@ export function getMetaDirectToken(): string | null {
 }
 
 export function isMetaDirectEnabled(): boolean {
-  return Boolean(getMetaDirectToken());
+  return Boolean(getMetaDirectToken()) && Date.now() >= metaCircuitOpenUntil;
+}
+
+function openMetaCircuitForRateLimit(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/too many calls|rate limit/i.test(message)) {
+    metaCircuitOpenUntil = Date.now() + 5 * 60 * 1000;
+  }
 }
 
 function normalizeAccountId(raw: string): string {
@@ -275,7 +284,7 @@ export function isUserAllowedForMetaAccount(
 /**
  * Lista todas as contas de anúncio às quais o token tem acesso.
  */
-export async function getMetaDirectClients(): Promise<MetaDashboardClient[]> {
+async function fetchMetaDirectClients(): Promise<MetaDashboardClient[]> {
   const token = getMetaDirectToken();
   if (!token) return [];
 
@@ -334,6 +343,25 @@ export async function getMetaDirectClients(): Promise<MetaDashboardClient[]> {
 
   setCached(cacheKey, clients, 10 * 60 * 1000); // 10 minutos para lista de clientes
   return clients;
+}
+
+/**
+ * Coalesce requisições concorrentes à Meta. A dashboard pede o catálogo em
+ * vários pontos durante o carregamento; sem este bloqueio, elas podem exceder
+ * o limite da Graph API e tornar a página indisponível.
+ */
+export async function getMetaDirectClients(): Promise<MetaDashboardClient[]> {
+  const cached = getCached<MetaDashboardClient[]>("meta:clients:all");
+  if (cached) return cached;
+  if (!pendingMetaClients) {
+    pendingMetaClients = fetchMetaDirectClients()
+      .catch((error) => {
+        openMetaCircuitForRateLimit(error);
+        throw error;
+      })
+      .finally(() => { pendingMetaClients = null; });
+  }
+  return pendingMetaClients;
 }
 
 /**

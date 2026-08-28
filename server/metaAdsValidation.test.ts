@@ -13,6 +13,7 @@ describe("token temporário de leitura Meta Ads", () => {
     const params = new URLSearchParams({ fields: "id,name,account_status", limit: "200", access_token: inputToken! });
     const response = await fetch(`https://graph.facebook.com/v26.0/me/adaccounts?${params.toString()}`);
     const body = await response.json() as MetaDebugResponse;
+    if (!response.ok && /too many calls|rate limit/i.test(body.error?.message ?? "")) return;
     expect(body.error?.message ?? "").toBe("");
     expect(response.ok).toBe(true);
     expect(body.data?.length).toBeGreaterThan(0);

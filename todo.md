@@ -842,6 +842,12 @@
 - [ ] Distinguir falha de permissão, campo indisponível e ausência de saldo pré-pago na resposta
 - [ ] Corrigir o tratamento e apresentar um estado observável na API externa
 
+## Correção de indisponibilidade da dashboard
+
+- [ ] Reproduzir a falha de carregamento e registrar os erros de navegador, servidor e rede
+- [ ] Corrigir a causa sem alterar dados ou permissões dos módulos existentes
+- [ ] Validar a dashboard autenticada e publicar a correção
+
 ## Contrato de fontes futuras da API externa
 
 - [x] Retornar campos financeiros, metas e etapas indisponíveis como nulos ou listas vazias, com indicação explícita da fonte pendente

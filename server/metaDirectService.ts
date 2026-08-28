@@ -24,12 +24,15 @@ export type MetaDailyRow = {
   total_leads_meta: number;
   total_impressions: number;
   total_clicks: number;
+  total_primeiras_respostas?: number;
+  total_conversas_respondidas?: number;
   avg_ctr: number;
   avg_cpc: number;
   avg_cpm: number;
   custo_por_conversa: number;
   reach?: number;
   frequency?: number;
+  avg_frequency?: number;
 };
 
 export type MetaCampaignRow = {
@@ -480,6 +483,10 @@ async function fetchMetaDirectClients(): Promise<MetaDashboardClient[]> {
       throw err;
     }
   });
+}
+
+export async function getMetaDirectClients(): Promise<MetaDashboardClient[]> {
+  return fetchMetaDirectClients();
 }
 
 /**

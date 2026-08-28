@@ -490,6 +490,13 @@ export async function getMetaDirectClients(): Promise<MetaDashboardClient[]> {
 }
 
 /**
+ * Catálogo de Contas / Clientes da Meta com deduplicação e cache.
+ */
+export async function getMetaDirectClients(): Promise<MetaDashboardClient[]> {
+  return fetchMetaDirectClients();
+}
+
+/**
  * Métricas Diárias da Conta para o Período com agrupamento in-flight e circuit breaker.
  */
 export async function getMetaDirectDaily(

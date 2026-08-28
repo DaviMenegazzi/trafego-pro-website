@@ -64,7 +64,7 @@ const NAV_ADMIN_ONLY = [
   { to: "/dashboard/integracoes-ia", label: "Integrações de IA", icon: Link2 },
 ];
 
-function ClientSelector({ collapsed }: { collapsed: boolean }) {
+function ClientSelector({ collapsed, variant = "sidebar" }: { collapsed: boolean; variant?: "sidebar" | "compact" }) {
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
   const [open, setOpen] = useState(false);
   const [unitSearch, setUnitSearch] = useState("");
@@ -90,17 +90,34 @@ function ClientSelector({ collapsed }: { collapsed: boolean }) {
   return (
     <Popover open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setUnitSearch(""); }}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label="Selecionar unidade"
-          className="inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left text-xs text-foreground shadow-sm transition-all duration-200 hover:border-zinc-500 hover:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-zinc-400"
-        >
-          <Building2 className="size-4 shrink-0 text-emerald-400" />
-          <span className="min-w-0 flex-1 truncate font-medium">{selectedName}</span>
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-        </button>
+        {variant === "compact" ? (
+          <button
+            type="button"
+            aria-label="Selecionar unidade"
+            className="inline-flex h-9 max-w-[165px] items-center gap-1.5 rounded-xl border border-white/10 bg-zinc-900/90 px-2.5 py-1 text-left text-xs text-foreground shadow-sm transition-all duration-200 active:scale-95 hover:border-emerald-500/50 hover:bg-zinc-800 focus:outline-none"
+          >
+            <Building2 className="size-3.5 shrink-0 text-emerald-400" />
+            <span className="min-w-0 flex-1 truncate font-medium text-zinc-200">{selectedName}</span>
+            <ChevronDown className="size-3 shrink-0 text-zinc-400" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label="Selecionar unidade"
+            className="inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left text-xs text-foreground shadow-sm transition-all duration-200 hover:border-zinc-500 hover:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-zinc-400"
+          >
+            <Building2 className="size-4 shrink-0 text-emerald-400" />
+            <span className="min-w-0 flex-1 truncate font-medium">{selectedName}</span>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+        )}
       </PopoverTrigger>
-      <PopoverContent align="start" side="right" sideOffset={10} className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-zinc-950/95 p-0 text-foreground shadow-2xl backdrop-blur-2xl z-50">
+      <PopoverContent
+        align={variant === "compact" ? "end" : "start"}
+        side={variant === "compact" ? "bottom" : "right"}
+        sideOffset={variant === "compact" ? 8 : 10}
+        className="w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-white/10 bg-zinc-950/95 p-0 text-foreground shadow-2xl backdrop-blur-2xl z-50 max-w-[calc(100vw-1rem)]"
+      >
         <div className="border-b border-white/10 px-4 py-3">
           <p className="font-display text-sm font-semibold text-white">Unidades disponíveis</p>
           <p className="mt-0.5 text-xs text-zinc-400">Selecione para atualizar os dados.</p>
@@ -302,15 +319,32 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <div className="dashboard-dark relative min-h-screen w-full overflow-hidden bg-background text-foreground">
       <AmbientBackground />
 
-      {/* Mobile toggle */}
-      <button
-        type="button"
-        onClick={() => setMobileSidebarOpen((o) => !o)}
-        aria-label={mobileSidebarOpen ? "Fechar menu" : "Abrir menu"}
-        className="fixed left-4 top-4 z-[80] md:hidden inline-flex size-10 items-center justify-center rounded-xl border border-border bg-card/90 text-foreground shadow-lg backdrop-blur hover:bg-card transition-colors"
+      {/* Mobile Top App Bar */}
+      <header
+        className="fixed top-0 inset-x-0 z-50 flex items-center justify-between border-b border-white/10 bg-zinc-950/90 px-3.5 backdrop-blur-xl md:hidden"
+        style={{
+          height: "calc(3.5rem + env(safe-area-inset-top, 0px))",
+          paddingTop: "env(safe-area-inset-top, 0px)",
+        }}
       >
-        {mobileSidebarOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-      </button>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-1.5 focus:outline-none">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500 font-display text-[11px] font-black text-zinc-950 shadow-sm shadow-emerald-500/30">TP</span>
+            <span className="font-display text-xs font-bold tracking-wider text-white">TRÁFEGO<span className="text-zinc-400"> PRO</span></span>
+          </Link>
+        </div>
+        <div className="flex items-center gap-2">
+          <ClientSelector variant="compact" collapsed={false} />
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen((o) => !o)}
+            aria-label={mobileSidebarOpen ? "Fechar menu" : "Abrir menu"}
+            className="inline-flex size-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-200 shadow-sm backdrop-blur hover:bg-white/10 active:scale-95 transition-all"
+          >
+            {mobileSidebarOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+          </button>
+        </div>
+      </header>
 
       {/* Mobile overlay */}
       {mobileSidebarOpen && (
@@ -333,9 +367,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
         {renderSidebar(collapsed)}
       </aside>
 
-      {/* Mobile sidebar */}
+      {/* Mobile sidebar drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-[70] flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-white/10 bg-[linear-gradient(180deg,#111111_0%,#090909_52%,#030303_100%)] shadow-2xl backdrop-blur-xl transition-transform duration-300 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-[70] flex h-screen w-72 shrink-0 flex-col overflow-y-auto border-r border-white/10 bg-[linear-gradient(180deg,#111111_0%,#090909_52%,#030303_100%)] shadow-2xl backdrop-blur-xl transition-transform duration-300 md:hidden ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ transitionTimingFunction: EASE }}
@@ -345,14 +379,48 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main
-        className="relative z-10 min-w-0 overflow-x-hidden pt-16 md:ml-[var(--dashboard-sidebar-width)] md:pt-0"
+        className="relative z-10 min-w-0 overflow-x-hidden md:ml-[var(--dashboard-sidebar-width)] md:!pt-0 md:!pb-0"
         style={{
           "--dashboard-sidebar-width": `${sidebarWidth}px`,
           transition: `margin-left ${DURATION} ${EASE}`,
+          paddingTop: "calc(3.5rem + env(safe-area-inset-top, 0px))",
+          paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))",
         } as CSSProperties}
       >
         {children}
       </main>
+
+      {/* Mobile Bottom Navigation Bar (Apenas Dashboard e Anúncios) */}
+      <nav
+        aria-label="Navegação móvel principal"
+        className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-center gap-6 border-t border-white/10 bg-zinc-950/90 px-6 backdrop-blur-2xl md:hidden"
+        style={{
+          height: "calc(4rem + env(safe-area-inset-bottom, 0px))",
+          paddingBottom: "calc(0.25rem + env(safe-area-inset-bottom, 0px))",
+        }}
+      >
+        <Link
+          href="/dashboard"
+          onClick={() => setMobileSidebarOpen(false)}
+          className={`flex flex-1 max-w-[160px] flex-col items-center justify-center gap-1 py-1.5 px-4 rounded-2xl transition-all ${
+            pathname === "/dashboard" ? "text-emerald-400 font-bold bg-emerald-500/10 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <LayoutDashboard className="size-5" />
+          <span className="text-[11px] font-medium tracking-tight">Dashboard</span>
+        </Link>
+
+        <Link
+          href="/dashboard/anuncios"
+          onClick={() => setMobileSidebarOpen(false)}
+          className={`flex flex-1 max-w-[160px] flex-col items-center justify-center gap-1 py-1.5 px-4 rounded-2xl transition-all ${
+            pathname.startsWith("/dashboard/anuncios") ? "text-emerald-400 font-bold bg-emerald-500/10 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <Tag className="size-5" />
+          <span className="text-[11px] font-medium tracking-tight">Anúncios</span>
+        </Link>
+      </nav>
     </div>
   );
 }

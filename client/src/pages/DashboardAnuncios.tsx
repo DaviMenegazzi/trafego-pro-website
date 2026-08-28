@@ -415,24 +415,24 @@ export default function DashboardAnunciosPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-[1540px] space-y-6 p-4 sm:p-6 lg:p-10">
+      <div className="mx-auto max-w-[1540px] space-y-4 sm:space-y-6 p-3.5 sm:p-6 lg:p-10">
         
         {/* Top Header */}
-        <div className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
+        <div className="flex flex-col gap-4 border-b border-white/10 pb-4 sm:pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-1.5 sm:space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs font-semibold text-emerald-400">
               <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>Visão de Performance & Criativos</span>
             </div>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-white sm:text-4xl">
               Anúncios & Criativos
             </h1>
-            <p className="max-w-xl text-sm leading-relaxed text-zinc-400 font-light">
+            <p className="hidden sm:block max-w-xl text-sm leading-relaxed text-zinc-400 font-light">
               Acompanhe a performance individual dos criativos, custo por lead e detalhes operacionais das campanhas ativas.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-md px-4 py-3 shadow-lg">
+          <div className="hidden sm:block rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-md px-4 py-3 shadow-lg">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Unidade ativa</p>
             <p className="mt-0.5 text-sm font-semibold text-zinc-200 flex items-center gap-2">
               <Building2 className="size-4 text-emerald-400 shrink-0" />
@@ -443,43 +443,43 @@ export default function DashboardAnunciosPage() {
 
         {/* Status / Fallback Alert Banner */}
         {dataSource === "supabase" && (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 text-zinc-200 backdrop-blur-xl shadow-lg shadow-black/20 animate-in fade-in duration-300">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className="rounded-xl bg-amber-500/20 p-2.5 text-amber-400 border border-amber-500/30 shrink-0 mt-0.5">
-                  <Database className="size-5" />
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 sm:p-5 text-zinc-200 backdrop-blur-xl shadow-lg shadow-black/20 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-amber-500/20 p-2 text-amber-400 border border-amber-500/30 shrink-0 mt-0.5">
+                  <Database className="size-4 sm:size-5" />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-display font-bold text-amber-300 text-sm tracking-tight">
+                    <span className="font-display font-bold text-amber-300 text-xs sm:text-sm tracking-tight">
                       Exibindo anúncios do Banco de Dados (Supabase)
                     </span>
                     {isRateLimited ? (
-                      <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300 border border-amber-500/30">
-                        Rate limit da Meta API ativo
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-amber-300 border border-amber-500/30">
+                        Rate limit Meta ativo
                       </span>
                     ) : (
-                      <span className="rounded-full bg-sky-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300 border border-sky-500/30">
-                        Modo Banco de Dados
+                      <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-sky-300 border border-sky-500/30">
+                        Modo Banco
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-zinc-300 font-light leading-relaxed max-w-3xl">
+                  <p className="hidden sm:block text-xs text-zinc-300 font-light leading-relaxed max-w-3xl">
                     {isRateLimited
                       ? "A Meta Graph API atingiu o limite temporário de requisições. Para manter a visualização de criativos 100% disponível, os dados foram carregados diretamente do banco de dados."
                       : "Os dados de anúncios estão sendo carregados a partir do banco de dados oficial do Supabase."}
                   </p>
                   {lastSyncedAt && (
-                    <p className="text-xs text-amber-200/90 flex items-center gap-1.5 pt-0.5 font-mono">
-                      <Clock className="size-3.5 text-amber-400 shrink-0" />
-                      <span>Data da última atualização no banco: <strong>{new Date(lastSyncedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</strong></span>
+                    <p className="text-[11px] sm:text-xs text-amber-200/90 flex items-center gap-1.5 pt-0.5 font-mono">
+                      <Clock className="size-3 text-amber-400 shrink-0" />
+                      <span>Última atualização: <strong>{new Date(lastSyncedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</strong></span>
                     </p>
                   )}
                 </div>
               </div>
-              <div className="sm:text-right shrink-0 rounded-2xl bg-zinc-950/70 border border-white/10 p-3 self-start sm:self-auto min-w-44">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">Retorno ao vivo</span>
-                <span className="text-xs font-semibold text-amber-300 flex items-center sm:justify-end gap-1.5 mt-1">
+              <div className="flex items-center justify-between sm:justify-end sm:text-right shrink-0 rounded-xl bg-zinc-950/70 border border-white/10 px-3 py-2 sm:p-3">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block sm:mb-1">Retorno ao vivo:</span>
+                <span className="text-xs font-semibold text-amber-300 flex items-center gap-1.5 ml-2 sm:ml-0">
                   <RefreshCw className={`size-3 text-amber-400 ${isRateLimited ? "animate-spin" : ""}`} />
                   {isRateLimited && cooldownRemainingSeconds && cooldownRemainingSeconds > 0
                     ? `Em ~${Math.max(1, Math.ceil(cooldownRemainingSeconds / 60))} min`
@@ -491,14 +491,14 @@ export default function DashboardAnunciosPage() {
         )}
 
         {dataSource === "meta_direct" && !isRateLimited && (
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-2.5 text-xs text-emerald-300 backdrop-blur-md">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs text-emerald-300 backdrop-blur-md">
             <div className="flex items-center gap-2">
               <span className="size-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               <span className="font-medium">Dados de anúncios sincronizados em tempo real via Meta Graph API</span>
             </div>
             {lastSyncedAt && (
               <span className="text-[11px] text-emerald-400/70 font-mono hidden sm:inline">
-                Sincronizado agora às {new Date(lastSyncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                Sincronizado às {new Date(lastSyncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>

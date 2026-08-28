@@ -109,9 +109,9 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   }
 
   if (listen) {
-    const port = process.env.PORT || (process.env.NODE_ENV === "production" ? 3000 : 4000);
-    server.listen(port, () => {
-      console.log(`Server running on http://localhost:${port}/`);
+    const port = Number(process.env.PORT) || (process.env.NODE_ENV === "production" ? 3000 : 4000);
+    server.listen(port, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${port}/`);
       startDailyMetricsBackupScheduler();
     });
   }

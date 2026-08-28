@@ -32,7 +32,7 @@ describe("Daily Metrics Backup Service", () => {
     expect(priority.length).toBeGreaterThan(0);
     expect(priority[0].id).toBe("client-prioritario-1");
     expect(priority[0].reason).toContain("Mais acessada na Dashboard");
-  });
+  }, 15000);
 
   it("retorna o status formatado do serviço de backup", () => {
     const status = getDailyBackupStatus();

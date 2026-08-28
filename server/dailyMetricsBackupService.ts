@@ -174,8 +174,6 @@ export async function saveDailyMetricsToSupabase(
     total_spend: row.total_spend || 0,
     total_conversas_iniciadas: row.total_conversas_iniciadas || 0,
     total_messaging_connections: row.total_messaging_connections || 0,
-    total_primeiras_respostas: row.total_primeiras_respostas || 0,
-    total_conversas_respondidas: row.total_conversas_respondidas || 0,
     total_leads_meta: row.total_leads_meta || 0,
     total_impressions: row.total_impressions || 0,
     impressions: row.total_impressions || 0,
@@ -184,7 +182,7 @@ export async function saveDailyMetricsToSupabase(
     avg_ctr: row.avg_ctr || 0,
     avg_cpc: row.avg_cpc || 0,
     avg_cpm: row.avg_cpm || 0,
-    avg_frequency: row.avg_frequency || 0,
+    avg_frequency: row.frequency || 0,
     custo_por_conversa: row.custo_por_conversa ?? null,
     synced_at: nowIso,
   }));

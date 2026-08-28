@@ -154,8 +154,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
   body {
-    @apply bg-background text-foreground;
+    background-color: #050505 !important;
+    color-scheme: dark !important;
+  }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    @apply text-foreground;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),

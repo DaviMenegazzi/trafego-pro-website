@@ -9,7 +9,10 @@ function toYmd(date: Date) {
 export function getPresetDashboardDateRange(period: string, now = new Date()): DashboardDateRange {
   const end = new Date(now);
   const start = new Date(now);
-  start.setDate(end.getDate() - (parseInt(period, 10) || 30));
+  const totalDays = Math.max(1, parseInt(period, 10) || 30);
+  // O dia atual compõe o intervalo. Assim, o atalho “7 dias” retorna
+  // exatamente sete datas, em vez de oito dias por diferença inclusiva.
+  start.setDate(end.getDate() - (totalDays - 1));
   return { start: toYmd(start), end: toYmd(end) };
 }
 

@@ -5,7 +5,13 @@ describe("intervalo de datas da dashboard", () => {
   it("calcula o atalho de 30 dias com início e fim previsíveis", () => {
     const range = getPresetDashboardDateRange("30", new Date("2026-08-15T12:00:00.000Z"));
 
-    expect(range).toEqual({ start: "2026-07-16", end: "2026-08-15" });
+    expect(range).toEqual({ start: "2026-07-17", end: "2026-08-15" });
+  });
+
+  it("calcula sete datas incluindo o dia atual no atalho de 7 dias", () => {
+    const range = getPresetDashboardDateRange("7", new Date("2026-08-15T12:00:00.000Z"));
+
+    expect(range).toEqual({ start: "2026-08-09", end: "2026-08-15" });
   });
 
   it("aceita uma faixa personalizada em ordem cronológica", () => {

@@ -858,3 +858,9 @@
 - [x] Preservar o Supabase da dashboard somente como fonte de autorizações de usuário e unidade
 - [x] Conectar o Supabase separado do usuário para dados, anexos e configurações de recrutamento
 - [x] Sincronizar ou resolver o catálogo mínimo de unidades autorizadas sem copiar usuários ou expor credenciais
+
+## Correção do filtro de período da dashboard
+
+- [x] Reproduzir a alteração de dias e registrar os parâmetros enviados às métricas
+- [x] Corrigir o estado ou a consulta que impede a atualização do período
+- [x] Testar períodos predefinidos e intervalo personalizado antes de publicar

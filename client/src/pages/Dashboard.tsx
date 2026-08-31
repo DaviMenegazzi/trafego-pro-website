@@ -170,7 +170,13 @@ export default function DashboardPage() {
   const metricsRequestGate = useRef(createRequestGate());
 
   const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+  // Evita recriar o objeto de headers após cada resposta. Sem esta
+  // estabilização, o efeito de métricas era reiniciado continuamente e podia
+  // sobrescrever a solicitação disparada ao mudar o período.
+  const authHeaders = useMemo(
+    () => (token ? { Authorization: `Bearer ${token}` } : undefined),
+    [token],
+  );
   const activeRange = useMemo(
     () => period === CUSTOM_PERIOD ? customRange : getPresetDashboardDateRange(period),
     [customRange, period],

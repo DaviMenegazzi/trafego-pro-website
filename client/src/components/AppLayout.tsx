@@ -316,7 +316,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="dashboard-dark relative min-h-screen w-full overflow-hidden bg-background text-foreground">
+    <div className="dashboard-dark relative min-h-screen w-full overflow-x-hidden bg-background text-foreground">
       <AmbientBackground />
 
       {/* Mobile Top App Bar */}

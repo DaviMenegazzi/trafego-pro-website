@@ -864,3 +864,9 @@
 - [x] Reproduzir a alteração de dias e registrar os parâmetros enviados às métricas
 - [x] Corrigir o estado ou a consulta que impede a atualização do período
 - [x] Testar períodos predefinidos e intervalo personalizado antes de publicar
+
+## Correção de clique do filtro de período
+
+- [x] Reproduzir o clique no seletor e identificar o bloqueio do popover ou dos atalhos
+- [x] Corrigir a interação do filtro em desktop e telemóvel
+- [x] Validar a abertura e aplicação dos períodos antes de publicar

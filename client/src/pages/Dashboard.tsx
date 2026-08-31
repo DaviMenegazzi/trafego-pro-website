@@ -503,7 +503,7 @@ export default function DashboardPage() {
                     <span>{period === CUSTOM_PERIOD ? formatDashboardDateRange(activeRange) : "Customizado"}</span>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl z-50">
+                <PopoverContent align="start" className="z-[100] w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl">
                   <div className="border-b border-white/10 px-4 py-3">
                     <p className="font-display text-sm font-bold">Data personalizada</p>
                     <p className="mt-0.5 text-xs text-zinc-400">Escolha o intervalo inicial e final.</p>
@@ -557,7 +557,7 @@ export default function DashboardPage() {
                     <ChevronDown className="size-3.5 text-zinc-500" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl">
+                <PopoverContent align="start" className="z-[100] w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl">
                   <div className="border-b border-white/10 px-5 py-4">
                     <p className="font-display text-base font-bold">Período de análise</p>
                     <p className="mt-1 text-xs leading-5 text-zinc-400">Selecione um intervalo pré-definido ou datas personalizadas.</p>

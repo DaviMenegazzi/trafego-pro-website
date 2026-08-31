@@ -40,21 +40,41 @@ userAccessRouter.get("/user-access", requireAuth, requireAdmin, async (req, res)
   }
 
   const profileIds = profiles.map((p: { id: string }) => p.id);
-  const { data: accessRows, error: accessError } = await sb
+  let accessRows: any[] | null;
+  let accessError: any;
+  ({ data: accessRows, error: accessError } = await sb
     .from("user_client_access")
     .select("id, user_id, client_id, granted_by, created_at")
-    .in("user_id", profileIds);
+    .in("user_id", profileIds));
+  if (accessError?.code === "42703") {
+    ({ data: accessRows, error: accessError } = await sb
+      .from("user_client_access")
+      .select("id, user_id, client_id, created_at")
+      .in("user_id", profileIds));
+  }
   if (accessError) {
+    console.error("[user-access] Falha ao consultar acessos:", accessError.code, accessError.message);
     res.status(502).json({ error: accessError.message });
     return;
   }
 
   const clientIds = Array.from(new Set((accessRows ?? []).map((row: any) => row.client_id).filter(Boolean)));
-  const { data: accessClients, error: accessClientsError } =
-    clientIds.length > 0
-      ? await sb.from("clients").select("id, name, client_group").in("id", clientIds)
-      : { data: [], error: null };
+  let accessClients: any[] | null = [];
+  let accessClientsError: any = null;
+  if (clientIds.length > 0) {
+    ({ data: accessClients, error: accessClientsError } = await sb
+      .from("clients")
+      .select("id, name, client_group")
+      .in("id", clientIds));
+  }
+  if (accessClientsError?.code === "42703" && clientIds.length > 0) {
+    ({ data: accessClients, error: accessClientsError } = await sb
+      .from("clients")
+      .select("id, name")
+      .in("id", clientIds));
+  }
   if (accessClientsError) {
+    console.error("[user-access] Falha ao consultar unidades:", accessClientsError.code, accessClientsError.message);
     res.status(502).json({ error: accessClientsError.message });
     return;
   }

@@ -882,3 +882,9 @@
 - [x] Identificar a consulta Supabase que responde com erro 502
 - [x] Corrigir a autorização ou o contrato da consulta de perfis e acessos
 - [x] Retornar erro observável à interface caso a fonte volte a falhar
+
+## Investigação aprofundada da rota de usuários
+
+- [x] Capturar a mensagem completa de erro devolvida pela rota para sessão administrativa
+- [x] Corrigir a consulta ou política restante que impede a leitura dos perfis
+- [x] Validar a rota e a interface em produção antes de publicar

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   Lock,
   User,
@@ -296,6 +296,16 @@ export default function Login() {
                       </>
                     )}
                   </button>
+                </div>
+
+                {/* Cadastro Link */}
+                <div className="pt-2 text-center">
+                  <Link
+                    href="/cadastro"
+                    className="text-xs text-zinc-400 hover:text-emerald-400 transition-colors"
+                  >
+                    Não possui uma conta? <span className="font-medium text-emerald-400 underline underline-offset-4">Solicitar cadastro</span>
+                  </Link>
                 </div>
               </form>
 

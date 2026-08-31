@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ClientProvider } from "./contexts/ClientContext";
 import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import DashboardPipeline from "./pages/DashboardPipeline";
 import DashboardPagamentos from "./pages/DashboardPagamentos";
@@ -28,6 +29,10 @@ function ExistingSiteRoutes() {
   return (
     <Switch>
       <Route path={"/login"} component={Login} />
+      <Route path={"/cadastro"} component={Register} />
+      <Route path={"/cadastro/"} component={Register} />
+      <Route path={"/signup"} component={Register} />
+      <Route path={"/signup/"} component={Register} />
       <Route path={"/feedback-leads"} component={StandaloneFeedbackLeads} />
       <Route path={"/feedback-leads/"} component={StandaloneFeedbackLeads} />
       <Route path={"/dashboard"} component={Dashboard} />

@@ -101,6 +101,81 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
   });
 });
 
+// ─── POST /api/user-access/:id/approve ──────────────────────────────────────
+// Aprova um usuário com status 'pending', definindo seu cargo e unidades autorizadas
+userAccessRouter.post("/user-access/:id/approve", requireAuth, requireAdmin, async (req, res) => {
+  const sb = getSupabaseForRequest(req);
+  if (!sb) {
+    res.status(401).json({ error: "Sessão Supabase expirada" });
+    return;
+  }
+
+  const { role, client_ids } = req.body as { role?: string; client_ids?: string[] };
+  const targetRole = role || "viewer";
+
+  // 1. Atualiza o status para 'active' e define o role
+  const { data: updatedProfile, error: updateErr } = await sb
+    .from("user_profiles")
+    .update({
+      status: "active",
+      role: targetRole,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", req.params.id)
+    .select("id, full_name, email, role, status, bio, avatar_url, created_at, updated_at")
+    .single();
+
+  if (updateErr) {
+    res.status(502).json({ error: updateErr.message });
+    return;
+  }
+
+  // 2. Se foram informados client_ids e a role não for admin geral, vincula as unidades
+  if (Array.isArray(client_ids) && client_ids.length > 0 && targetRole !== "admin") {
+    const records = client_ids.map((cid) => ({
+      user_id: req.params.id,
+      client_id: cid,
+      granted_by: req.claims?.email || "admin",
+    }));
+
+    try {
+      await sb
+        .from("user_client_access")
+        .upsert(records, { onConflict: "user_id,client_id" });
+    } catch (err: any) {
+      console.warn("[user-access-approve] Falha ao vincular unidades:", err);
+    }
+  }
+
+  res.json({
+    ok: true,
+    message: "Usuário aprovado com sucesso!",
+    profile: updatedProfile,
+  });
+});
+
+// ─── POST /api/user-access/:id/reject ───────────────────────────────────────
+// Recusa ou inativa um cadastro pendente
+userAccessRouter.post("/user-access/:id/reject", requireAuth, requireAdmin, async (req, res) => {
+  const sb = getSupabaseForRequest(req);
+  if (!sb) {
+    res.status(401).json({ error: "Sessão Supabase expirada" });
+    return;
+  }
+
+  const { error } = await sb
+    .from("user_profiles")
+    .update({ status: "inactive", updated_at: new Date().toISOString() })
+    .eq("id", req.params.id);
+
+  if (error) {
+    res.status(502).json({ error: error.message });
+    return;
+  }
+
+  res.json({ ok: true, message: "Cadastro recusado/inativado com sucesso." });
+});
+
 // ─── POST /api/user-access ──────────────────────────────────────────────────
 userAccessRouter.post("/user-access", requireAuth, requireAdmin, async (req, res) => {
   const sb = getSupabaseForRequest(req);

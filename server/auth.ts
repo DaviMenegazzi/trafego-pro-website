@@ -74,13 +74,15 @@ export function hasUnitAccess(clientId: string | number, claims: Pick<JwtClaims,
 export async function fetchUserAccess(
   supabaseUid: string,
   accessToken?: string,
+  supabaseClient?: any,
 ): Promise<{
   role: string;
   allowedClientIds: string[];
+  status?: string;
 }> {
-  const sb = getSupabaseForAccessToken(accessToken);
+  const sb = supabaseClient || getSupabaseForAccessToken(accessToken);
   if (!sb) {
-    return { role: "", allowedClientIds: [] };
+    return { role: "", allowedClientIds: [], status: "unauthenticated" };
   }
 
   // 1. Busca role no user_profiles
@@ -92,12 +94,12 @@ export async function fetchUserAccess(
 
   if (profileErr || !profile) {
     console.warn(`[auth] Nenhum profile encontrado para uid=${supabaseUid}`);
-    return { role: "", allowedClientIds: [] };
+    return { role: "", allowedClientIds: [], status: "not_found" };
   }
 
   if (profile.status !== "active") {
-    console.warn(`[auth] Profile inativo para ${profile.email} (status=${profile.status})`);
-    return { role: "", allowedClientIds: [] };
+    console.warn(`[auth] Profile não ativo para ${profile.email} (status=${profile.status})`);
+    return { role: "", allowedClientIds: [], status: profile.status || "inactive" };
   }
 
   const role = profile.role || "none";

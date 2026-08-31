@@ -12,10 +12,22 @@ userAccessRouter.get("/user-access", requireAuth, requireAdmin, async (req, res)
     return;
   }
 
-  const { data: profiles, error } = await sb
+  let profiles: any[] | null;
+  let error: any;
+  ({ data: profiles, error } = await sb
     .from("user_profiles")
     .select("id, full_name, email, role, status, bio, avatar_url, created_at, updated_at")
-    .order("email");
+    .order("email"));
+
+  // Instalações anteriores da dashboard não possuem os campos visuais
+  // opcionais bio/avatar_url. A listagem administrativa deve continuar
+  // funcional nesses esquemas, retornando os campos essenciais do perfil.
+  if (error?.code === "42703") {
+    ({ data: profiles, error } = await sb
+      .from("user_profiles")
+      .select("id, full_name, email, role, status, created_at, updated_at")
+      .order("email"));
+  }
 
   if (error) {
     res.status(502).json({ error: error.message });

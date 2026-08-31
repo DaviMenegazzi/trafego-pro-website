@@ -870,3 +870,15 @@
 - [x] Reproduzir o clique no seletor e identificar o bloqueio do popover ou dos atalhos
 - [x] Corrigir a interação do filtro em desktop e telemóvel
 - [x] Validar a abertura e aplicação dos períodos antes de publicar
+
+## Correção da listagem de usuários
+
+- [x] Reproduzir a consulta de usuários com sessão administrativa e registrar a resposta
+- [x] Corrigir a fonte de perfis ou a autorização que retorna lista vazia
+- [x] Validar a listagem e a gestão de usuários para administrador antes de publicar
+
+## Erro 502 da rota de usuários
+
+- [x] Identificar a consulta Supabase que responde com erro 502
+- [x] Corrigir a autorização ou o contrato da consulta de perfis e acessos
+- [x] Retornar erro observável à interface caso a fonte volte a falhar

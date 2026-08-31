@@ -144,13 +144,18 @@ export default function DashboardUsuariosPage() {
         fetch("/api/user-access", { headers: authHeaders() }),
         fetch("/api/metrics/clients", { headers: authHeaders() }),
       ]);
-      if (accessRes.ok) setProfiles(await accessRes.json());
+      if (accessRes.ok) {
+        setProfiles(await accessRes.json());
+      } else {
+        const body = await accessRes.json().catch(() => ({}));
+        throw new Error(body.error ?? "Não foi possível carregar os usuários");
+      }
       if (clientsRes.ok) {
         const d = await clientsRes.json();
         setClients(d.clients ?? []);
       }
-    } catch {
-      toast.error("Erro ao carregar dados de usuários");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao carregar dados de usuários");
     } finally {
       setLoading(false);
     }

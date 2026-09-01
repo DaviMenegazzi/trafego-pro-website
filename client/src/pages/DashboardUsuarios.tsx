@@ -226,8 +226,39 @@ export default function DashboardUsuariosPage() {
   async function openApproveModal(profile: ProfileRow) {
     setApprovingProfile(profile);
     setApproveRole(profile.role !== "none" ? profile.role : "viewer");
-    // Pre-popula unidades se houver correspondência
-    setApproveClientIds(profile.client_access.map((a) => a.client_id));
+
+    const initialClientIds = profile.client_access.map((a) => a.client_id);
+
+    // Se ainda não tem unidades vinculadas, tenta pré-selecionar a unidade solicitada no cadastro
+    if (initialClientIds.length === 0 && profile.bio) {
+      // 1. Tenta extrair ID estruturado: [Unit ID: act_12345]
+      const unitIdMatch = profile.bio.match(/\[Unit ID:\s*([^\]]+)\]/i);
+      if (unitIdMatch && unitIdMatch[1]) {
+        const matchedId = unitIdMatch[1].trim();
+        if (clients.some((c) => c.id === matchedId)) {
+          initialClientIds.push(matchedId);
+        }
+      }
+
+      // 2. Fallback: tenta casar pelo nome da unidade mencionado na bio
+      if (initialClientIds.length === 0) {
+        const unitNameMatch = profile.bio.match(/Unidade:\s*([^|]+)/i);
+        if (unitNameMatch && unitNameMatch[1]) {
+          const requestedName = unitNameMatch[1].trim().toLowerCase();
+          const foundClient = clients.find(
+            (c) =>
+              c.name.toLowerCase() === requestedName ||
+              c.name.toLowerCase().includes(requestedName) ||
+              requestedName.includes(c.name.toLowerCase())
+          );
+          if (foundClient) {
+            initialClientIds.push(foundClient.id);
+          }
+        }
+      }
+    }
+
+    setApproveClientIds(initialClientIds);
   }
 
   async function handleConfirmApprove() {

@@ -85,12 +85,20 @@ export async function fetchUserAccess(
     return { role: "", allowedClientIds: [], status: "unauthenticated" };
   }
 
-  // 1. Busca role no user_profiles
-  const { data: profile, error: profileErr } = await sb
-    .from("user_profiles")
-    .select("role, status, email, full_name")
-    .eq("id", supabaseUid)
-    .single();
+  // Busca perfil e acessos em paralelo para eliminar latência sequencial
+  const [profileResult, accessResult] = await Promise.all([
+    sb
+      .from("user_profiles")
+      .select("role, status, email, full_name")
+      .eq("id", supabaseUid)
+      .single(),
+    sb
+      .from("user_client_access")
+      .select("client_id")
+      .eq("user_id", supabaseUid),
+  ]);
+
+  const { data: profile, error: profileErr } = profileResult;
 
   if (profileErr || !profile) {
     console.warn(`[auth] Nenhum profile encontrado para uid=${supabaseUid}`);
@@ -104,38 +112,30 @@ export async function fetchUserAccess(
 
   const role = profile.role || "none";
 
-  // 2. Admin vê tudo
+  // 1. Admin vê tudo
   if (isAdminRole(role)) {
     return { role, allowedClientIds: ["*"] };
   }
 
-  // 3. Roles de equipe (viewer, designer, cs, etc.)
-  if (isTeamRole(role)) {
-    const { data: accessRows } = await sb
-      .from("user_client_access")
-      .select("client_id")
-      .eq("user_id", supabaseUid);
+  const accessRows = accessResult.data ?? [];
+  const clientIds = accessRows.map((r: { client_id: string }) => r.client_id);
 
-    if (accessRows && accessRows.length > 0) {
-      const clientIds = accessRows.map((r: { client_id: string }) => r.client_id);
+  // 2. Roles de equipe (viewer, designer, cs, etc.)
+  if (isTeamRole(role)) {
+    if (clientIds.length > 0) {
       return { role, allowedClientIds: clientIds };
     }
-
-    return { role, allowedClientIds: ["*"] };
+    // Fail closed: equipe sem unidades vinculadas não tem acesso a nada até vinculação explícita
+    console.warn(`[auth] Team role "${role}" sem vínculo em user_client_access para uid=${supabaseUid}`);
+    return { role, allowedClientIds: [] };
   }
 
-  // 4. client_viewer: só vê o que está em user_client_access
+  // 3. client_viewer: só vê o que está em user_client_access
   if (role === "client_viewer") {
-    const { data: accessRows } = await sb
-      .from("user_client_access")
-      .select("client_id")
-      .eq("user_id", supabaseUid);
-
-    const clientIds = (accessRows ?? []).map((r: { client_id: string }) => r.client_id);
     return { role, allowedClientIds: clientIds };
   }
 
-  // 5. Role "none" ou desconhecida = sem acesso
+  // 4. Role "none" ou desconhecida = sem acesso
   return { role: "none", allowedClientIds: [] };
 }
 
@@ -180,7 +180,9 @@ export async function listDashboardClientsFromSupabase(
 
 // ─── Cookies & Sessões ──────────────────────────────────────────────────────
 export const SUPABASE_ACCESS_COOKIE = "tp_supabase_access";
-export const SUPABASE_COOKIE_MAX_AGE_MS = 50 * 60 * 1000;
+export const APP_TOKEN_COOKIE = "tp_app_token";
+export const SUPABASE_COOKIE_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 horas (alinhado com o JWT)
+export const APP_COOKIE_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 horas
 
 export function readCookie(req: express.Request, cookieName: string): string | undefined {
   const raw = req.headers.cookie;
@@ -203,21 +205,32 @@ export function getSupabaseForRequest(req: express.Request) {
 
 // ─── Middlewares de Autorização ─────────────────────────────────────────────
 export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+  // 1. Tenta obter o token do cookie HttpOnly seguro primeiro
+  let token = readCookie(req, APP_TOKEN_COOKIE);
+
+  // 2. Fallback para header Authorization: Bearer <token> (compatibilidade durante transição)
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.slice(7);
+    }
+  }
+
+  if (!token) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const token = authHeader.slice(7);
+
   const payload = verifyToken(token) as JwtClaims | null;
   if (!payload) {
     res.status(401).json({ error: "Invalid token" });
     return;
   }
 
-  if (!payload.allowedClientIds) {
-    payload.allowedClientIds = ["*"];
-    payload.role = payload.role || "admin";
+  // Validação estrita de integridade do payload - rejeita tokens malformados sem allowedClientIds
+  if (!payload.allowedClientIds || !Array.isArray(payload.allowedClientIds)) {
+    res.status(401).json({ error: "Token inválido ou malformado — faça login novamente" });
+    return;
   }
 
   req.claims = payload;

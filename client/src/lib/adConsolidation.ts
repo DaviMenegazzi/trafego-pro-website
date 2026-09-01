@@ -69,7 +69,17 @@ export function consolidateAdsList(ads: AdRow[]): ConsolidatedAdRow[] {
   const groups = new Map<string, AdRow[]>();
 
   for (const ad of ads) {
-    const key = (cleanDisplayName(ad) || ad.ad_name || `ad_${ad.id}`).trim().toLowerCase();
+    // Agrupa por URL de imagem (se disponível) ou pelo nome exato/criativo para evitar colapsar anúncios distintos na mesma thumbnail
+    let key: string;
+    if (ad.ad_image_url) {
+      // Usa a URL da imagem ou hash do criativo como chave principal
+      key = `img:${ad.ad_image_url}`;
+    } else if (ad.creative_id) {
+      key = `cr:${ad.creative_id}`;
+    } else {
+      key = `name:${(cleanDisplayName(ad) || ad.ad_name || `ad_${ad.id}`).trim().toLowerCase()}`;
+    }
+
     if (!groups.has(key)) {
       groups.set(key, []);
     }
@@ -77,6 +87,7 @@ export function consolidateAdsList(ads: AdRow[]): ConsolidatedAdRow[] {
   }
 
   const result: ConsolidatedAdRow[] = [];
+
 
   for (const group of Array.from(groups.values())) {
     if (group.length === 1) {

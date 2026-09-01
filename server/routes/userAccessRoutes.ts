@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { getSupabaseForRequest, requireAdmin, requireAuth } from "../auth.js";
+import { getSupabase } from "../supabase.js";
 import { groupClientAccessByUser } from "../clientAccess.js";
+import { notifyUserApproved, notifyUserRejected } from "../lib/notifications.js";
 
 export const userAccessRouter = Router();
+
 
 // ─── GET /api/user-access ───────────────────────────────────────────────────
 userAccessRouter.get("/user-access", requireAuth, requireAdmin, async (req, res) => {
@@ -58,21 +61,25 @@ userAccessRouter.get("/user-access", requireAuth, requireAdmin, async (req, res)
     return;
   }
 
-  const clientIds = Array.from(new Set((accessRows ?? []).map((row: any) => row.client_id).filter(Boolean)));
+  const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+  const clientIds = Array.from(new Set((accessRows ?? []).map((row: any) => String(row.client_id || "")).filter(Boolean)));
+  const uuidClientIds = clientIds.filter(isUUID);
+
   let accessClients: any[] | null = [];
   let accessClientsError: any = null;
-  if (clientIds.length > 0) {
+  if (uuidClientIds.length > 0) {
     ({ data: accessClients, error: accessClientsError } = await sb
       .from("clients")
       .select("id, name, client_group")
-      .in("id", clientIds));
+      .in("id", uuidClientIds));
+    if (accessClientsError?.code === "42703") {
+      ({ data: accessClients, error: accessClientsError } = await sb
+        .from("clients")
+        .select("id, name")
+        .in("id", uuidClientIds));
+    }
   }
-  if (accessClientsError?.code === "42703" && clientIds.length > 0) {
-    ({ data: accessClients, error: accessClientsError } = await sb
-      .from("clients")
-      .select("id, name")
-      .in("id", clientIds));
-  }
+
   if (accessClientsError) {
     console.error("[user-access] Falha ao consultar unidades:", accessClientsError.code, accessClientsError.message);
     res.status(502).json({ error: accessClientsError.message });
@@ -80,6 +87,7 @@ userAccessRouter.get("/user-access", requireAuth, requireAdmin, async (req, res)
   }
 
   const accessByUser = groupClientAccessByUser(accessRows ?? [], accessClients ?? []);
+
 
   const formatted = profiles.map((p: any) => ({
     id: p.id,
@@ -167,7 +175,7 @@ userAccessRouter.post("/user-access/:id/approve", requireAuth, requireAdmin, asy
     const records = client_ids.map((cid) => ({
       user_id: req.params.id,
       client_id: cid,
-      granted_by: req.claims?.email || "admin",
+      granted_by: req.claims?.id || req.claims?.email || "admin",
     }));
 
     try {
@@ -177,6 +185,15 @@ userAccessRouter.post("/user-access/:id/approve", requireAuth, requireAdmin, asy
     } catch (err: any) {
       console.warn("[user-access-approve] Falha ao vincular unidades:", err);
     }
+  }
+
+  // Notificação assíncrona ao usuário
+  if (updatedProfile?.email) {
+    notifyUserApproved({
+      email: updatedProfile.email,
+      fullName: updatedProfile.full_name || updatedProfile.email,
+      role: targetRole,
+    }).catch((err) => console.error("[user-access-approve] Falha ao notificar usuário:", err));
   }
 
   res.json({
@@ -195,6 +212,12 @@ userAccessRouter.post("/user-access/:id/reject", requireAuth, requireAdmin, asyn
     return;
   }
 
+  const { data: profile } = await sb
+    .from("user_profiles")
+    .select("email, full_name")
+    .eq("id", req.params.id)
+    .maybeSingle();
+
   const { error } = await sb
     .from("user_profiles")
     .update({ status: "inactive", updated_at: new Date().toISOString() })
@@ -203,6 +226,14 @@ userAccessRouter.post("/user-access/:id/reject", requireAuth, requireAdmin, asyn
   if (error) {
     res.status(502).json({ error: error.message });
     return;
+  }
+
+  // Notificação assíncrona ao usuário
+  if (profile?.email) {
+    notifyUserRejected({
+      email: profile.email,
+      fullName: profile.full_name || profile.email,
+    }).catch((err) => console.error("[user-access-reject] Falha ao notificar usuário:", err));
   }
 
   res.json({ ok: true, message: "Cadastro recusado/inativado com sucesso." });
@@ -277,19 +308,39 @@ userAccessRouter.delete("/user-access/:id", requireAuth, requireAdmin, async (re
 
 // ─── POST /api/client-access ────────────────────────────────────────────────
 userAccessRouter.post("/client-access", requireAuth, requireAdmin, async (req, res) => {
-  const sb = getSupabaseForRequest(req);
+  const sb = getSupabaseForRequest(req) || getSupabase();
   if (!sb) {
     res.status(401).json({ error: "Sessão Supabase expirada" });
     return;
   }
-  const { user_id, client_id } = req.body as { user_id: string; client_id: string };
+  let { user_id, client_id } = req.body as { user_id: string; client_id: string };
   if (!user_id || !client_id) {
     res.status(400).json({ error: "user_id e client_id são obrigatórios" });
     return;
   }
+
+  // Se o frontend passou um email como user_id ou se o ID precisa de resolução
+  const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+  if (!isUUID(user_id)) {
+    const { data: profile } = await sb
+      .from("user_profiles")
+      .select("id")
+      .ilike("email", user_id.trim())
+      .maybeSingle();
+
+    if (profile?.id) {
+      user_id = profile.id;
+    }
+  }
+
+  if (!isUUID(user_id)) {
+    res.status(400).json({ error: `Usuário inválido ou não encontrado: ${user_id}` });
+    return;
+  }
+
   const { data, error } = await sb
     .from("user_client_access")
-    .insert({ user_id, client_id, granted_by: req.claims!.email })
+    .insert({ user_id, client_id, granted_by: req.claims?.id || req.claims?.email || "admin" })
     .select("id, user_id, client_id, granted_by, created_at")
     .single();
   if (error) {
@@ -302,6 +353,8 @@ userAccessRouter.post("/client-access", requireAuth, requireAdmin, async (req, r
   }
   res.status(201).json(data);
 });
+
+
 
 // ─── DELETE /api/client-access/:id ──────────────────────────────────────────
 userAccessRouter.delete("/client-access/:id", requireAuth, requireAdmin, async (req, res) => {

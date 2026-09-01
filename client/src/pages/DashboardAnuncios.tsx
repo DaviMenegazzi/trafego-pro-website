@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
+import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
+import { WeeklyCreativeExportModal } from "@/components/WeeklyCreativeExportModal";
 import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
 import {
@@ -19,8 +21,9 @@ import {
   Tag, DollarSign, MessageSquare, Coins, Target, Search, Filter, Check,
   Sparkles, ImageOff, ArrowUpDown, HelpCircle, LayoutGrid, LayoutList,
   ChevronDown, RefreshCw, Building2, TrendingUp, BarChart3, Layers, CalendarRange,
-  Database, Clock, AlertTriangle,
+  Database, Clock, AlertTriangle, Download,
 } from "lucide-react";
+
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
@@ -273,11 +276,22 @@ export default function DashboardAnunciosPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"default" | "creative-grid">("default");
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+
+  const storedUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+    } catch {
+      return {};
+    }
+  }, []);
+  const isAdmin = canSeeAdminFeedbacks(storedUser);
 
   // Popover open states (using Radix UI Portal)
   const [statusOpen, setStatusOpen] = useState(false);
   const [perfOpen, setPerfOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+
 
   const [refreshIndex, setRefreshIndex] = useState(0);
 
@@ -358,9 +372,19 @@ export default function DashboardAnunciosPage() {
   }, [rows, groupByCreative, search, statusFilter, perfFilter, sortKey, sortDir]);
 
   const activeImages = useMemo(() => {
-    if (viewMode !== "creative-grid") return [];
-    return rows.filter((r) => r.status_formatado === "Ativa" && r.ad_image_url);
-  }, [rows, viewMode]);
+    // Pega todos os anúncios ativos (da lista consolidada) que possuem imagem válida
+    const consolidated = consolidateAdsList(rows);
+    return consolidated.filter((r) => {
+      const isAtivo = 
+        r.status_formatado === "Ativa" || 
+        r.offer_status === "ACTIVE" || 
+        (r as any).effective_status === "ACTIVE" ||
+        (r as any).status === "ACTIVE";
+      return Boolean(r.ad_image_url) && isAtivo;
+    });
+  }, [rows]);
+
+
 
   // Keep valid selection without triggering re-render cascades
   useEffect(() => {
@@ -383,7 +407,9 @@ export default function DashboardAnunciosPage() {
   const totalSpend = sum("total_spend");
   const totalConversas = sum("total_conversas_iniciadas");
   const totalLeads = sum("total_leads_meta");
+  const totalImpressions = sum("total_impressions");
   const custoPorConversa = totalConversas > 0 ? totalSpend / totalConversas : 0;
+
 
   const conversasChart = useMemo(() =>
     [...filtered].map((r) => ({ name: cleanDisplayName(r), value: num(r.total_conversas_iniciadas) }))
@@ -791,6 +817,17 @@ export default function DashboardAnunciosPage() {
 
             {/* View Mode & Grouping Toggles */}
             <div className="flex items-center gap-2 flex-wrap">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setExportModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 h-11 px-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950 text-xs font-bold transition-all shadow-md shadow-emerald-950/20"
+                  title="Gerar card executivo de criativos em alta resolução para enviar no WhatsApp"
+                >
+                  <Download className="size-4" />
+                  <span>Exportar Card WhatsApp (HD)</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setGroupByCreative((g) => !g)}
@@ -818,7 +855,7 @@ export default function DashboardAnunciosPage() {
         {/* ─── Creative Grid mode ─────────────────────────────────────────────── */}
         {viewMode === "creative-grid" && (
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <Sparkles className="size-4 text-emerald-400" />
@@ -826,7 +863,19 @@ export default function DashboardAnunciosPage() {
                 </h2>
                 <p className="text-xs text-zinc-400 mt-0.5 font-light">Imagens em veiculação nas campanhas ativas da unidade.</p>
               </div>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setExportModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-emerald-500 text-zinc-950 text-xs font-bold hover:bg-emerald-400 transition-all shadow-md shadow-emerald-950/30"
+                >
+                  <Download className="size-3.5" />
+                  <span>Baixar / Copiar Card HD</span>
+                </button>
+              )}
             </div>
+
 
             {loading && (
               <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-12 text-center text-sm text-zinc-400">
@@ -1163,6 +1212,33 @@ export default function DashboardAnunciosPage() {
           </div>
         </div>
       )}
+
+      {/* Weekly Creative Export Modal (Admin Only) */}
+      {isAdmin && (
+        <WeeklyCreativeExportModal
+          isOpen={exportModalOpen}
+          onClose={() => setExportModalOpen(false)}
+          unitName={selectedClient?.name ?? "Todas as Unidades"}
+          periodLabel={periodLabel}
+          creatives={rows.filter((r) => {
+            const isAtivo = 
+              r.status_formatado === "Ativa" || 
+              r.offer_status === "ACTIVE" || 
+              (r as any).effective_status === "ACTIVE" ||
+              (r as any).status === "ACTIVE";
+            return Boolean(r.ad_image_url) && isAtivo;
+          })}
+          kpis={{
+            totalLeads,
+            totalConversas,
+            totalSpend,
+            totalImpressions,
+            custoPorConversa,
+          }}
+        />
+      )}
     </AppLayout>
   );
 }
+
+

@@ -25,6 +25,8 @@ import TalentBankAdmin from "./pages/TalentBankAdmin";
 import EvolutionAdmin from "./pages/EvolutionAdmin";
 import SocialPublishingAdmin from "./pages/SocialPublishingAdmin";
 
+import AdminFinanceiro from "./pages/admin/financeiro";
+
 function ExistingSiteRoutes() {
   return (
     <Switch>
@@ -59,6 +61,10 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/integracoes-ia/"} component={DashboardExternalAiTokens} />
       <Route path={"/admin/metricas"} component={AdminMetricsOverview} />
       <Route path={"/admin/metricas/"} component={AdminMetricsOverview} />
+      <Route path={"/admin/financeiro"} component={AdminFinanceiro} />
+      <Route path={"/admin/financeiro/"} component={AdminFinanceiro} />
+      <Route path={"/dashboard/financeiro"} component={AdminFinanceiro} />
+      <Route path={"/dashboard/financeiro/"} component={AdminFinanceiro} />
       <Route path={"/dashboard/metricas"} component={AdminMetricsOverview} />
       <Route path={"/dashboard/metricas/"} component={AdminMetricsOverview} />
       <Route path={"/404"} component={NotFound} />

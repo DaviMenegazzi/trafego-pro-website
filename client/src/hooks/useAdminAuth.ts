@@ -17,14 +17,16 @@ export function useAdminAuth() {
   useEffect(() => {
     const token = localStorage.getItem("tp_token");
     const userStr = localStorage.getItem("tp_user");
-    if (shouldRedirectToLogin(token, userStr, true)) {
-      navigate("/login");
-      setLoading(false);
-      return;
+
+    // Validação de sessão no servidor via cookies HttpOnly + fallback token
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
-    // Verify token with server
+
     fetch("/api/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
+      credentials: "include",
     })
       .then((res) => {
         if (!res.ok) {
@@ -33,27 +35,57 @@ export function useAdminAuth() {
           navigate("/login");
           return null;
         }
-        if (shouldRedirectToLogin(token, userStr, res.ok)) {
-          localStorage.removeItem("tp_token");
-          localStorage.removeItem("tp_user");
-          navigate("/login");
-          return null;
-        }
-        return JSON.parse(userStr!) as AdminUser;
+        return res.json();
       })
-      .then((u) => {
-        if (u) setUser(u);
+      .then((serverClaims) => {
+        if (serverClaims && serverClaims.email) {
+          const verifiedUser: AdminUser = {
+            email: serverClaims.email,
+            name: serverClaims.name,
+            role: serverClaims.role,
+            allowedClientIds: serverClaims.allowedClientIds,
+          };
+
+          if (shouldRedirectToLogin(token || "cookie-authenticated", JSON.stringify(verifiedUser), true)) {
+            localStorage.removeItem("tp_token");
+            localStorage.removeItem("tp_user");
+            navigate("/login");
+            return;
+          }
+
+          localStorage.setItem("tp_user", JSON.stringify(verifiedUser));
+          setUser(verifiedUser);
+        } else if (userStr) {
+          try {
+            setUser(JSON.parse(userStr));
+          } catch {
+            navigate("/login");
+          }
+        }
       })
       .catch(() => {
-        navigate("/login");
+        if (!userStr) {
+          navigate("/login");
+        }
       })
       .finally(() => setLoading(false));
   }, [navigate]);
 
-  function logout() {
-    localStorage.removeItem("tp_token");
-    localStorage.removeItem("tp_user");
-    navigate("/login");
+  async function logout() {
+    try {
+      const token = localStorage.getItem("tp_token");
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+    } catch (err) {
+      console.warn("Aviso ao encerrar sessão:", err);
+    } finally {
+      localStorage.removeItem("tp_token");
+      localStorage.removeItem("tp_user");
+      navigate("/login");
+    }
   }
 
   return { user, loading, logout };

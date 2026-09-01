@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   User,
@@ -15,11 +15,20 @@ import {
   Loader2,
 } from "lucide-react";
 
+interface AvailableUnit {
+  id: string;
+  name: string;
+  client_group?: string;
+}
+
 export default function Register() {
   const [, navigate] = useLocation();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [requestedUnit, setRequestedUnit] = useState("");
+  const [requestedUnitId, setRequestedUnitId] = useState("");
+  const [availableUnits, setAvailableUnits] = useState<AvailableUnit[]>([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
   const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,6 +38,19 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    setLoadingUnits(true);
+    fetch("/api/auth/available-units")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: AvailableUnit[]) => {
+        if (Array.isArray(data)) {
+          setAvailableUnits(data);
+        }
+      })
+      .catch((err) => console.warn("Falha ao carregar unidades:", err))
+      .finally(() => setLoadingUnits(false));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,6 +82,7 @@ export default function Register() {
           email: email.trim().toLowerCase(),
           password,
           requested_unit: requestedUnit.trim() || undefined,
+          requested_unit_id: requestedUnitId.trim() || undefined,
           reason: reason.trim() || undefined,
         }),
       });
@@ -248,13 +271,26 @@ export default function Register() {
                       <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
                         <Building2 className="size-3.5 text-emerald-400/80" /> Franquia / Unidade
                       </label>
-                      <input
-                        type="text"
-                        value={requestedUnit}
-                        onChange={(e) => setRequestedUnit(e.target.value)}
-                        placeholder="Ex: Vida Card Passo Fundo"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-white placeholder:text-zinc-600 text-xs focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                      />
+                      <select
+                        value={requestedUnitId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRequestedUnitId(val);
+                          const found = availableUnits.find((u) => u.id === val);
+                          setRequestedUnit(found ? found.name : val);
+                        }}
+                        disabled={loadingUnits}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-white placeholder:text-zinc-600 text-xs focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all cursor-pointer"
+                      >
+                        <option value="" className="bg-zinc-900 text-zinc-400">
+                          {loadingUnits ? "Carregando unidades..." : "Selecione sua franquia / unidade..."}
+                        </option>
+                        {availableUnits.map((unit) => (
+                          <option key={unit.id} value={unit.id} className="bg-zinc-900 text-zinc-100">
+                            {unit.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* Cargo / Justificativa */}

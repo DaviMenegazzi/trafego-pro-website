@@ -7,7 +7,10 @@ import {
   signToken,
   SUPABASE_ACCESS_COOKIE,
   SUPABASE_COOKIE_MAX_AGE_MS,
+  APP_TOKEN_COOKIE,
+  APP_COOKIE_MAX_AGE_MS,
 } from "../auth.js";
+import { notifyAdminNewRegistration } from "../lib/notifications.js";
 
 export const authRouter = Router();
 
@@ -27,14 +30,43 @@ const registerRateLimiter = rateLimit({
   message: { error: "Muitas solicitações de cadastro. Aguarde alguns minutos antes de tentar novamente." },
 });
 
+// ─── GET /api/auth/available-units ──────────────────────────────────────────
+// Listagem pública leve das unidades disponíveis para auto-cadastro
+authRouter.get("/available-units", async (_req, res) => {
+  const supabase = getSupabase();
+  if (!supabase) {
+    res.json([]);
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, name, client_group")
+      .order("name");
+
+    if (error) {
+      console.warn("[auth-available-units] Aviso ao listar unidades:", error.message);
+      res.json([]);
+      return;
+    }
+
+    res.json(data ?? []);
+  } catch (err) {
+    console.warn("[auth-available-units] Erro inesperado:", err);
+    res.json([]);
+  }
+});
+
 // ─── POST /api/auth/register ────────────────────────────────────────────────
 // Auto-cadastro público de usuário com aprovação pendente por administrador
 authRouter.post("/register", registerRateLimiter, async (req, res) => {
-  const { email, password, full_name, requested_unit, reason } = req.body as {
+  const { email, password, full_name, requested_unit, requested_unit_id, reason } = req.body as {
     email?: string;
     password?: string;
     full_name?: string;
     requested_unit?: string;
+    requested_unit_id?: string;
     reason?: string;
   };
 
@@ -68,26 +100,7 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
   }
 
   try {
-    // 1. Verifica se já existe perfil cadastrado com esse email
-    const { data: existingProfile } = await supabase
-      .from("user_profiles")
-      .select("id, status")
-      .eq("email", registerEmail)
-      .maybeSingle();
-
-    if (existingProfile) {
-      if (existingProfile.status === "pending") {
-        res.status(409).json({
-          error: "Já existe uma solicitação de cadastro pendente de aprovação para este e-mail.",
-          status: "pending",
-        });
-        return;
-      }
-      res.status(409).json({ error: "Este e-mail já está cadastrado na plataforma." });
-      return;
-    }
-
-    // 2. Cadastra o usuário no Supabase Auth
+    // 1. Cadastra o usuário no Supabase Auth diretamente (elimina SELECT prévio do caminho feliz)
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: registerEmail,
       password,
@@ -95,6 +108,7 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
         data: {
           name: trimmedName,
           requested_unit: requested_unit || "",
+          requested_unit_id: requested_unit_id || "",
           reason: reason || "",
         },
       },
@@ -103,6 +117,21 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
     if (authError) {
       console.warn("[auth-register] Erro no Supabase Auth signUp:", authError.message);
       if (authError.message.toLowerCase().includes("already registered")) {
+        // Consulta status do cadastro existente para responder com mensagem precisa
+        const { data: existingProfile } = await supabase
+          .from("user_profiles")
+          .select("status")
+          .eq("email", registerEmail)
+          .maybeSingle();
+
+        if (existingProfile?.status === "pending") {
+          res.status(409).json({
+            error: "Já existe uma solicitação de cadastro pendente de aprovação para este e-mail.",
+            status: "pending",
+          });
+          return;
+        }
+
         res.status(409).json({ error: "Este e-mail já possui uma conta no sistema." });
         return;
       }
@@ -111,35 +140,47 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
     }
 
     const userId = authData.user?.id;
-    const bioText = [
-      requested_unit ? `Unidade solicitada: ${requested_unit}` : "",
-      reason ? `Justificativa: ${reason}` : "",
-    ]
-      .filter(Boolean)
-      .join(" | ");
+    const bioParts = [];
+    if (requested_unit_id) bioParts.push(`[Unit ID: ${requested_unit_id}]`);
+    if (requested_unit) bioParts.push(`Unidade: ${requested_unit}`);
+    if (reason) bioParts.push(`Justificativa: ${reason}`);
+    const bioText = bioParts.join(" | ");
 
-    // 3. Insere ou atualiza o perfil em user_profiles com status 'pending'
-    if (userId) {
-      await supabase.from("user_profiles").upsert(
-        {
-          id: userId,
-          email: registerEmail,
-          full_name: trimmedName,
-          role: "viewer",
+    // 2. Upsert atômico do perfil com status 'pending'
+    const profilePayload = {
+      ...(userId ? { id: userId } : {}),
+      email: registerEmail,
+      full_name: trimmedName,
+      role: "viewer",
+      status: "pending",
+      bio: bioText,
+    };
+
+    const { error: profileError } = await supabase
+      .from("user_profiles")
+      .upsert(profilePayload, { onConflict: userId ? "id" : "email" });
+
+    if (profileError) {
+      console.warn("[auth-register] Erro ao gravar user_profiles:", profileError.message);
+      if (profileError.code === "23505") {
+        res.status(409).json({
+          error: "Já existe uma solicitação de cadastro para este e-mail.",
           status: "pending",
-          bio: bioText,
-        },
-        { onConflict: "id" },
-      );
-    } else {
-      await supabase.from("user_profiles").insert({
-        email: registerEmail,
-        full_name: trimmedName,
-        role: "viewer",
-        status: "pending",
-        bio: bioText,
-      });
+        });
+        return;
+      }
+      res.status(502).json({ error: "Falha ao registrar perfil de usuário" });
+      return;
     }
+
+    // 3. Notificação assíncrona ao administrador (fire-and-forget)
+    notifyAdminNewRegistration({
+      userId,
+      fullName: trimmedName,
+      email: registerEmail,
+      requestedUnit: requested_unit,
+      reason,
+    }).catch((err) => console.error("[auth-register] Falha ao notificar admin:", err));
 
     res.status(201).json({
       ok: true,
@@ -211,14 +252,27 @@ authRouter.post("/login", authRateLimiter, async (req, res) => {
         allowedClientIds: access.allowedClientIds,
       });
 
+      const isProduction = process.env.NODE_ENV === "production";
+
+      // 1. Seta cookie do Supabase Access Token (HttpOnly + Secure)
       res.cookie(SUPABASE_ACCESS_COOKIE, accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: isProduction,
         sameSite: "lax",
         maxAge: SUPABASE_COOKIE_MAX_AGE_MS,
         path: "/",
       });
 
+      // 2. Seta cookie HttpOnly com o JWT da aplicação (proteção total contra roubo via XSS)
+      res.cookie(APP_TOKEN_COOKIE, token, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+        maxAge: APP_COOKIE_MAX_AGE_MS,
+        path: "/",
+      });
+
+      // Retorna token no payload para compatibilidade de transição e dados públicos de exibição
       res.json({
         token,
         user: {
@@ -247,11 +301,15 @@ authRouter.get("/me", requireAuth, (req, res) => {
 
 // ─── POST /api/auth/logout ──────────────────────────────────────────────────
 authRouter.post("/logout", requireAuth, (_req, res) => {
-  res.clearCookie(SUPABASE_ACCESS_COOKIE, {
+  const isProduction = process.env.NODE_ENV === "production";
+  const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: "lax" as const,
     path: "/",
-  });
+  };
+
+  res.clearCookie(SUPABASE_ACCESS_COOKIE, cookieOptions);
+  res.clearCookie(APP_TOKEN_COOKIE, cookieOptions);
   res.status(204).end();
 });

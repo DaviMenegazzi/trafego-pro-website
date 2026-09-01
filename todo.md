@@ -888,3 +888,13 @@
 - [x] Capturar a mensagem completa de erro devolvida pela rota para sessão administrativa
 - [x] Corrigir a consulta ou política restante que impede a leitura dos perfis
 - [x] Validar a rota e a interface em produção antes de publicar
+
+## Nova sincronização do repositório
+
+- [ ] Sincronizar a cópia local com a revisão mais recente do GitHub
+- [ ] Confirmar se há alterações novas disponíveis no projeto
+
+## Sincronização do commit 81120c5
+
+- [ ] Atualizar o projeto para o commit indicado na origin/main
+- [ ] Confirmar a revisão sincronizada no ambiente de desenvolvimento

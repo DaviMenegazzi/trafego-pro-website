@@ -904,3 +904,9 @@
 - [ ] Identificar a dependência Firebase ausente e os arquivos que a utilizam
 - [ ] Instalar a dependência declarada e atualizar o lockfile
 - [ ] Validar o servidor e o build após a sincronização
+
+## Correção do Firebase no Financeiro
+
+- [x] Inspecionar o erro de conexão ou leitura no módulo `/admin/financeiro`
+- [x] Corrigir a configuração Firebase ou as regras que impedem a consulta
+- [x] Validar o carregamento real dos dados financeiros antes de publicar

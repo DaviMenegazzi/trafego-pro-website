@@ -898,3 +898,9 @@
 
 - [ ] Atualizar o projeto para o commit indicado na origin/main
 - [ ] Confirmar a revisão sincronizada no ambiente de desenvolvimento
+
+## Recuperação após commit 81120c5
+
+- [ ] Identificar a dependência Firebase ausente e os arquivos que a utilizam
+- [ ] Instalar a dependência declarada e atualizar o lockfile
+- [ ] Validar o servidor e o build após a sincronização

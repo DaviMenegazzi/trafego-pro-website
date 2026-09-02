@@ -126,12 +126,25 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
     updates.status = normalizedStatus;
   }
   updates.updated_at = new Date().toISOString();
-  const { data, error } = await sb
+  let data: any;
+  let error: any;
+  ({ data, error } = await sb
     .from("user_profiles")
     .update(updates)
     .eq("id", req.params.id)
     .select("id, full_name, email, role, status, bio, avatar_url, created_at, updated_at")
-    .single();
+    .single());
+
+  // Perfis legados podem não possuir campos visuais opcionais. O status deve
+  // continuar atualizável mesmo quando esses campos não existem no esquema.
+  if (error?.code === "42703") {
+    ({ data, error } = await sb
+      .from("user_profiles")
+      .update(updates)
+      .eq("id", req.params.id)
+      .select("id, full_name, email, role, status, created_at, updated_at")
+      .single());
+  }
   if (error) {
     res.status(502).json({ error: error.message });
     return;

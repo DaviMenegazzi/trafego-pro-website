@@ -11,6 +11,7 @@ import {
   APP_COOKIE_MAX_AGE_MS,
 } from "../auth.js";
 import { notifyAdminNewRegistration } from "../lib/notifications.js";
+import { buildPendingRegistrationBio } from "../registrationPolicy.js";
 
 export const authRouter = Router();
 
@@ -30,43 +31,13 @@ const registerRateLimiter = rateLimit({
   message: { error: "Muitas solicitações de cadastro. Aguarde alguns minutos antes de tentar novamente." },
 });
 
-// ─── GET /api/auth/available-units ──────────────────────────────────────────
-// Listagem pública leve das unidades disponíveis para auto-cadastro
-authRouter.get("/available-units", async (_req, res) => {
-  const supabase = getSupabase();
-  if (!supabase) {
-    res.json([]);
-    return;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("clients")
-      .select("id, name, client_group")
-      .order("name");
-
-    if (error) {
-      console.warn("[auth-available-units] Aviso ao listar unidades:", error.message);
-      res.json([]);
-      return;
-    }
-
-    res.json(data ?? []);
-  } catch (err) {
-    console.warn("[auth-available-units] Erro inesperado:", err);
-    res.json([]);
-  }
-});
-
 // ─── POST /api/auth/register ────────────────────────────────────────────────
 // Auto-cadastro público de usuário com aprovação pendente por administrador
 authRouter.post("/register", registerRateLimiter, async (req, res) => {
-  const { email, password, full_name, requested_unit, requested_unit_id, reason } = req.body as {
+  const { email, password, full_name, reason } = req.body as {
     email?: string;
     password?: string;
     full_name?: string;
-    requested_unit?: string;
-    requested_unit_id?: string;
     reason?: string;
   };
 
@@ -107,8 +78,6 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
       options: {
         data: {
           name: trimmedName,
-          requested_unit: requested_unit || "",
-          requested_unit_id: requested_unit_id || "",
           reason: reason || "",
         },
       },
@@ -140,11 +109,7 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
     }
 
     const userId = authData.user?.id;
-    const bioParts = [];
-    if (requested_unit_id) bioParts.push(`[Unit ID: ${requested_unit_id}]`);
-    if (requested_unit) bioParts.push(`Unidade: ${requested_unit}`);
-    if (reason) bioParts.push(`Justificativa: ${reason}`);
-    const bioText = bioParts.join(" | ");
+    const bioText = buildPendingRegistrationBio(reason);
 
     // 2. Upsert atômico do perfil com status 'pending'
     const profilePayload = {
@@ -178,7 +143,6 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
       userId,
       fullName: trimmedName,
       email: registerEmail,
-      requestedUnit: requested_unit,
       reason,
     }).catch((err) => console.error("[auth-register] Falha ao notificar admin:", err));
 

@@ -910,3 +910,10 @@
 - [x] Inspecionar o erro de conexão ou leitura no módulo `/admin/financeiro`
 - [x] Corrigir a configuração Firebase ou as regras que impedem a consulta
 - [x] Validar o carregamento real dos dados financeiros antes de publicar
+
+## Correções de Usuários e Registro
+
+- [x] Diagnosticar por que a ativação ou desativação de usuários não persiste
+- [x] Corrigir a ação administrativa de ativar e desativar usuários
+- [x] Remover a seleção de unidade da página de registro
+- [x] Validar permissões, ativação e registro antes de publicar

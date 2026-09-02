@@ -3,6 +3,7 @@ import { getSupabaseForRequest, requireAdmin, requireAuth } from "../auth.js";
 import { getSupabase } from "../supabase.js";
 import { groupClientAccessByUser } from "../clientAccess.js";
 import { notifyUserApproved, notifyUserRejected } from "../lib/notifications.js";
+import { normalizeManagedUserStatus } from "../userAccessPolicy.js";
 
 export const userAccessRouter = Router();
 
@@ -116,7 +117,14 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
   const updates: Record<string, unknown> = {};
   if (role) updates.role = role;
   if (full_name !== undefined) updates.full_name = full_name;
-  if (status !== undefined) updates.status = status;
+  if (status !== undefined) {
+    const normalizedStatus = normalizeManagedUserStatus(status);
+    if (!normalizedStatus) {
+      res.status(400).json({ error: "Status de usuário inválido" });
+      return;
+    }
+    updates.status = normalizedStatus;
+  }
   updates.updated_at = new Date().toISOString();
   const { data, error } = await sb
     .from("user_profiles")

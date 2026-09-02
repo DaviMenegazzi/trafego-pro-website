@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { isAdminRole, isTeamRole, fetchUserAccess } from "./auth.js";
+import { buildPendingRegistrationBio } from "./registrationPolicy.js";
+import { normalizeManagedUserStatus } from "./userAccessPolicy.js";
 
 describe("User Registration and Admin Approval Policy", () => {
   it("recognizes administrative and team roles correctly", () => {
@@ -78,5 +80,16 @@ describe("User Registration and Admin Approval Policy", () => {
     expect(access.role).toBe("viewer");
     expect(access.allowedClientIds).toEqual(["client-unit-1"]);
     expect(access.status).toBeUndefined(); // Active does not return non-active status flag
+  });
+
+  it("retains only the declared role justification in a new registration profile", () => {
+    expect(buildPendingRegistrationBio("Gestor de unidade")).toBe("Justificativa: Gestor de unidade");
+    expect(buildPendingRegistrationBio()).toBe("");
+  });
+
+  it("accepts only active and inactive administrative status transitions", () => {
+    expect(normalizeManagedUserStatus("active")).toBe("active");
+    expect(normalizeManagedUserStatus("inactive")).toBe("inactive");
+    expect(normalizeManagedUserStatus("pending")).toBeNull();
   });
 });

@@ -118,7 +118,6 @@ export default function DashboardUsuariosPage() {
 
   // Modais
   const [showModal, setShowModal] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<ProfileRow | null>(null);
   const [approvingProfile, setApprovingProfile] = useState<ProfileRow | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -132,6 +131,7 @@ export default function DashboardUsuariosPage() {
   const [approveRole, setApproveRole] = useState("viewer");
   const [approveClientIds, setApproveClientIds] = useState<string[]>([]);
   const [approving, setApproving] = useState(false);
+  const [updatingStatusUserId, setUpdatingStatusUserId] = useState<string | null>(null);
 
   // Grant access inline state
   const [grantingUserId, setGrantingUserId] = useState<string | null>(null);
@@ -309,22 +309,26 @@ export default function DashboardUsuariosPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!confirmDelete) return;
+  async function handleToggleStatus(profile: ProfileRow) {
+    const nextStatus = profile.status === "inactive" ? "active" : "inactive";
+    setUpdatingStatusUserId(profile.id);
     try {
-      const res = await fetch(`/api/user-access/${confirmDelete.id}`, {
-        method: "DELETE",
+      const res = await fetch(`/api/user-access/${profile.id}`, {
+        method: "PUT",
         headers: authHeaders(),
+        body: JSON.stringify({ status: nextStatus }),
       });
       if (!res.ok) {
-        toast.error("Erro ao desativar");
+        const error = await res.json().catch(() => ({}));
+        toast.error(error.error || "Erro ao atualizar o status do usuário");
         return;
       }
-      toast.success("Usuário desativado");
-      setConfirmDelete(null);
+      toast.success(nextStatus === "active" ? "Usuário ativado" : "Usuário desativado");
       fetchData();
     } catch {
       toast.error("Erro de conexão");
+    } finally {
+      setUpdatingStatusUserId(null);
     }
   }
 
@@ -601,11 +605,16 @@ export default function DashboardUsuariosPage() {
                           </select>
 
                           <button
-                            onClick={() => setConfirmDelete(profile)}
-                            className="size-7 flex items-center justify-center rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                            title={isInactive ? "Excluir/Inativado" : "Desativar"}
+                            onClick={() => handleToggleStatus(profile)}
+                            disabled={updatingStatusUserId === profile.id}
+                            className={`size-7 flex items-center justify-center rounded-lg transition-colors disabled:cursor-wait disabled:opacity-50 ${
+                              isInactive
+                                ? "text-emerald-400 hover:bg-emerald-500/10"
+                                : "text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10"
+                            }`}
+                            title={isInactive ? "Ativar usuário" : "Desativar usuário"}
                           >
-                            <Trash2 className="size-3.5" />
+                            {isInactive ? <CheckCircle2 className="size-3.5" /> : <XCircle className="size-3.5" />}
                           </button>
                         </div>
                       )}
@@ -906,35 +915,6 @@ export default function DashboardUsuariosPage() {
         </div>
       )}
 
-      {/* Modal: Confirmar Desativação */}
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="glass-card w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-base font-semibold text-white">Desativar Usuário</h2>
-            <p className="text-xs text-zinc-300 leading-relaxed">
-              Deseja desativar o acesso de{" "}
-              <strong>{confirmDelete.full_name || confirmDelete.user_email}</strong>?
-            </p>
-            <p className="text-[11px] text-zinc-500">
-              O perfil não será excluído permanentemente, apenas marcado como inativo.
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 rounded-xl border border-zinc-800 text-xs text-zinc-400 hover:bg-zinc-900"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600"
-              >
-                Confirmar Desativação
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </AppLayout>
   );
 }

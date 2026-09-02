@@ -917,3 +917,15 @@
 - [x] Corrigir a ação administrativa de ativar e desativar usuários
 - [x] Remover a seleção de unidade da página de registro
 - [x] Validar permissões, ativação e registro antes de publicar
+
+## Erro persistente na atualização de status
+
+- [ ] Capturar a resposta de erro detalhada ao ativar ou desativar um usuário
+- [ ] Corrigir a causa específica na rota ou nas permissões do Supabase
+- [ ] Validar a alteração de status com sessão administrativa real
+
+## Exclusão silenciosa de usuários
+
+- [ ] Reproduzir a exclusão e capturar o evento da interface e a requisição HTTP
+- [ ] Corrigir o disparo, a autorização ou a atualização visual da exclusão
+- [ ] Validar a exclusão administrativa com retorno de sucesso ou erro observável

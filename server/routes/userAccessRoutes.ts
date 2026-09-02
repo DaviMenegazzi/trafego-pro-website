@@ -108,6 +108,7 @@ userAccessRouter.get("/user-access", requireAuth, requireAdmin, async (req, res)
 
 // ─── PUT /api/user-access/:id ───────────────────────────────────────────────
 userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
   const sb = getSupabaseForRequest(req);
   if (!sb) {
     res.status(401).json({ error: "Sessão Supabase expirada" });
@@ -160,6 +161,11 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
     created_at: data.created_at,
     updated_at: data.updated_at,
   });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "Falha inesperada ao atualizar o status";
+    console.error("[user-access] Falha na atualização de status:", message);
+    res.status(502).json({ error: message });
+  }
 });
 
 // ─── POST /api/user-access/:id/approve ──────────────────────────────────────

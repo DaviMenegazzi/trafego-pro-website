@@ -9,15 +9,15 @@ export function getDashboardUnitMenuState(
 
   if (loading) {
     return {
-      label: "Carregando unidades…",
-      canOpen: false,
+      label: selectedUnit?.name ?? "Carregando unidades…",
+      canOpen: true,
       emptyMessage: "Carregando as unidades autorizadas para a sua sessão.",
     };
   }
 
   return {
     label: selectedUnit?.name ?? "Selecione uma unidade",
-    canOpen: units.length > 0,
+    canOpen: true,
     emptyMessage: "Nenhuma unidade está disponível para a sua sessão.",
   };
 }

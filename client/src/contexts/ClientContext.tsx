@@ -98,7 +98,14 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         return supabaseClients[0]?.id ?? null;
       });
     } catch {
-      // ignore
+      setTimeout(() => {
+        setClients((curr) => {
+          if (curr.length === 0) {
+            void fetchClients();
+          }
+          return curr;
+        });
+      }, 1500);
     } finally {
       setLoading(false);
     }

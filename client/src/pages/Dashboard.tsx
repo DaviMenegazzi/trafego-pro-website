@@ -165,7 +165,9 @@ export default function DashboardPage() {
   const [draftStart, setDraftStart] = useState(customRange.start);
   const [draftEnd, setDraftEnd] = useState(customRange.end);
   const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
+  const [mobilePeriodMenuOpen, setMobilePeriodMenuOpen] = useState(false);
   const [unitMenuOpen, setUnitMenuOpen] = useState(false);
+  const [mobileUnitMenuOpen, setMobileUnitMenuOpen] = useState(false);
   const [unitSearch, setUnitSearch] = useState("");
   const [customRangeError, setCustomRangeError] = useState<string | null>(null);
   const [daily, setDaily] = useState<DailyRow[]>([]);
@@ -179,7 +181,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
-  const { clients: clientOpts, selectedClientId, selectedClient, setSelectedClientId, loading: clientsLoading } = useClientContext();
+  const { clients: clientOpts, selectedClientId, selectedClient, setSelectedClientId, loading: clientsLoading, refetch: refetchClients } = useClientContext();
   const metricsRequestGate = useRef(createRequestGate());
 
   const token = typeof window !== "undefined" ? localStorage.getItem("tp_token") : null;
@@ -203,6 +205,7 @@ export default function DashboardPage() {
     setPeriod(value);
     setCustomRangeError(null);
     setPeriodMenuOpen(false);
+    setMobilePeriodMenuOpen(false);
   };
 
   const applyCustomRange = () => {
@@ -215,6 +218,7 @@ export default function DashboardPage() {
     setPeriod(CUSTOM_PERIOD);
     setCustomRangeError(null);
     setPeriodMenuOpen(false);
+    setMobilePeriodMenuOpen(false);
   };
 
   const handlePeriodMenu = (open: boolean) => {
@@ -226,9 +230,19 @@ export default function DashboardPage() {
     }
   };
 
+  const handleMobilePeriodMenu = (open: boolean) => {
+    setMobilePeriodMenuOpen(open);
+    if (open) {
+      setDraftStart(activeRange.start);
+      setDraftEnd(activeRange.end);
+      setCustomRangeError(null);
+    }
+  };
+
   const selectUnit = (clientId: string) => {
     if (selectAuthorizedDashboardUnit(clientOpts, clientId, setSelectedClientId)) {
       setUnitMenuOpen(false);
+      setMobileUnitMenuOpen(false);
     }
   };
 
@@ -557,10 +571,85 @@ export default function DashboardPage() {
         {/* Filter Control Deck */}
         <section className="rounded-2xl sm:rounded-3xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-3 sm:p-5 shadow-xl shadow-black/30">
           
-          {/* Mobile View: Quick Chips & Refresh Action */}
-          <div className="flex flex-col gap-2.5 md:hidden">
+          {/* Mobile View: Units, Quick Chips & Refresh Action */}
+          <div className="flex flex-col gap-3 md:hidden">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Período:</span>
+              {/* Unit Selector Mobile */}
+              <Popover open={mobileUnitMenuOpen} onOpenChange={(isOpen) => { setMobileUnitMenuOpen(isOpen); if (!isOpen) setUnitSearch(""); }}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Selecionar unidade das métricas"
+                    className="flex-1 inline-flex min-h-10 items-center justify-between gap-2 rounded-xl border border-white/10 bg-zinc-950/80 px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-all active:scale-[0.99] hover:bg-zinc-900"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Building2 className="size-3.5 text-emerald-400 shrink-0" />
+                      <span className="truncate">{unitMenu.label}</span>
+                    </div>
+                    <ChevronDown className="size-3 text-zinc-500 shrink-0" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="z-[100] w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl">
+                  <div className="border-b border-white/10 px-4 py-3">
+                    <p className="font-display text-sm font-bold">Unidades disponíveis</p>
+                    {clientOpts.length > 5 && (
+                      <div className="mt-2.5">
+                        <input
+                          type="text"
+                          value={unitSearch}
+                          onChange={(e) => setUnitSearch(e.target.value)}
+                          placeholder="Filtrar unidade…"
+                          className="h-8 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500/60"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {clientsLoading ? (
+                    <div className="flex items-center gap-2.5 px-4 py-5 text-xs text-zinc-400">
+                      <RefreshCw className="size-3.5 animate-spin text-emerald-400" /> Carregando unidades…
+                    </div>
+                  ) : clientOpts.length === 0 ? (
+                    <div className="px-4 py-5 text-center space-y-2">
+                      <p className="text-xs leading-5 text-zinc-400">{unitMenu.emptyMessage}</p>
+                      <button
+                        type="button"
+                        onClick={() => refetchClients()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold active:scale-95"
+                      >
+                        <RefreshCw className="size-3" /> Tentar recarregar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="max-h-60 overflow-y-auto p-1.5">
+                      {clientOpts
+                        .filter((c) => !unitSearch.trim() || c.name.toLowerCase().includes(unitSearch.toLowerCase()))
+                        .map((client) => {
+                          const selected = client.id === selectedClientId;
+                          return (
+                            <button
+                              key={client.id}
+                              type="button"
+                              onClick={() => {
+                                selectUnit(client.id);
+                                setUnitSearch("");
+                              }}
+                              className={`flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-all ${
+                                selected
+                                  ? "bg-emerald-500 text-zinc-950 font-bold shadow-md shadow-emerald-950/30"
+                                  : "text-zinc-300 hover:bg-white/5"
+                              }`}
+                            >
+                              <span className="truncate">{client.name}</span>
+                              {selected && <span className="shrink-0 text-[9px] uppercase tracking-wider font-extrabold">Ativa</span>}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+
+              {/* Refresh Action Mobile */}
               <button
                 onClick={() => {
                   if (selectedClientId) {
@@ -570,7 +659,7 @@ export default function DashboardPage() {
                   setRefreshIndex((value) => value + 1);
                 }}
                 disabled={loading || clientsLoading || !selectedClientId}
-                className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-white/5 border border-white/10 px-2.5 text-[11px] font-medium text-zinc-200 active:scale-95 transition-all"
+                className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-white/5 border border-white/10 px-3 text-xs font-medium text-zinc-200 active:scale-95 transition-all disabled:opacity-50"
               >
                 <RefreshCw className={`size-3 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
                 <span>Atualizar</span>
@@ -594,8 +683,8 @@ export default function DashboardPage() {
                 </button>
               ))}
 
-              {/* Popover trigger for Custom Date */}
-              <Popover open={periodMenuOpen} onOpenChange={handlePeriodMenu}>
+              {/* Popover trigger for Custom Date Mobile */}
+              <Popover open={mobilePeriodMenuOpen} onOpenChange={handleMobilePeriodMenu}>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
@@ -609,7 +698,7 @@ export default function DashboardPage() {
                     <span>{period === CUSTOM_PERIOD ? formatDashboardDateRange(activeRange) : "Customizado"}</span>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="z-[100] w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl">
+                <PopoverContent align="start" className="z-[100] w-[min(20rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl">
                   <div className="border-b border-white/10 px-4 py-3">
                     <p className="font-display text-sm font-bold">Data personalizada</p>
                     <p className="mt-0.5 text-xs text-zinc-400">Escolha o intervalo inicial e final.</p>
@@ -638,7 +727,7 @@ export default function DashboardPage() {
                     {customRangeError && <p className="text-xs text-rose-400">{customRangeError}</p>}
                   </div>
                   <div className="flex items-center justify-end gap-2 border-t border-white/10 bg-zinc-900/40 p-3">
-                    <button type="button" onClick={() => setPeriodMenuOpen(false)} className="rounded-xl px-3 py-1.5 text-xs text-zinc-400">Cancelar</button>
+                    <button type="button" onClick={() => setMobilePeriodMenuOpen(false)} className="rounded-xl px-3 py-1.5 text-xs text-zinc-400">Cancelar</button>
                     <button type="button" onClick={applyCustomRange} className="rounded-xl bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-zinc-950">Aplicar</button>
                   </div>
                 </PopoverContent>
@@ -646,11 +735,11 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Desktop View: Original Popovers and Buttons */}
+          {/* Desktop View: Popovers and Action Buttons */}
           <div className="hidden md:flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               
-              {/* Period Filter */}
+              {/* Period Filter Desktop */}
               <Popover open={periodMenuOpen} onOpenChange={handlePeriodMenu}>
                 <PopoverTrigger asChild>
                   <button
@@ -717,21 +806,20 @@ export default function DashboardPage() {
                 </PopoverContent>
               </Popover>
 
-              {/* Unit Filter */}
+              {/* Unit Filter Desktop */}
               <Popover open={unitMenuOpen} onOpenChange={(isOpen) => { setUnitMenuOpen(isOpen); if (!isOpen) setUnitSearch(""); }}>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
                     aria-label="Selecionar unidade das métricas"
-                    disabled={!unitMenu.canOpen}
-                    className="inline-flex min-h-11 items-center gap-2.5 rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-2.5 text-left text-xs font-medium text-zinc-200 transition-all hover:border-white/20 hover:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center gap-2.5 rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-2.5 text-left text-xs font-medium text-zinc-200 transition-all hover:border-white/20 hover:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   >
                     <Building2 className="size-4 text-emerald-400" />
                     <span className="max-w-52 truncate">{unitMenu.label}</span>
                     <ChevronDown className="size-3.5 text-zinc-500" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl z-50">
+                <PopoverContent align="start" className="z-[100] w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl">
                   <div className="border-b border-white/10 px-5 py-4">
                     <p className="font-display text-base font-bold">Unidades disponíveis</p>
                     <p className="mt-1 text-xs leading-5 text-zinc-400">Selecione a unidade para filtrar as métricas.</p>
@@ -752,7 +840,16 @@ export default function DashboardPage() {
                       <RefreshCw className="size-4 animate-spin text-emerald-400" /> Carregando unidades…
                     </div>
                   ) : clientOpts.length === 0 ? (
-                    <p className="px-4 py-6 text-sm leading-6 text-zinc-400">{unitMenu.emptyMessage}</p>
+                    <div className="px-5 py-6 text-center space-y-2.5">
+                      <p className="text-xs leading-5 text-zinc-400">{unitMenu.emptyMessage}</p>
+                      <button
+                        type="button"
+                        onClick={() => refetchClients()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20"
+                      >
+                        <RefreshCw className="size-3" /> Recarregar unidades
+                      </button>
+                    </div>
                   ) : (
                     <div className="max-h-64 overflow-y-auto p-2">
                       {clientOpts

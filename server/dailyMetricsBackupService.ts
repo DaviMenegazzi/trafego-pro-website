@@ -193,6 +193,13 @@ export async function saveDailyMetricsToSupabase(
     .upsert(rowsToInsert, { onConflict: "client_id,date_start" });
 
   if (error) {
+    if (error.code === "PGRST205" || error.message?.includes("Could not find the table")) {
+      const err = new Error(
+        "Tabela 'meta_ads_daily_summary' ainda não criada no Supabase. Execute o script 'db/meta_ads_daily_summary.sql' para ativá-la.",
+      );
+      (err as any).isTableMissing = true;
+      throw err;
+    }
     // Se a tabela tiver conflito em outra chave, tenta insert simples
     const { error: insertError } = await sb.from("meta_ads_daily_summary").insert(rowsToInsert);
     if (insertError) {
@@ -233,6 +240,7 @@ export async function runDailyMetricsBackupRoutine(): Promise<{
 
   let totalUpserted = 0;
   let unitsProcessed = 0;
+  let tableMissingNoticeLogged = false;
   const { today, yesterday } = getBackupTargetDates();
 
   try {
@@ -257,6 +265,18 @@ export async function runDailyMetricsBackupRoutine(): Promise<{
         // Delay suave de 400ms entre requisições para evitar rate limit na Meta
         await new Promise((resolve) => setTimeout(resolve, 400));
       } catch (unitErr: any) {
+        if (unitErr.isTableMissing) {
+          if (!tableMissingNoticeLogged) {
+            console.warn(
+              "[daily-backup] ℹ️ Aviso: A tabela 'meta_ads_daily_summary' ainda não foi criada no Supabase.\n" +
+              "              Para ativar o histórico e backup persistente, execute o script 'db/meta_ads_daily_summary.sql' no SQL Editor do Supabase.\n" +
+              "              (O painel continua funcionando normalmente com dados em tempo real da Meta)."
+            );
+            tableMissingNoticeLogged = true;
+          }
+          // Interrompe tentativas subsequentes nesta rodada para não poluir o terminal
+          break;
+        }
         console.warn(`[daily-backup] Aviso ao processar unidade ${unit.name} (${unit.id}):`, unitErr.message);
       }
     }

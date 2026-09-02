@@ -111,31 +111,35 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
     const userId = authData.user?.id;
     const bioText = buildPendingRegistrationBio(reason);
 
-    // 2. Upsert atômico do perfil com status 'pending'
-    const profilePayload = {
-      ...(userId ? { id: userId } : {}),
-      email: registerEmail,
-      full_name: trimmedName,
-      role: "viewer",
-      status: "pending",
-      bio: bioText,
-    };
+    // 2. Atualização segura do perfil com status 'pending'
+    // Como a trigger do Postgres já criou o perfil no signUp, usamos a sessão do próprio usuário
+    // para atualizar a justificativa e os metadados em conformidade com o RLS.
+    try {
+      const { data: userSign } = await supabase.auth.signInWithPassword({
+        email: registerEmail,
+        password,
+      });
 
-    const { error: profileError } = await supabase
-      .from("user_profiles")
-      .upsert(profilePayload, { onConflict: userId ? "id" : "email" });
+      const authedUserSb = userSign?.session?.access_token
+        ? (await import("../supabase.js")).getSupabaseForAccessToken(userSign.session.access_token)
+        : null;
 
-    if (profileError) {
-      console.warn("[auth-register] Erro ao gravar user_profiles:", profileError.message);
-      if (profileError.code === "23505") {
-        res.status(409).json({
-          error: "Já existe uma solicitação de cadastro para este e-mail.",
+      const targetClient = authedUserSb || supabase;
+      const { error: profileError } = await targetClient
+        .from("user_profiles")
+        .update({
+          full_name: trimmedName,
           status: "pending",
-        });
-        return;
+          role: "viewer",
+          ...(bioText ? { bio: bioText } : {}),
+        })
+        .eq("email", registerEmail);
+
+      if (profileError && profileError.code !== "42501" && profileError.code !== "42703") {
+        console.warn("[auth-register] Aviso ao atualizar detalhes do perfil:", profileError.message);
       }
-      res.status(502).json({ error: "Falha ao registrar perfil de usuário" });
-      return;
+    } catch (err) {
+      console.warn("[auth-register] Aviso na sincronização do perfil pós-cadastro:", err);
     }
 
     // 3. Notificação assíncrona ao administrador (fire-and-forget)
@@ -160,61 +164,84 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
 
 // ─── POST /api/auth/login ───────────────────────────────────────────────────
 authRouter.post("/login", authRateLimiter, async (req, res) => {
-  const { email, password } = req.body as { email?: string; password: string };
+  const { email, password, name, identifier } = req.body as {
+    email?: string;
+    password?: string;
+    name?: string;
+    identifier?: string;
+  };
 
-  if (!email || !password) {
+  const rawIdentifier = (email || name || identifier || "").trim();
+  if (!rawIdentifier || !password) {
     res.status(400).json({ error: "Identificação e senha são obrigatórios" });
     return;
   }
-  const loginEmail = email.trim().toLowerCase();
 
-  // Tenta autenticar contra o Supabase Auth
   const supabase = getSupabase();
-  if (supabase) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
-      if (error || !data.user) {
-        res.status(401).json({ error: "Credenciais inválidas" });
+  if (!supabase) {
+    res.status(503).json({ error: "Supabase não configurado para autenticação" });
+    return;
+  }
+
+  try {
+    let loginEmail = rawIdentifier.toLowerCase();
+
+    // Se o usuário digitou um nome ao invés de email, resolve o email no user_profiles
+    if (!loginEmail.includes("@")) {
+      const { data: matchedProfile } = await supabase
+        .from("user_profiles")
+        .select("email")
+        .or(`full_name.ilike.%${rawIdentifier}%,email.ilike.${rawIdentifier}%`)
+        .maybeSingle();
+
+      if (matchedProfile?.email) {
+        loginEmail = matchedProfile.email.toLowerCase().trim();
+      }
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
+    if (error || !data.user) {
+      res.status(401).json({ error: "Credenciais inválidas" });
+      return;
+    }
+
+    // Busca role + acessos usando o UID do Supabase Auth e o email de fallback
+    const accessToken = data.session?.access_token;
+    const access = await fetchUserAccess(data.user.id, accessToken, undefined, loginEmail);
+
+    if (!access.role || access.allowedClientIds.length === 0) {
+      if (access.status === "pending") {
+        res.status(403).json({
+          error: "Seu cadastro foi realizado com sucesso e está aguardando aprovação de um administrador.",
+          status: "pending",
+        });
         return;
       }
-
-      // Busca role + acessos usando o UID do Supabase Auth
-      const accessToken = data.session?.access_token;
-      const access = await fetchUserAccess(data.user.id, accessToken);
-
-      if (!access.role || access.allowedClientIds.length === 0) {
-        if (access.status === "pending") {
-          res.status(403).json({
-            error: "Seu cadastro foi realizado com sucesso e está aguardando aprovação de um administrador.",
-            status: "pending",
-          });
-          return;
-        }
-        if (access.status === "inactive" || access.status === "rejected") {
-          res.status(403).json({
-            error: "Seu acesso está inativo ou foi recusado pela administração.",
-            status: "inactive",
-          });
-          return;
-        }
-        res.status(403).json({ error: "Sem permissão de acesso. Contate o administrador." });
+      if (access.status === "inactive" || access.status === "rejected") {
+        res.status(403).json({
+          error: "Seu acesso está inativo ou foi recusado pela administração.",
+          status: "inactive",
+        });
         return;
       }
+      res.status(403).json({ error: "Sem permissão de acesso. Contate o administrador." });
+      return;
+    }
 
-      if (!accessToken) {
-        res.status(500).json({ error: "Sessão Supabase indisponível" });
-        return;
-      }
+    if (!accessToken) {
+      res.status(500).json({ error: "Sessão Supabase indisponível" });
+      return;
+    }
 
-      const userName = data.user.user_metadata?.name || loginEmail.split("@")[0];
+    const userName = data.user.user_metadata?.name || loginEmail.split("@")[0];
 
-      const token = signToken({
-        email: loginEmail,
-        name: userName,
-        role: access.role,
-        id: data.user.id,
-        allowedClientIds: access.allowedClientIds,
-      });
+    const token = signToken({
+      email: loginEmail,
+      name: userName,
+      role: access.role,
+      id: data.user.id,
+      allowedClientIds: access.allowedClientIds,
+    });
 
       const isProduction = process.env.NODE_ENV === "production";
 
@@ -247,15 +274,11 @@ authRouter.post("/login", authRateLimiter, async (req, res) => {
           allowedClientIds: access.allowedClientIds,
         },
       });
-      return;
     } catch (err) {
       console.error("[auth] Erro ao autenticar com Supabase:", err);
       res.status(500).json({ error: "Erro de autenticação" });
       return;
     }
-  }
-
-  res.status(503).json({ error: "Supabase não configurado para autenticação" });
 });
 
 // ─── GET /api/auth/me ───────────────────────────────────────────────────────

@@ -41,11 +41,27 @@ const ClientContext = createContext<ClientContextType>({
 });
 
 export function ClientProvider({ children }: { children: ReactNode }) {
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<Client[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = sessionStorage.getItem("tp_cached_clients");
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [selectedClientId, setSelectedClientId] = useState<string | null>(() =>
     typeof window === "undefined" ? null : localStorage.getItem("tp_selected_client_id"),
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const cached = sessionStorage.getItem("tp_cached_clients");
+      return !cached || JSON.parse(cached).length === 0;
+    } catch {
+      return true;
+    }
+  });
 
   const fetchClients = async () => {
     try {
@@ -59,6 +75,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem("tp_token");
         localStorage.removeItem("tp_user");
         localStorage.removeItem("tp_selected_client_id");
+        try { sessionStorage.removeItem("tp_cached_clients"); } catch {}
         window.location.href = "/login?session=renovada";
         return;
       }
@@ -69,6 +86,11 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         : [];
 
       setClients(supabaseClients);
+      if (supabaseClients.length > 0) {
+        try {
+          sessionStorage.setItem("tp_cached_clients", JSON.stringify(supabaseClients));
+        } catch {}
+      }
       setSelectedClientId((current) => {
         if (current && supabaseClients.some((client) => String(client.id) === String(current))) {
           return current;

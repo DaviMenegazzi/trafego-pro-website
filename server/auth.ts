@@ -75,68 +75,81 @@ export async function fetchUserAccess(
   supabaseUid: string,
   accessToken?: string,
   supabaseClient?: any,
+  userEmail?: string,
 ): Promise<{
   role: string;
   allowedClientIds: string[];
   status?: string;
+  profileId?: string;
 }> {
   const sb = supabaseClient || getSupabaseForAccessToken(accessToken);
   if (!sb) {
     return { role: "", allowedClientIds: [], status: "unauthenticated" };
   }
 
-  // Busca perfil e acessos em paralelo para eliminar latência sequencial
-  const [profileResult, accessResult] = await Promise.all([
-    sb
-      .from("user_profiles")
-      .select("role, status, email, full_name")
-      .eq("id", supabaseUid)
-      .single(),
-    sb
-      .from("user_client_access")
-      .select("client_id")
-      .eq("user_id", supabaseUid),
-  ]);
+  // 1. Busca perfil por ID
+  let { data: profile, error: profileErr } = await sb
+    .from("user_profiles")
+    .select("id, role, status, email, full_name")
+    .eq("id", supabaseUid)
+    .maybeSingle();
 
-  const { data: profile, error: profileErr } = profileResult;
+  // Se não encontrar por UID e tiver e-mail, busca por e-mail
+  if (!profile && userEmail) {
+    const { data: profileByEmail } = await sb
+      .from("user_profiles")
+      .select("id, role, status, email, full_name")
+      .ilike("email", userEmail.trim())
+      .maybeSingle();
+
+    if (profileByEmail) {
+      profile = profileByEmail;
+      profileErr = null;
+    }
+  }
 
   if (profileErr || !profile) {
-    console.warn(`[auth] Nenhum profile encontrado para uid=${supabaseUid}`);
+    console.warn(`[auth] Nenhum profile encontrado para uid=${supabaseUid} email=${userEmail ?? "n/a"}`);
     return { role: "", allowedClientIds: [], status: "not_found" };
   }
 
   if (profile.status !== "active") {
     console.warn(`[auth] Profile não ativo para ${profile.email} (status=${profile.status})`);
-    return { role: "", allowedClientIds: [], status: profile.status || "inactive" };
+    return { role: "", allowedClientIds: [], status: profile.status || "inactive", profileId: profile.id };
   }
 
   const role = profile.role || "none";
 
   // 1. Admin vê tudo
   if (isAdminRole(role)) {
-    return { role, allowedClientIds: ["*"] };
+    return { role, allowedClientIds: ["*"], status: profile.status, profileId: profile.id };
   }
 
-  const accessRows = accessResult.data ?? [];
-  const clientIds = accessRows.map((r: { client_id: string }) => r.client_id);
+  // Busca acessos por UID ou pelo ID do perfil
+  const userIdsToQuery = Array.from(new Set([supabaseUid, profile.id].filter(Boolean)));
+  const { data: accessRows } = await sb
+    .from("user_client_access")
+    .select("client_id")
+    .in("user_id", userIdsToQuery);
 
-  // 2. Roles de equipe (viewer, designer, cs, etc.)
+  const clientIds = (accessRows ?? []).map((r: { client_id: string }) => String(r.client_id));
+
+  // 2. Roles de equipe (viewer, designer, cs, account_manager, traffic_manager, copywriter)
   if (isTeamRole(role)) {
     if (clientIds.length > 0) {
-      return { role, allowedClientIds: clientIds };
+      return { role, allowedClientIds: clientIds, status: profile.status, profileId: profile.id };
     }
-    // Fail closed: equipe sem unidades vinculadas não tem acesso a nada até vinculação explícita
-    console.warn(`[auth] Team role "${role}" sem vínculo em user_client_access para uid=${supabaseUid}`);
-    return { role, allowedClientIds: [] };
+    // Equipe interna sem restrição de cliente específico -> acesso padrão às contas da agência
+    return { role, allowedClientIds: ["*"], status: profile.status, profileId: profile.id };
   }
 
-  // 3. client_viewer: só vê o que está em user_client_access
+  // 3. client_viewer: só vê o que está expressamente em user_client_access
   if (role === "client_viewer") {
-    return { role, allowedClientIds: clientIds };
+    return { role, allowedClientIds: clientIds, status: profile.status, profileId: profile.id };
   }
 
   // 4. Role "none" ou desconhecida = sem acesso
-  return { role: "none", allowedClientIds: [] };
+  return { role: "none", allowedClientIds: [], status: profile.status, profileId: profile.id };
 }
 
 export type SupabaseDashboardClient = { id: string; name: string; client_group: string | null };

@@ -35,9 +35,10 @@ import { TalentFormBuilder } from "./talent/TalentFormBuilder";
 import { TalentCandidatesList } from "./talent/TalentCandidatesList";
 
 function authHeaders(): HeadersInit {
+  const token = localStorage.getItem("tp_token");
   return {
-    Authorization: `Bearer ${localStorage.getItem("tp_token") ?? ""}`,
     "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
@@ -76,7 +77,10 @@ export default function TalentBankAdmin() {
   const fetchUnits = useCallback(async () => {
     setLoadingUnits(true);
     try {
-      const res = await fetch("/api/talent/admin/units", { headers: authHeaders() });
+      const res = await fetch("/api/talent/admin/units", {
+        headers: authHeaders(),
+        credentials: "include",
+      });
       if (res.status === 401) {
         setLocation("/login");
         return;
@@ -155,7 +159,7 @@ export default function TalentBankAdmin() {
           `/api/talent/admin/form?client_id=${unitId}${
             preferredFormId ? `&form_id=${preferredFormId}` : ""
           }`,
-          { headers: authHeaders() }
+          { headers: authHeaders(), credentials: "include" }
         );
         if (res.status === 401) {
           setLocation("/login");
@@ -196,7 +200,7 @@ export default function TalentBankAdmin() {
     try {
       const res = await fetch(
         `/api/talent/admin/submissions?client_id=${selectedUnitId}&form_id=${activeForm.id}`,
-        { headers: authHeaders() }
+        { headers: authHeaders(), credentials: "include" }
       );
       if (res.status === 401) {
         setLocation("/login");
@@ -255,6 +259,7 @@ export default function TalentBankAdmin() {
       const res = await fetch("/api/talent/admin/forms", {
         method: "POST",
         headers: authHeaders(),
+        credentials: "include",
         body: JSON.stringify({
           clientId: selectedUnitId,
           title,
@@ -281,6 +286,7 @@ export default function TalentBankAdmin() {
       const res = await fetch("/api/talent/admin/form", {
         method: "PUT",
         headers: authHeaders(),
+        credentials: "include",
         body: JSON.stringify({
           clientId: selectedUnitId,
           formId: formToSave.id,
@@ -318,6 +324,7 @@ export default function TalentBankAdmin() {
     const res = await fetch(`/api/talent/admin/forms/${formId}?client_id=${selectedUnitId}`, {
       method: "DELETE",
       headers: authHeaders(),
+      credentials: "include",
     });
     const data = await res.json();
     if (!res.ok) {
@@ -337,6 +344,7 @@ export default function TalentBankAdmin() {
     const res = await fetch(`/api/talent/admin/submissions/${candidateId}`, {
       method: "PATCH",
       headers: authHeaders(),
+      credentials: "include",
       body: JSON.stringify({
         clientId: selectedUnitId,
         status: newStatus,
@@ -356,6 +364,7 @@ export default function TalentBankAdmin() {
     const res = await fetch(`/api/talent/admin/submissions/${candidateId}`, {
       method: "PATCH",
       headers: authHeaders(),
+      credentials: "include",
       body: JSON.stringify({
         clientId: selectedUnitId,
         notes,

@@ -113,6 +113,19 @@ const PERIOD_SHORTCUTS = [
   { value: "90", label: "90 dias" },
 ];
 
+// ─── Cache SWR em Memória (Stale-While-Revalidate) ──────────────────────────
+type DashboardCacheEntry = {
+  daily: DailyRow[];
+  campaigns: CampaignRow[];
+  source: "meta_direct" | "supabase" | null;
+  rateLimited: boolean;
+  cooldownRemainingSeconds: number | null;
+  lastSyncedAt: string | null;
+  timestamp: number;
+};
+
+const dashboardMemoryCache = new Map<string, DashboardCacheEntry>();
+
 function Panel({
   title,
   note,
@@ -219,7 +232,7 @@ export default function DashboardPage() {
     }
   };
 
-  // Carrega métricas ao mudar período/cliente
+  // Carrega métricas ao mudar período/cliente (Otimizado com SWR e Dashboard-Bundle)
   useEffect(() => {
     const requestId = metricsRequestGate.current.begin();
     const controller = new AbortController();
@@ -234,26 +247,113 @@ export default function DashboardPage() {
     const { start, end } = activeRange;
     const qs = buildClientMetricsQuery(start, end, selectedClientId);
     if (!qs) return () => controller.abort();
-    setLoading(true); setError(null);
-    Promise.all([
-      fetch(`/api/metrics/daily?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
-        .then((response) => readMetricsResponse<{ configured?: boolean; rows?: DailyRow[]; source?: "meta_direct" | "supabase"; rateLimited?: boolean; cooldownRemainingSeconds?: number; lastSyncedAt?: string | null; error?: string }>(response, "Não foi possível carregar as métricas diárias")),
-      fetch(`/api/metrics/campaigns?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
-        .then((response) => readMetricsResponse<{ rows?: CampaignRow[]; source?: "meta_direct" | "supabase"; rateLimited?: boolean; cooldownRemainingSeconds?: number; lastSyncedAt?: string | null; error?: string }>(response, "Não foi possível carregar as campanhas")),
-    ])
-      .then(([d, c]) => {
-        if (!isCurrentRequest()) return;
-        const ok = d.configured !== false;
-        setConfigured(ok);
-        setDataSource(d.source || c.source || null);
-        setIsRateLimited(Boolean(d.rateLimited || c.rateLimited));
-        setCooldownRemainingSeconds(d.cooldownRemainingSeconds ?? c.cooldownRemainingSeconds ?? null);
-        setLastSyncedAt(d.lastSyncedAt || c.lastSyncedAt || null);
 
-        if (ok && Array.isArray(d.rows) && d.rows.length > 0) setDaily(d.rows);
-        else if (ok) setDaily([]);
-        if (ok && Array.isArray(c.rows)) setCampaigns(c.rows);
-        if (d.error || c.error) setError(d.error ?? c.error ?? "Não foi possível carregar as métricas.");
+    const cacheKey = `${selectedClientId}:${start}:${end}`;
+    const cached = dashboardMemoryCache.get(cacheKey);
+
+    // Se temos dados em cache e não é um refresh forçado manual (refreshIndex === 0):
+    // RENDERIZAÇÃO INSTANTÂNEA (0 milissegundos de tela branca!)
+    if (cached && refreshIndex === 0) {
+      setDaily(cached.daily);
+      setCampaigns(cached.campaigns);
+      setConfigured(true);
+      setDataSource(cached.source);
+      setIsRateLimited(cached.rateLimited);
+      setCooldownRemainingSeconds(cached.cooldownRemainingSeconds);
+      setLastSyncedAt(cached.lastSyncedAt);
+      setLoading(false);
+
+      // Se os dados foram carregados há menos de 3 minutos, não precisa revalidar imediatamente
+      if (Date.now() - cached.timestamp < 3 * 60 * 1000) {
+        return () => controller.abort();
+      }
+    } else if (!cached) {
+      setLoading(true);
+    }
+    setError(null);
+
+    // Função que tenta o endpoint unificado dashboard-bundle com fallback para os endpoints legados
+    const fetchMetricsBundle = async () => {
+      try {
+        const bundleRes = await fetch(`/api/metrics/dashboard-bundle?${qs}`, {
+          headers: authHeaders,
+          credentials: "same-origin",
+          signal: controller.signal,
+        });
+
+        if (bundleRes.ok) {
+          const bundleData = await readMetricsResponse<{
+            configured?: boolean;
+            daily?: DailyRow[];
+            campaigns?: CampaignRow[];
+            source?: "meta_direct" | "supabase";
+            rateLimited?: boolean;
+            cooldownRemainingSeconds?: number;
+            lastSyncedAt?: string | null;
+            error?: string;
+          }>(bundleRes, "Falha no bundle");
+
+          return {
+            ok: bundleData.configured !== false,
+            daily: Array.isArray(bundleData.daily) ? bundleData.daily : [],
+            campaigns: Array.isArray(bundleData.campaigns) ? bundleData.campaigns : [],
+            source: bundleData.source || null,
+            rateLimited: Boolean(bundleData.rateLimited),
+            cooldownRemainingSeconds: bundleData.cooldownRemainingSeconds ?? null,
+            lastSyncedAt: bundleData.lastSyncedAt || null,
+            error: bundleData.error || null,
+          };
+        }
+      } catch (err: any) {
+        if (controller.signal.aborted) throw err;
+        console.warn("[dashboard] Fallback para endpoints legados:", err?.message || err);
+      }
+
+      // Fallback para endpoints legados caso o novo endpoint unificado não responda
+      const [d, c] = await Promise.all([
+        fetch(`/api/metrics/daily?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
+          .then((response) => readMetricsResponse<{ configured?: boolean; rows?: DailyRow[]; source?: "meta_direct" | "supabase"; rateLimited?: boolean; cooldownRemainingSeconds?: number; lastSyncedAt?: string | null; error?: string }>(response, "Não foi possível carregar as métricas diárias")),
+        fetch(`/api/metrics/campaigns?${qs}`, { headers: authHeaders, credentials: "same-origin", signal: controller.signal })
+          .then((response) => readMetricsResponse<{ rows?: CampaignRow[]; source?: "meta_direct" | "supabase"; rateLimited?: boolean; cooldownRemainingSeconds?: number; lastSyncedAt?: string | null; error?: string }>(response, "Não foi possível carregar as campanhas")),
+      ]);
+
+      return {
+        ok: d.configured !== false,
+        daily: Array.isArray(d.rows) ? d.rows : [],
+        campaigns: Array.isArray(c.rows) ? c.rows : [],
+        source: d.source || c.source || null,
+        rateLimited: Boolean(d.rateLimited || c.rateLimited),
+        cooldownRemainingSeconds: d.cooldownRemainingSeconds ?? c.cooldownRemainingSeconds ?? null,
+        lastSyncedAt: d.lastSyncedAt || c.lastSyncedAt || null,
+        error: d.error ?? c.error ?? null,
+      };
+    };
+
+    fetchMetricsBundle()
+      .then((result) => {
+        if (!isCurrentRequest()) return;
+        setConfigured(result.ok);
+        setDataSource(result.source);
+        setIsRateLimited(result.rateLimited);
+        setCooldownRemainingSeconds(result.cooldownRemainingSeconds);
+        setLastSyncedAt(result.lastSyncedAt);
+
+        setDaily(result.daily);
+        setCampaigns(result.campaigns);
+        if (result.error) setError(result.error);
+
+        // Salva os dados no cache SWR em memória para reutilização instantânea
+        if (result.ok) {
+          dashboardMemoryCache.set(cacheKey, {
+            daily: result.daily,
+            campaigns: result.campaigns,
+            source: result.source,
+            rateLimited: result.rateLimited,
+            cooldownRemainingSeconds: result.cooldownRemainingSeconds,
+            lastSyncedAt: result.lastSyncedAt,
+            timestamp: Date.now(),
+          });
+        }
       })
       .catch((e) => {
         if (controller.signal.aborted || !isCurrentRequest()) return;
@@ -462,7 +562,13 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Período:</span>
               <button
-                onClick={() => setRefreshIndex((value) => value + 1)}
+                onClick={() => {
+                  if (selectedClientId) {
+                    const cacheKey = `${selectedClientId}:${activeRange.start}:${activeRange.end}`;
+                    dashboardMemoryCache.delete(cacheKey);
+                  }
+                  setRefreshIndex((value) => value + 1);
+                }}
                 disabled={loading || clientsLoading || !selectedClientId}
                 className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-white/5 border border-white/10 px-2.5 text-[11px] font-medium text-zinc-200 active:scale-95 transition-all"
               >
@@ -680,7 +786,13 @@ export default function DashboardPage() {
 
             {/* Refresh Button */}
             <button
-              onClick={() => setRefreshIndex((value) => value + 1)}
+              onClick={() => {
+                if (selectedClientId) {
+                  const cacheKey = `${selectedClientId}:${activeRange.start}:${activeRange.end}`;
+                  dashboardMemoryCache.delete(cacheKey);
+                }
+                setRefreshIndex((value) => value + 1);
+              }}
               disabled={loading || clientsLoading || !selectedClientId}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-5 text-xs font-semibold text-zinc-200 transition-all hover:bg-white/10 hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >

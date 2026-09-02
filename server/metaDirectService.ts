@@ -2,8 +2,8 @@ import "./env.js";
 import { resilientFetch } from "./resilientFetch.js";
 
 const GRAPH_API_BASE = "https://graph.facebook.com/v21.0";
-export const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos de cache em memória para métricas
-export const CLIENTS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutos para lista de clientes/contas
+export const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutos de cache em memória para métricas
+export const CLIENTS_CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutos para lista de clientes/contas
 export const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos de cooldown em rate limit
 
 export type MetaDashboardClient = {

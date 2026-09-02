@@ -27,7 +27,10 @@ type Feedback = {
 };
 
 function authHeaders(): HeadersInit {
-  return { Authorization: `Bearer ${localStorage.getItem("tp_token") ?? ""}` };
+  const token = localStorage.getItem("tp_token");
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 function useAdminGuard() {
@@ -75,7 +78,10 @@ export default function DashboardFeedbackLeadsList() {
       if (unit) params.set("unit", unit);
       if (weekStart) params.set("weekStart", weekStart);
       if (weekEnd) params.set("weekEnd", weekEnd);
-      const response = await fetch(`/api/feedback-leads${params.size ? `?${params}` : ""}`, { headers: authHeaders() });
+      const response = await fetch(`/api/feedback-leads${params.size ? `?${params}` : ""}`, {
+        headers: authHeaders(),
+        credentials: "include",
+      });
       if (response.status === 401) { setLocation("/login"); return; }
       if (response.status === 403) { toast.error("Esta aba é exclusiva para administradores."); setLocation("/dashboard"); return; }
       if (!response.ok) throw new Error("Falha ao carregar feedbacks");
@@ -89,7 +95,10 @@ export default function DashboardFeedbackLeadsList() {
   const exportAll = async () => {
     setExporting(true);
     try {
-      const response = await fetch("/api/feedback-leads/export", { headers: authHeaders() });
+      const response = await fetch("/api/feedback-leads/export", {
+        headers: authHeaders(),
+        credentials: "include",
+      });
       if (response.status === 401) { setLocation("/login"); return; }
       if (response.status === 403) { toast.error("A exportação é exclusiva para administradores."); setLocation("/dashboard"); return; }
       if (!response.ok) throw new Error("Falha ao exportar");

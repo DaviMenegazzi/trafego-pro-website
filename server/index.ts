@@ -4,6 +4,7 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import helmet from "helmet";
+import compression from "compression";
 import rateLimit from "express-rate-limit";
 
 // ─── Re-exports de Autenticação e Autorização ───────────────────────────────
@@ -94,6 +95,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   });
 
   app.use("/api/", apiGeneralRateLimiter);
+  app.use(compression());
   app.use(express.json({ limit: "10mb" }));
 
   // ─── Registro dos Roteadores de Domínio ─────────────────────────────────────

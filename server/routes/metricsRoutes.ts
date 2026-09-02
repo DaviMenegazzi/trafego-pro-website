@@ -372,6 +372,91 @@ metricsRouter.get("/metrics/campaigns", requireAuth, async (req, res) => {
   });
 });
 
+// ─── GET /api/metrics/dashboard-bundle ──────────────────────────────────────
+// Endpoint otimizado que retorna métricas diárias e de campanhas em uma única requisição
+metricsRouter.get("/metrics/dashboard-bundle", requireAuth, async (req, res) => {
+  const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+  if (clientId) recordClientAccess(clientId);
+
+  // 1. Caminho Meta Direct (se ativo e cliente especificado)
+  if (isMetaDirectActive() && clientId) {
+    const allowed = await checkUserHasMetaAccountAccess(req, clientId);
+    if (!allowed) {
+      res.status(403).json({ error: "Sem acesso a essa unidade" });
+      return;
+    }
+
+    try {
+      // Executa daily e campaigns em paralelo no servidor
+      const [dailyRows, campaignRows] = await Promise.all([
+        getMetaDirectDaily(clientId, start, end),
+        getMetaDirectCampaigns(clientId, start, end),
+      ]);
+
+      res.json({
+        configured: true,
+        daily: dailyRows,
+        campaigns: campaignRows,
+        source: "meta_direct",
+        rateLimited: false,
+        cooldownRemainingSeconds: 0,
+        lastSyncedAt: new Date().toISOString(),
+      });
+      return;
+    } catch (err: any) {
+      console.warn(
+        "[meta-direct] Falha ou rate limit no dashboard-bundle, usando fallback Supabase:",
+        err.message,
+      );
+    }
+  }
+
+  // 2. Fallback Supabase
+  const sb = getSupabaseForRequest(req);
+  if (!sb) {
+    res.status(401).json({ error: "Sessão Supabase expirada" });
+    return;
+  }
+
+  if (clientId && req.claims && !isAdmin(req.claims)) {
+    if (!req.claims.allowedClientIds.includes(clientId)) {
+      res.status(403).json({ error: "Sem acesso a essa unidade" });
+      return;
+    }
+  }
+
+  try {
+    const [dailyRes, campaignsRes] = await Promise.all([
+      sb.rpc("fn_daily_period_summary", {
+        p_client_id: clientId ?? null,
+        p_date_start: start ?? null,
+        p_date_stop: end ?? null,
+      }),
+      sb.rpc("fn_campaign_period_summary", {
+        p_client_id: clientId ?? null,
+        p_date_start: start ?? null,
+        p_date_stop: end ?? null,
+      }),
+    ]);
+
+    const dailyRows = dailyRes.data ?? [];
+    const campaignRows = campaignsRes.data ?? [];
+    const latestSynced = extractLatestSyncedAt(dailyRows) || extractLatestSyncedAt(campaignRows);
+
+    res.json({
+      configured: true,
+      daily: dailyRows,
+      campaigns: campaignRows,
+      source: "supabase",
+      rateLimited: isMetaDirectSuspended(),
+      cooldownRemainingSeconds: Math.round(getMetaDirectSuspensionRemainingMs() / 1000),
+      lastSyncedAt: latestSynced,
+    });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || "Erro ao consultar métricas" });
+  }
+});
+
 // ─── GET /api/metrics/offers ────────────────────────────────────────────────
 metricsRouter.get("/metrics/offers", requireAuth, async (req, res) => {
   const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };

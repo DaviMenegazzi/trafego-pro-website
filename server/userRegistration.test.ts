@@ -20,7 +20,7 @@ describe("User Registration and Admin Approval Policy", () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            single: async () => ({
+            maybeSingle: async () => ({
               data: {
                 id: "user-123",
                 email: "novo@empresa.com",
@@ -48,7 +48,7 @@ describe("User Registration and Admin Approval Policy", () => {
           return {
             select: () => ({
               eq: () => ({
-                single: async () => ({
+                maybeSingle: async () => ({
                   data: {
                     id: "user-456",
                     email: "aprovado@empresa.com",
@@ -65,7 +65,7 @@ describe("User Registration and Admin Approval Policy", () => {
         if (table === "user_client_access") {
           return {
             select: () => ({
-              eq: async () => ({
+              in: async () => ({
                 data: [{ client_id: "client-unit-1" }],
                 error: null,
               }),
@@ -79,7 +79,7 @@ describe("User Registration and Admin Approval Policy", () => {
     const access = await fetchUserAccess("user-456", "dummy-token", mockSupabaseActive);
     expect(access.role).toBe("viewer");
     expect(access.allowedClientIds).toEqual(["client-unit-1"]);
-    expect(access.status).toBeUndefined(); // Active does not return non-active status flag
+    expect(access.status).toBe("active");
   });
 
   it("retains only the declared role justification in a new registration profile", () => {

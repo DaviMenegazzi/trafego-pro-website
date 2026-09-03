@@ -901,9 +901,9 @@
 
 ## Recuperação após commit 81120c5
 
-- [ ] Identificar a dependência Firebase ausente e os arquivos que a utilizam
-- [ ] Instalar a dependência declarada e atualizar o lockfile
-- [ ] Validar o servidor e o build após a sincronização
+- [x] Identificar a dependência Firebase ausente e os arquivos que a utilizam
+- [x] Instalar a dependência declarada e atualizar o lockfile
+- [x] Validar o servidor e o build após a sincronização
 
 ## Correção do Firebase no Financeiro
 
@@ -932,6 +932,12 @@
 
 ## Resposta inesperada de métricas
 
-- [ ] Capturar parâmetros, status HTTP e corpo da resposta do endpoint de métricas
-- [ ] Corrigir a fonte ou normalização que devolve formato incompatível à dashboard
+- [x] Capturar parâmetros, status HTTP e corpo da resposta do endpoint de métricas
+- [x] Corrigir a fonte ou normalização que devolve formato incompatível à dashboard
 - [ ] Validar os filtros de período e unidade após restaurar as métricas
+
+## Unidades ausentes para administrador
+
+- [ ] Capturar as claims administrativas e a resposta de `/api/metrics/clients` após login
+- [ ] Corrigir a resolução de todas as unidades para perfil admin
+- [ ] Validar seleção de unidade e métricas com sessão administrativa real

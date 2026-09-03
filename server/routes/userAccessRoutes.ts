@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getSupabaseForRequest, requireAdmin, requireAuth } from "../auth.js";
-import { getAuthedSupabase, getSupabase } from "../supabase.js";
+import { getAuthedSupabase, getSupabase, getSupabaseForAccessToken } from "../supabase.js";
 import { groupClientAccessByUser } from "../clientAccess.js";
 import { notifyUserApproved, notifyUserRejected } from "../lib/notifications.js";
 import { normalizeManagedUserStatus } from "../userAccessPolicy.js";
@@ -216,6 +216,10 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
     if (error) {
       console.error("[user-access-put] Erro ao atualizar perfil:", error.message);
       res.status(502).json({ error: error.message });
+      return;
+    }
+    if (!data) {
+      res.status(502).json({ error: "O perfil não foi retornado após a atualização" });
       return;
     }
     res.json({

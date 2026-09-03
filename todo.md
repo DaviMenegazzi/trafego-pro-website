@@ -929,3 +929,9 @@
 - [ ] Reproduzir a exclusão e capturar o evento da interface e a requisição HTTP
 - [ ] Corrigir o disparo, a autorização ou a atualização visual da exclusão
 - [ ] Validar a exclusão administrativa com retorno de sucesso ou erro observável
+
+## Resposta inesperada de métricas
+
+- [ ] Capturar parâmetros, status HTTP e corpo da resposta do endpoint de métricas
+- [ ] Corrigir a fonte ou normalização que devolve formato incompatível à dashboard
+- [ ] Validar os filtros de período e unidade após restaurar as métricas

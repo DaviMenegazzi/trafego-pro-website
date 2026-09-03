@@ -152,6 +152,7 @@ metricsRouter.get("/metrics/status", requireAuth, (_req, res) => {
 
 // ─── GET /api/metrics/clients ───────────────────────────────────────────────
 metricsRouter.get("/metrics/clients", requireAuth, async (req, res) => {
+  try {
   const isFullAdmin = req.claims && (isAdminRole(req.claims.role) || req.claims.allowedClientIds.includes("*"));
 
   if (isMetaDirectActive()) {
@@ -212,6 +213,11 @@ metricsRouter.get("/metrics/clients", requireAuth, async (req, res) => {
     rateLimited: isMetaDirectSuspended(),
     cooldownRemainingSeconds: Math.round(getMetaDirectSuspensionRemainingMs() / 1000),
   });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "Falha inesperada ao carregar unidades";
+    console.error("[metrics/clients] Falha ao carregar unidades:", message);
+    res.status(502).json({ error: message, clients: [] });
+  }
 });
 
 // ─── GET /api/metrics/daily ─────────────────────────────────────────────────
@@ -875,4 +881,3 @@ metricsRouter.get("/metrics/image-proxy", async (req, res) => {
     res.status(500).send("Erro interno ao carregar imagem");
   }
 });
-

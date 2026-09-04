@@ -55,29 +55,83 @@ export function WeeklyCreativeExportModal({
   const [downloading, setDownloading] = useState(false);
   const [copyingImage, setCopyingImage] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
-  const [viewAllAds, setViewAllAds] = useState(true); // Default: mostrar TODOS os anúncios ativos
+  // Default: Criativos Únicos agrupados
+  const [viewAllAds, setViewAllAds] = useState(false);
 
-  // Filtra anúncios com imagem válida
+  // Filtra e consolida anúncios com imagem válida
   const activeCreatives = useMemo(() => {
     const valid = creatives.filter((c) => Boolean(c.ad_image_url));
     if (viewAllAds) {
       return valid;
     }
-    // Caso o usuário queira agrupar por imagem única
-    const seen = new Set<string>();
-    const unique: CreativeExportItem[] = [];
+
+    // Agrupa criativos únicos por imagem canônica e agrega métricas
+    const groupMap = new Map<string, {
+      item: CreativeExportItem;
+      totalConversas: number;
+      totalSpend: number;
+      totalImpressions: number;
+      count: number;
+    }>();
+
     for (const c of valid) {
-      const key = c.ad_image_url || String(c.id);
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(c);
+      let key = c.ad_image_url || String(c.id);
+      try {
+        if (c.ad_image_url && c.ad_image_url.startsWith("http")) {
+          const u = new URL(c.ad_image_url);
+          key = u.origin + u.pathname;
+        }
+      } catch {
+        key = c.ad_image_url?.split("?")[0] || String(c.id);
+      }
+
+      const convs = Number(c.total_conversas_iniciadas || 0);
+      const spend = Number(c.total_spend || 0);
+      const imps = Number(c.total_impressions || 0);
+
+      const existing = groupMap.get(key);
+      if (existing) {
+        existing.totalConversas += convs;
+        existing.totalSpend += spend;
+        existing.totalImpressions += imps;
+        existing.count += 1;
+        if (!existing.item.ad_name && c.ad_name) {
+          existing.item.ad_name = c.ad_name;
+        }
+      } else {
+        groupMap.set(key, {
+          item: { ...c },
+          totalConversas: convs,
+          totalSpend: spend,
+          totalImpressions: imps,
+          count: 1,
+        });
       }
     }
+
+    const unique: CreativeExportItem[] = Array.from(groupMap.values()).map((g, idx) => {
+      const cpl = g.totalConversas > 0 ? g.totalSpend / g.totalConversas : null;
+      return {
+        ...g.item,
+        id: g.item.id || `unique_${idx}`,
+        total_conversas_iniciadas: g.totalConversas,
+        total_spend: g.totalSpend,
+        custo_por_conversa: cpl,
+        total_impressions: g.totalImpressions,
+      };
+    });
+
+    unique.sort((a, b) => {
+      const convA = Number(a.total_conversas_iniciadas || 0);
+      const convB = Number(b.total_conversas_iniciadas || 0);
+      if (convB !== convA) return convB - convA;
+      return Number(b.total_spend || 0) - Number(a.total_spend || 0);
+    });
+
     return unique;
   }, [creatives, viewAllAds]);
 
   if (!isOpen) return null;
-
 
   const brl = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -85,34 +139,46 @@ export function WeeklyCreativeExportModal({
   const n = (v: number) =>
     new Intl.NumberFormat("pt-BR").format(Math.round(v));
 
+  // Placeholder SVG transparente para que falhas de imagens externas não abortem a renderização
+  const FALLBACK_TRANSPARENT_IMAGE =
+    "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2318181b'/%3E%3C/svg%3E";
+
+  const getExportOptions = (node: HTMLElement) => {
+    const rect = node.getBoundingClientRect();
+    const targetWidth = Math.round(rect.width) || 860;
+    const targetHeight = node.scrollHeight;
+    const scale = 2; // Resolução Retina 2x
+
+    return {
+      width: targetWidth,
+      height: targetHeight,
+      pixelRatio: scale,
+      cacheBust: false,
+      includeQueryParams: true,
+      skipFonts: true,
+      imagePlaceholder: FALLBACK_TRANSPARENT_IMAGE,
+      quality: 0.98,
+      backgroundColor: "#09090b",
+      style: {
+        width: `${targetWidth}px`,
+        minWidth: `${targetWidth}px`,
+        maxWidth: `${targetWidth}px`,
+        height: `${targetHeight}px`,
+        maxHeight: "none",
+        overflow: "hidden",
+        transform: "none",
+        margin: "0",
+      },
+    };
+  };
+
   // Geração de imagem PNG Ultra HD via html-to-image com alinhamento e largura exata
   const generatePngBlob = async (): Promise<Blob | null> => {
-    if (!cardRef.current) return null;
+    if (!cardRef.current || activeCreatives.length === 0) return null;
     try {
       const node = cardRef.current;
-      const rect = node.getBoundingClientRect();
-      const targetWidth = Math.round(rect.width) || 860;
-      const targetHeight = node.scrollHeight;
-      const scale = 2; // Resolução Retina 2x
-
-      const blob = await toBlob(node, {
-        width: targetWidth,
-        height: targetHeight,
-        pixelRatio: scale,
-        cacheBust: true,
-        quality: 0.98,
-        backgroundColor: "#09090b",
-        style: {
-          width: `${targetWidth}px`,
-          minWidth: `${targetWidth}px`,
-          maxWidth: `${targetWidth}px`,
-          height: `${targetHeight}px`,
-          maxHeight: "none",
-          overflow: "hidden",
-          transform: "none",
-          margin: "0",
-        },
-      });
+      const options = getExportOptions(node);
+      const blob = await toBlob(node, options);
       return blob;
     } catch (err: any) {
       console.error("[export-card] Falha ao renderizar card:", err);
@@ -122,33 +188,12 @@ export function WeeklyCreativeExportModal({
   };
 
   const handleDownload = async () => {
+    if (!cardRef.current || activeCreatives.length === 0) return;
     setDownloading(true);
     try {
-      if (!cardRef.current) return;
       const node = cardRef.current;
-      const rect = node.getBoundingClientRect();
-      const targetWidth = Math.round(rect.width) || 860;
-      const targetHeight = node.scrollHeight;
-      const scale = 2;
-
-      const dataUrl = await toPng(node, {
-        width: targetWidth,
-        height: targetHeight,
-        pixelRatio: scale,
-        cacheBust: true,
-        quality: 0.98,
-        backgroundColor: "#09090b",
-        style: {
-          width: `${targetWidth}px`,
-          minWidth: `${targetWidth}px`,
-          maxWidth: `${targetWidth}px`,
-          height: `${targetHeight}px`,
-          maxHeight: "none",
-          overflow: "hidden",
-          transform: "none",
-          margin: "0",
-        },
-      });
+      const options = getExportOptions(node);
+      const dataUrl = await toPng(node, options);
       
       const safeUnit = unitName.toLowerCase().replace(/[^a-z0-9]/g, "-");
       const filename = `trafego-pro-criativos-${safeUnit}-${new Date().toISOString().slice(0, 10)}.png`;
@@ -159,7 +204,8 @@ export function WeeklyCreativeExportModal({
       link.click();
       
       toast.success("Imagem Ultra HD baixada com sucesso!");
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[export-card] Falha ao baixar PNG:", err);
       toast.error("Não foi possível baixar a imagem.");
     } finally {
       setDownloading(false);
@@ -269,11 +315,15 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
             <button
               type="button"
               onClick={() => setViewAllAds((v) => !v)}
-              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-zinc-200 transition-all flex items-center gap-1.5"
-              title="Alternar entre exibir cada anúncio ativo individualmente ou agrupar criativos únicos"
+              className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all flex items-center gap-1.5 ${
+                !viewAllAds
+                  ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
+                  : "bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10"
+              }`}
+              title="Alternar entre Criativos Únicos agrupados ou Todos os Anúncios Ativos"
             >
               <Layers className="size-3 text-emerald-400" />
-              <span>{viewAllAds ? "Todos os Anúncios Ativos" : "Criativos Únicos"}</span>
+              <span>{!viewAllAds ? "Criativos Únicos" : "Todos os Anúncios Ativos"}</span>
             </button>
           </div>
 

@@ -95,7 +95,9 @@ export function DashboardMetricsExportModal({
         width: targetWidth,
         height: targetHeight,
         pixelRatio: scale,
-        cacheBust: true,
+        cacheBust: false,
+        includeQueryParams: true,
+        skipFonts: true,
         quality: 0.98,
         backgroundColor: "#09090b",
         style: {
@@ -131,7 +133,9 @@ export function DashboardMetricsExportModal({
         width: targetWidth,
         height: targetHeight,
         pixelRatio: scale,
-        cacheBust: true,
+        cacheBust: false,
+        includeQueryParams: true,
+        skipFonts: true,
         quality: 0.98,
         backgroundColor: "#09090b",
         style: {

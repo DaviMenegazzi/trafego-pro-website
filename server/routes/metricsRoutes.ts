@@ -874,34 +874,48 @@ metricsRouter.post("/metrics/backup-daily", requireAuth, requireAdmin, async (_r
 // ─── GET /api/metrics/image-proxy ───────────────────────────────────────────
 // Proxy seguro para imagens de criativos (permite renderização de canvas em HD sem erro de CORS)
 metricsRouter.get("/metrics/image-proxy", async (req, res) => {
+  // Always set CORS headers so client fetch / html-to-image never triggers CORS violations
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "*");
+
+  const TRANSPARENT_1PX_PNG = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAAElFTkSuQmCC",
+    "base64"
+  );
+
   try {
     const rawUrl = req.query.url;
     if (typeof rawUrl !== "string" || !rawUrl.startsWith("http")) {
-      res.status(400).send("URL de imagem inválida");
+      res.setHeader("Content-Type", "image/png");
+      res.status(200).send(TRANSPARENT_1PX_PNG);
       return;
     }
 
     const response = await fetch(rawUrl, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
       },
     });
 
     if (!response.ok) {
-      res.status(response.status).send("Falha ao buscar imagem da origem");
+      console.warn(`[image-proxy] Imagem externa indisponível (${response.status}):`, rawUrl);
+      res.setHeader("Content-Type", "image/png");
+      res.status(200).send(TRANSPARENT_1PX_PNG);
       return;
     }
 
     const contentType = response.headers.get("content-type") || "image/jpeg";
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24h
-    res.setHeader("Access-Control-Allow-Origin", "*");
 
     const buffer = Buffer.from(await response.arrayBuffer());
     res.send(buffer);
   } catch (error: any) {
-    console.error("[image-proxy] Erro ao carregar imagem:", error.message);
-    res.status(500).send("Erro interno ao carregar imagem");
+    console.warn("[image-proxy] Erro ao carregar imagem externa:", error?.message || error);
+    res.setHeader("Content-Type", "image/png");
+    res.status(200).send(TRANSPARENT_1PX_PNG);
   }
 });

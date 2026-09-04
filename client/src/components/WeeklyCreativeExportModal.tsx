@@ -14,6 +14,7 @@ import {
   Layers
 } from "lucide-react";
 import { toast } from "sonner";
+import { canSeeAdminFeedbacks } from "./adminNavigationPolicy";
 
 export type CreativeExportItem = {
   id: string | number;
@@ -57,6 +58,17 @@ export function WeeklyCreativeExportModal({
   const [copiedText, setCopiedText] = useState(false);
   // Default: Criativos Únicos agrupados
   const [viewAllAds, setViewAllAds] = useState(false);
+
+  const isAdmin = useMemo(() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+      return canSeeAdminFeedbacks(storedUser);
+    } catch {
+      return false;
+    }
+  }, []);
+
+  if (!isOpen || !isAdmin) return null;
 
   // Filtra e consolida anúncios com imagem válida
   const activeCreatives = useMemo(() => {

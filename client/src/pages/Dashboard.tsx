@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/AppLayout";
 import { DashboardMetricsExportModal } from "@/components/DashboardMetricsExportModal";
 import { DashboardState } from "@/components/DashboardState";
+import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
 import { DeepAnalyticsAccordion } from "@/components/DeepAnalyticsAccordion";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useClientContext } from "@/contexts/ClientContext";
@@ -209,7 +210,7 @@ export default function DashboardPage() {
   const isAdmin = useMemo(() => {
     try {
       const storedUser = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
-      return storedUser?.role === "admin" || storedUser?.allowedClientIds?.includes("*");
+      return canSeeAdminFeedbacks(storedUser);
     } catch {
       return false;
     }
@@ -427,9 +428,13 @@ export default function DashboardPage() {
   const responseRate = calculateResponseRate(kpi.respondidas, kpi.connections);
 
   const hasMetrics = daily.length > 0 || campaigns.length > 0;
-  const canExport = Boolean(selectedClientId);
+  const canExport = Boolean(isAdmin && selectedClientId);
 
   const exportMetricsForActiveUnit = () => {
+    if (!isAdmin) {
+      toast.error("Ação restrita a administradores.");
+      return;
+    }
     if (!selectedClientId) return;
     if (!daily.length && !campaigns.length) {
       toast.error("Não há métricas disponíveis para exportar neste período.");
@@ -1330,29 +1335,31 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <DashboardMetricsExportModal
-        isOpen={printModalOpen}
-        onClose={() => setPrintModalOpen(false)}
-        unitName={selectedClient?.name ?? "Unidade"}
-        periodLabel={periodLabel}
-        kpis={{
-          spend: kpi.spend,
-          conv: kpi.conv,
-          custoConversa: kpi.custoConversa,
-          primeiras: kpi.primeiras,
-          respondidas: kpi.respondidas,
-          connections: kpi.connections,
-          leads: kpi.leads,
-          impressions: kpi.impressions,
-          clicks: kpi.clicks,
-          ctr: kpi.ctr,
-          cpc: kpi.cpc,
-          cpm: kpi.cpm,
-          frequency: kpi.frequency,
-          responseRate,
-        }}
-        campaigns={campaigns}
-      />
+      {isAdmin && (
+        <DashboardMetricsExportModal
+          isOpen={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          unitName={selectedClient?.name ?? "Unidade"}
+          periodLabel={periodLabel}
+          kpis={{
+            spend: kpi.spend,
+            conv: kpi.conv,
+            custoConversa: kpi.custoConversa,
+            primeiras: kpi.primeiras,
+            respondidas: kpi.respondidas,
+            connections: kpi.connections,
+            leads: kpi.leads,
+            impressions: kpi.impressions,
+            clicks: kpi.clicks,
+            ctr: kpi.ctr,
+            cpc: kpi.cpc,
+            cpm: kpi.cpm,
+            frequency: kpi.frequency,
+            responseRate,
+          }}
+          campaigns={campaigns}
+        />
+      )}
     </AppLayout>
   );
 }

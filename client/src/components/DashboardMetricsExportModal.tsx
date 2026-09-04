@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { toBlob, toPng } from "html-to-image";
+import { canSeeAdminFeedbacks } from "./adminNavigationPolicy";
 import { 
   Download, 
   Copy, 
@@ -70,7 +71,16 @@ export function DashboardMetricsExportModal({
   const [copyingImage, setCopyingImage] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
 
-  if (!isOpen) return null;
+  const isAdmin = useMemo(() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+      return canSeeAdminFeedbacks(storedUser);
+    } catch {
+      return false;
+    }
+  }, []);
+
+  if (!isOpen || !isAdmin) return null;
 
   const brl = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);

@@ -86,6 +86,8 @@ function App() {
           <Toaster />
           <Switch>
             <Route path={"/"} component={TrafegoProHome} />
+            <Route path={"/pixel"} component={EvolutionAdmin} />
+            <Route path={"/pixel/"} component={EvolutionAdmin} />
             <Route path={"/evolution"} component={EvolutionAdmin} />
             <Route path={"/evolution/"} component={EvolutionAdmin} />
             <Route path={"/publicacoes"} component={SocialPublishingAdmin} />

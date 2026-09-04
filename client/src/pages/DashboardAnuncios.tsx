@@ -1213,7 +1213,7 @@ export default function DashboardAnunciosPage() {
       )}
 
       {/* Weekly Creative Export Modal (Admin Only) */}
-      {isAdmin && (
+      {isAdmin && exportModalOpen && (
         <WeeklyCreativeExportModal
           isOpen={exportModalOpen}
           onClose={() => setExportModalOpen(false)}

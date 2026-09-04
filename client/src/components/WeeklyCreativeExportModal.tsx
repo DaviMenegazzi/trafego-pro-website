@@ -68,8 +68,6 @@ export function WeeklyCreativeExportModal({
     }
   }, []);
 
-  if (!isOpen || !isAdmin) return null;
-
   // Filtra e consolida anúncios com imagem válida
   const activeCreatives = useMemo(() => {
     const valid = creatives.filter((c) => Boolean(c.ad_image_url));
@@ -143,7 +141,7 @@ export function WeeklyCreativeExportModal({
     return unique;
   }, [creatives, viewAllAds]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !isAdmin) return null;
 
   const brl = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);

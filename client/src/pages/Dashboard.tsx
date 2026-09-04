@@ -1335,7 +1335,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {isAdmin && (
+      {isAdmin && printModalOpen && (
         <DashboardMetricsExportModal
           isOpen={printModalOpen}
           onClose={() => setPrintModalOpen(false)}

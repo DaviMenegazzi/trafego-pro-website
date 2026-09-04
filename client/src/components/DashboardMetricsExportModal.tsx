@@ -81,29 +81,32 @@ export function DashboardMetricsExportModal({
   const pct = (v: number) =>
     `${(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
-  // Geração de imagem PNG Ultra HD via html-to-image com altura total sem corte
+  // Geração de imagem PNG Ultra HD via html-to-image com alinhamento e largura exata
   const generatePngBlob = async (): Promise<Blob | null> => {
     if (!cardRef.current) return null;
     try {
       const node = cardRef.current;
-      const fullHeight = node.scrollHeight;
-      const fullWidth = node.scrollWidth;
-      const scale = 2.5; // Resolução Retina 2.5x
+      const rect = node.getBoundingClientRect();
+      const targetWidth = Math.round(rect.width) || 880;
+      const targetHeight = node.scrollHeight;
+      const scale = 2; // Resolução Retina 2x
 
       const blob = await toBlob(node, {
-        width: fullWidth,
-        height: fullHeight,
-        canvasWidth: fullWidth * scale,
-        canvasHeight: fullHeight * scale,
+        width: targetWidth,
+        height: targetHeight,
         pixelRatio: scale,
         cacheBust: true,
         quality: 0.98,
         backgroundColor: "#09090b",
         style: {
-          height: `${fullHeight}px`,
+          width: `${targetWidth}px`,
+          minWidth: `${targetWidth}px`,
+          maxWidth: `${targetWidth}px`,
+          height: `${targetHeight}px`,
           maxHeight: "none",
-          overflow: "visible",
+          overflow: "hidden",
           transform: "none",
+          margin: "0",
         },
       });
       return blob;
@@ -119,24 +122,27 @@ export function DashboardMetricsExportModal({
     try {
       if (!cardRef.current) return;
       const node = cardRef.current;
-      const fullHeight = node.scrollHeight;
-      const fullWidth = node.scrollWidth;
-      const scale = 2.5;
+      const rect = node.getBoundingClientRect();
+      const targetWidth = Math.round(rect.width) || 880;
+      const targetHeight = node.scrollHeight;
+      const scale = 2;
 
       const dataUrl = await toPng(node, {
-        width: fullWidth,
-        height: fullHeight,
-        canvasWidth: fullWidth * scale,
-        canvasHeight: fullHeight * scale,
+        width: targetWidth,
+        height: targetHeight,
         pixelRatio: scale,
         cacheBust: true,
         quality: 0.98,
         backgroundColor: "#09090b",
         style: {
-          height: `${fullHeight}px`,
+          width: `${targetWidth}px`,
+          minWidth: `${targetWidth}px`,
+          maxWidth: `${targetWidth}px`,
+          height: `${targetHeight}px`,
           maxHeight: "none",
-          overflow: "visible",
+          overflow: "hidden",
           transform: "none",
+          margin: "0",
         },
       });
       
@@ -184,9 +190,14 @@ export function DashboardMetricsExportModal({
   const handleCopyWhatsappText = () => {
     const cpl = kpis.custoConversa > 0 ? brl(kpis.custoConversa) : "—";
     
-    // Top campanhas por conversas
+    // Top campanhas com gasto por conversas
     const topCampaigns = [...campaigns]
-      .sort((a, b) => Number(b.total_conversas_iniciadas || 0) - Number(a.total_conversas_iniciadas || 0))
+      .filter((c) => Number(c.total_spend || 0) > 0)
+      .sort(
+        (a, b) =>
+          Number(b.total_conversas_iniciadas || 0) - Number(a.total_conversas_iniciadas || 0) ||
+          Number(b.total_spend || 0) - Number(a.total_spend || 0)
+      )
       .slice(0, 5);
 
     const campaignsText = topCampaigns.length > 0
@@ -196,7 +207,7 @@ export function DashboardMetricsExportModal({
           const spend = Number(c.total_spend || 0);
           return `${i + 1}. *${c.campaign_name}*: ${convs} conv. (${cost > 0 ? brl(cost) : "—"}/conv.) · Investido: ${brl(spend)}`;
         }).join("\n")
-      : "_Nenhuma campanha com dados no período._";
+      : "_Nenhuma campanha com investimento no período._";
 
     const text = `*📊 RELATÓRIO EXECUTIVO DE PERFORMANCE — TRÁFEGO PRO*
 🏢 *Unidade:* ${unitName}
@@ -228,7 +239,12 @@ _Relatório de performance gerado pela Tráfego Pro._`;
   };
 
   const sortedCampaigns = [...campaigns]
-    .sort((a, b) => Number(b.total_conversas_iniciadas || 0) - Number(a.total_conversas_iniciadas || 0));
+    .filter((c) => Number(c.total_spend || 0) > 0)
+    .sort(
+      (a, b) =>
+        Number(b.total_conversas_iniciadas || 0) - Number(a.total_conversas_iniciadas || 0) ||
+        Number(b.total_spend || 0) - Number(a.total_spend || 0)
+    );
 
   return (
     <div 
@@ -317,12 +333,12 @@ _Relatório de performance gerado pela Tráfego Pro._`;
           {/* ─── CARD EXECUTIVO QUE SERÁ CAPTURADO COMO IMAGEM ──────────────── */}
           <div
             ref={cardRef}
-            className="w-full max-w-[880px] rounded-3xl border border-white/15 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 p-6 sm:p-8 shadow-2xl text-white space-y-6 relative overflow-hidden"
+            className="w-full max-w-[880px] rounded-3xl border border-white/15 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 p-6 sm:p-8 shadow-2xl text-white space-y-6 relative overflow-hidden box-border"
             style={{ fontFamily: "Montserrat, Inter, sans-serif" }}
           >
             {/* Background Glow Emitters */}
-            <div className="absolute -top-24 -right-24 size-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 size-72 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
+            <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 size-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 translate-y-12 -translate-x-12 size-72 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
 
             {/* Header do Card com Logo Oficial */}
             <div className="flex items-center justify-between border-b border-white/10 pb-5 relative z-10 gap-4">
@@ -443,7 +459,7 @@ _Relatório de performance gerado pela Tráfego Pro._`;
               </div>
             </div>
 
-            {/* Tabela Executiva de Campanhas */}
+            {/* Tabela Executiva de Campanhas (Sem Status) */}
             <div className="space-y-3 relative z-10">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
@@ -457,7 +473,7 @@ _Relatório de performance gerado pela Tráfego Pro._`;
 
               {sortedCampaigns.length === 0 ? (
                 <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-xs text-zinc-500">
-                  Nenhuma campanha registrada para esta unidade no período selecionado.
+                  Nenhuma campanha com investimento registrada no período selecionado.
                 </div>
               ) : (
                 <div className="rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden">
@@ -469,8 +485,7 @@ _Relatório de performance gerado pela Tráfego Pro._`;
                         <th className="py-3 px-3 text-center">Custo/Conv.</th>
                         <th className="py-3 px-3 text-center">Investimento</th>
                         <th className="py-3 px-3 text-center">Cliques</th>
-                        <th className="py-3 px-3 text-center">CTR</th>
-                        <th className="py-3 px-3 text-right">Status</th>
+                        <th className="py-3 px-4 text-right">CTR</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -481,17 +496,9 @@ _Relatório de performance gerado pela Tráfego Pro._`;
                         const clicks = Number(camp.total_clicks || 0);
                         const ctr = Number(camp.avg_ctr || 0);
 
-                        const isGood = cost > 0 && cost <= 8;
-                        const isWarning = cost > 8 && cost <= 15;
-                        const statusBadge = isGood
-                          ? { label: "Positivo", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" }
-                          : isWarning
-                          ? { label: "Atenção", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" }
-                          : { label: "Alerta", cls: "bg-rose-500/15 text-rose-400 border-rose-500/30" };
-
                         return (
                           <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="py-3 px-4 font-medium text-white max-w-[220px] truncate" title={camp.campaign_name}>
+                            <td className="py-3 px-4 font-medium text-white max-w-[260px] truncate" title={camp.campaign_name}>
                               {camp.campaign_name}
                             </td>
                             <td className="py-3 px-3 text-center font-bold text-emerald-400 font-mono">
@@ -500,19 +507,14 @@ _Relatório de performance gerado pela Tráfego Pro._`;
                             <td className="py-3 px-3 text-center font-mono text-zinc-200">
                               {cost > 0 ? brl(cost) : "—"}
                             </td>
-                            <td className="py-3 px-3 text-center font-mono text-amber-300/90">
+                            <td className="py-3 px-3 text-center font-mono text-amber-300 font-bold">
                               {brl(spend)}
                             </td>
                             <td className="py-3 px-3 text-center font-mono text-zinc-300">
                               {n(clicks)}
                             </td>
-                            <td className="py-3 px-3 text-center font-mono text-zinc-300">
+                            <td className="py-3 px-4 text-right font-mono text-emerald-400 font-bold">
                               {pct(ctr)}
-                            </td>
-                            <td className="py-3 px-3 text-right">
-                              <span className={`inline-block px-2 py-0.5 rounded-full border text-[9px] uppercase font-bold tracking-wider ${statusBadge.cls}`}>
-                                {statusBadge.label}
-                              </span>
                             </td>
                           </tr>
                         );

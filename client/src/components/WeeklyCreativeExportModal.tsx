@@ -85,29 +85,32 @@ export function WeeklyCreativeExportModal({
   const n = (v: number) =>
     new Intl.NumberFormat("pt-BR").format(Math.round(v));
 
-  // Geração de imagem PNG Ultra HD via html-to-image com altura total sem corte
+  // Geração de imagem PNG Ultra HD via html-to-image com alinhamento e largura exata
   const generatePngBlob = async (): Promise<Blob | null> => {
     if (!cardRef.current) return null;
     try {
       const node = cardRef.current;
-      const fullHeight = node.scrollHeight;
-      const fullWidth = node.scrollWidth;
-      const scale = 2.5; // Resolução Retina 2.5x
+      const rect = node.getBoundingClientRect();
+      const targetWidth = Math.round(rect.width) || 860;
+      const targetHeight = node.scrollHeight;
+      const scale = 2; // Resolução Retina 2x
 
       const blob = await toBlob(node, {
-        width: fullWidth,
-        height: fullHeight,
-        canvasWidth: fullWidth * scale,
-        canvasHeight: fullHeight * scale,
+        width: targetWidth,
+        height: targetHeight,
         pixelRatio: scale,
         cacheBust: true,
         quality: 0.98,
         backgroundColor: "#09090b",
         style: {
-          height: `${fullHeight}px`,
+          width: `${targetWidth}px`,
+          minWidth: `${targetWidth}px`,
+          maxWidth: `${targetWidth}px`,
+          height: `${targetHeight}px`,
           maxHeight: "none",
-          overflow: "visible",
+          overflow: "hidden",
           transform: "none",
+          margin: "0",
         },
       });
       return blob;
@@ -123,24 +126,27 @@ export function WeeklyCreativeExportModal({
     try {
       if (!cardRef.current) return;
       const node = cardRef.current;
-      const fullHeight = node.scrollHeight;
-      const fullWidth = node.scrollWidth;
-      const scale = 2.5;
+      const rect = node.getBoundingClientRect();
+      const targetWidth = Math.round(rect.width) || 860;
+      const targetHeight = node.scrollHeight;
+      const scale = 2;
 
       const dataUrl = await toPng(node, {
-        width: fullWidth,
-        height: fullHeight,
-        canvasWidth: fullWidth * scale,
-        canvasHeight: fullHeight * scale,
+        width: targetWidth,
+        height: targetHeight,
         pixelRatio: scale,
         cacheBust: true,
         quality: 0.98,
         backgroundColor: "#09090b",
         style: {
-          height: `${fullHeight}px`,
+          width: `${targetWidth}px`,
+          minWidth: `${targetWidth}px`,
+          maxWidth: `${targetWidth}px`,
+          height: `${targetHeight}px`,
           maxHeight: "none",
-          overflow: "visible",
+          overflow: "hidden",
           transform: "none",
+          margin: "0",
         },
       });
       
@@ -309,12 +315,12 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
           {/* ─── CARD EXECUTIVO QUE SERÁ CAPTURADO COMO IMAGEM ──────────────── */}
           <div
             ref={cardRef}
-            className="w-full max-w-[860px] rounded-3xl border border-white/15 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 p-6 sm:p-8 shadow-2xl text-white space-y-6 relative overflow-hidden"
+            className="w-full max-w-[860px] rounded-3xl border border-white/15 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 p-6 sm:p-8 shadow-2xl text-white space-y-6 relative overflow-hidden box-border"
             style={{ fontFamily: "Montserrat, Inter, sans-serif" }}
           >
             {/* Background Glow Emitters */}
-            <div className="absolute -top-24 -right-24 size-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 size-72 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
+            <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 size-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 translate-y-12 -translate-x-12 size-72 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
 
             {/* Header do Card com Logo Oficial */}
             <div className="flex items-center justify-between border-b border-white/10 pb-5 relative z-10 gap-4">

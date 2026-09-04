@@ -984,6 +984,11 @@
 - [x] Corrigir a fonte ou normalização que devolve formato incompatível à dashboard
 - [ ] Validar os filtros de período e unidade após restaurar as métricas
 
+## Sincronização e publicação mais recente
+
+- [ ] Sincronizar a cópia de trabalho com o commit remoto mais recente
+- [ ] Validar a aplicação atualizada e publicar a revisão sincronizada
+
 ## Unidades ausentes para administrador
 
 - [ ] Capturar as claims administrativas e a resposta de `/api/metrics/clients` após login

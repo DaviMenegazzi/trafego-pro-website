@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef } from "react";
 import { toBlob, toPng } from "html-to-image";
 import { 
   Download, 
@@ -11,79 +11,75 @@ import {
   MessageSquare, 
   DollarSign, 
   Eye, 
-  Layers
+  Target,
+  Activity,
+  Layers,
+  MousePointerClick
 } from "lucide-react";
 import { toast } from "sonner";
 
-export type CreativeExportItem = {
-  id: string | number;
-  ad_name?: string | null;
-  offer_name?: string | null;
-
-  ad_image_url?: string | null;
-  total_conversas_iniciadas?: number | string | null;
-  total_spend?: number | string | null;
-  custo_por_conversa?: number | string | null;
-  total_impressions?: number | string | null;
-  total_leads_meta?: number | string | null;
+export type CampaignExportItem = {
+  campaign_name: string;
+  total_spend: number | null;
+  total_conversas_iniciadas: number | null;
+  custo_por_conversa: number | null;
+  total_leads_meta: number | null;
+  total_impressions: number | null;
+  total_clicks: number | null;
+  avg_ctr: number | null;
+  avg_cpc: number | null;
+  avg_cpm: number | null;
 };
 
-interface WeeklyCreativeExportModalProps {
+export type DashboardKpis = {
+  spend: number;
+  conv: number;
+  custoConversa: number;
+  primeiras: number;
+  respondidas: number;
+  connections: number;
+  leads: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  cpm: number;
+  frequency: number;
+  responseRate: number;
+};
+
+interface DashboardMetricsExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   unitName: string;
   periodLabel: string;
-  creatives: CreativeExportItem[];
-  kpis: {
-    totalLeads: number;
-    totalConversas: number;
-    totalSpend: number;
-    totalImpressions: number;
-    custoPorConversa: number;
-  };
+  kpis: DashboardKpis;
+  campaigns: CampaignExportItem[];
 }
 
-export function WeeklyCreativeExportModal({
+export function DashboardMetricsExportModal({
   isOpen,
   onClose,
   unitName,
   periodLabel,
-  creatives,
   kpis,
-}: WeeklyCreativeExportModalProps) {
+  campaigns,
+}: DashboardMetricsExportModalProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [copyingImage, setCopyingImage] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
-  const [viewAllAds, setViewAllAds] = useState(true); // Default: mostrar TODOS os anúncios ativos
-
-  // Filtra anúncios com imagem válida
-  const activeCreatives = useMemo(() => {
-    const valid = creatives.filter((c) => Boolean(c.ad_image_url));
-    if (viewAllAds) {
-      return valid;
-    }
-    // Caso o usuário queira agrupar por imagem única
-    const seen = new Set<string>();
-    const unique: CreativeExportItem[] = [];
-    for (const c of valid) {
-      const key = c.ad_image_url || String(c.id);
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(c);
-      }
-    }
-    return unique;
-  }, [creatives, viewAllAds]);
 
   if (!isOpen) return null;
-
 
   const brl = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 
   const n = (v: number) =>
     new Intl.NumberFormat("pt-BR").format(Math.round(v));
+
+  const pct = (v: number) =>
+    `${(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
   // Geração de imagem PNG Ultra HD via html-to-image com altura total sem corte
   const generatePngBlob = async (): Promise<Blob | null> => {
@@ -112,7 +108,7 @@ export function WeeklyCreativeExportModal({
       });
       return blob;
     } catch (err: any) {
-      console.error("[export-card] Falha ao renderizar card:", err);
+      console.error("[export-metrics-card] Falha ao renderizar card:", err);
       toast.error("Erro ao gerar imagem em alta resolução.");
       return null;
     }
@@ -145,7 +141,7 @@ export function WeeklyCreativeExportModal({
       });
       
       const safeUnit = unitName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-      const filename = `trafego-pro-criativos-${safeUnit}-${new Date().toISOString().slice(0, 10)}.png`;
+      const filename = `trafego-pro-metricas-${safeUnit}-${new Date().toISOString().slice(0, 10)}.png`;
       
       const link = document.createElement("a");
       link.download = filename;
@@ -154,12 +150,12 @@ export function WeeklyCreativeExportModal({
       
       toast.success("Imagem Ultra HD baixada com sucesso!");
     } catch (err) {
+      console.error(err);
       toast.error("Não foi possível baixar a imagem.");
     } finally {
       setDownloading(false);
     }
   };
-
 
   const handleCopyImage = async () => {
     setCopyingImage(true);
@@ -186,30 +182,53 @@ export function WeeklyCreativeExportModal({
   };
 
   const handleCopyWhatsappText = () => {
-    const totalConvs = kpis.totalConversas || kpis.totalLeads;
-    const cpl = kpis.custoPorConversa > 0 ? brl(kpis.custoPorConversa) : "—";
-    const impressions = n(kpis.totalImpressions);
+    const cpl = kpis.custoConversa > 0 ? brl(kpis.custoConversa) : "—";
+    
+    // Top campanhas por conversas
+    const topCampaigns = [...campaigns]
+      .sort((a, b) => Number(b.total_conversas_iniciadas || 0) - Number(a.total_conversas_iniciadas || 0))
+      .slice(0, 5);
 
-    const text = `*📊 ACOMPANHAMENTO DE CRIATIVOS E RESULTADOS — TRÁFEGO PRO*
+    const campaignsText = topCampaigns.length > 0
+      ? topCampaigns.map((c, i) => {
+          const convs = Number(c.total_conversas_iniciadas || 0);
+          const cost = Number(c.custo_por_conversa || 0);
+          const spend = Number(c.total_spend || 0);
+          return `${i + 1}. *${c.campaign_name}*: ${convs} conv. (${cost > 0 ? brl(cost) : "—"}/conv.) · Investido: ${brl(spend)}`;
+        }).join("\n")
+      : "_Nenhuma campanha com dados no período._";
+
+    const text = `*📊 RELATÓRIO EXECUTIVO DE PERFORMANCE — TRÁFEGO PRO*
 🏢 *Unidade:* ${unitName}
 📅 *Período:* ${periodLabel}
 
-*🚀 Resumo de Performance:*
-💬 *Leads / Conversas no WhatsApp:* ${totalConvs}
-🎯 *Custo por Lead (CPL):* ${cpl}
-👁️ *Visualizações / Impressões:* ${impressions}
-🖼️ *Criativos Ativos em Veiculação:* ${activeCreatives.length}
+*🚀 Principais Indicadores:*
+💰 *Total Investido:* ${brl(kpis.spend)}
+💬 *Conversas no WhatsApp:* ${n(kpis.conv)}
+🎯 *Custo por Conversa:* ${cpl}
+⚡ *Taxa de Resposta:* ${pct(kpis.responseRate)}
+👥 *Conexões de Mensagens:* ${n(kpis.connections)}
+👁️ *Visualizações / Impressões:* ${n(kpis.impressions)}
+🖱️ *Cliques no Link:* ${n(kpis.clicks)}
+📈 *CTR Médio:* ${pct(kpis.ctr)}
+🏷️ *CPC Médio:* ${brl(kpis.cpc)}
+
+*🏆 Desempenho das Campanhas:*
+${campaignsText}
 
 🔗 *Acompanhe os resultados completos na Dashboard:*
 👉 https://www.trafego.pro/dashboard
 
-_Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida ou ajuste, estamos à disposição!_`;
+_Relatório de performance gerado pela Tráfego Pro._`;
 
     navigator.clipboard.writeText(text);
     setCopiedText(true);
     toast.success("Texto formatado copiado com sucesso!");
     setTimeout(() => setCopiedText(false), 2500);
   };
+
+  const sortedCampaigns = [...campaigns]
+    .sort((a, b) => Number(b.total_conversas_iniciadas || 0) - Number(a.total_conversas_iniciadas || 0));
 
   return (
     <div 
@@ -228,13 +247,13 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
             </div>
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                Exportar Card Executivo de Criativos
+                Exportar Relatório Executivo de Métricas
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                   Ultra HD
                 </span>
               </h2>
               <p className="text-xs text-zinc-400">
-                Gere um card visual de alta qualidade para enviar nos grupos do WhatsApp.
+                Gere um print oficial de alta qualidade da dashboard para compartilhar no WhatsApp.
               </p>
             </div>
           </div>
@@ -259,18 +278,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
             <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
               {periodLabel}
             </span>
-            <span className="text-zinc-500">·</span>
-            <button
-              type="button"
-              onClick={() => setViewAllAds((v) => !v)}
-              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-zinc-200 transition-all flex items-center gap-1.5"
-              title="Alternar entre exibir cada anúncio ativo individualmente ou agrupar criativos únicos"
-            >
-              <Layers className="size-3 text-emerald-400" />
-              <span>{viewAllAds ? "Todos os Anúncios Ativos" : "Criativos Únicos"}</span>
-            </button>
           </div>
-
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -285,7 +293,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
             <button
               type="button"
               onClick={handleCopyImage}
-              disabled={copyingImage || activeCreatives.length === 0}
+              disabled={copyingImage}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900 text-xs font-semibold text-zinc-200 hover:text-white hover:border-white/20 transition-all disabled:opacity-50"
             >
               <Copy className="size-3.5 text-cyan-400" />
@@ -295,7 +303,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
             <button
               type="button"
               onClick={handleDownload}
-              disabled={downloading || activeCreatives.length === 0}
+              disabled={downloading}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 text-zinc-950 text-xs font-bold hover:bg-emerald-400 transition-all shadow-md shadow-emerald-950/40 disabled:opacity-50"
             >
               <Download className="size-3.5" />
@@ -309,7 +317,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
           {/* ─── CARD EXECUTIVO QUE SERÁ CAPTURADO COMO IMAGEM ──────────────── */}
           <div
             ref={cardRef}
-            className="w-full max-w-[860px] rounded-3xl border border-white/15 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 p-6 sm:p-8 shadow-2xl text-white space-y-6 relative overflow-hidden"
+            className="w-full max-w-[880px] rounded-3xl border border-white/15 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 p-6 sm:p-8 shadow-2xl text-white space-y-6 relative overflow-hidden"
             style={{ fontFamily: "Montserrat, Inter, sans-serif" }}
           >
             {/* Background Glow Emitters */}
@@ -321,7 +329,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
               <div className="space-y-1.5">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
                   <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>ACOMPANHAMENTO DE CRIATIVOS</span>
+                  <span>RELATÓRIO EXECUTIVO DE PERFORMANCE</span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
                   <span>{unitName}</span>
@@ -345,97 +353,177 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
               </div>
             </div>
 
-
-            {/* Grid de KPIs Resumidos (Sem exibição de Investimento) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative z-10">
-              <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4 backdrop-blur-sm">
+            {/* Grid Primário de KPIs Executivos */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
+              <div className="rounded-2xl border border-white/10 bg-zinc-900/70 p-4 backdrop-blur-sm">
                 <div className="flex items-center justify-between text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
-                  <span>Leads WhatsApp</span>
+                  <span>Total Investido</span>
+                  <DollarSign className="size-4 text-amber-400" />
+                </div>
+                <div className="mt-2 text-2xl font-bold font-display text-amber-400">
+                  {brl(kpis.spend)}
+                </div>
+                <p className="mt-1 text-[10px] text-zinc-400 font-light">Verba Meta Ads</p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-zinc-900/70 p-4 backdrop-blur-sm">
+                <div className="flex items-center justify-between text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
+                  <span>Conversas WhatsApp</span>
                   <MessageSquare className="size-4 text-emerald-400" />
                 </div>
                 <div className="mt-2 text-2xl font-bold font-display text-emerald-400">
-                  {n(kpis.totalConversas || kpis.totalLeads)}
+                  {n(kpis.conv)}
                 </div>
+                <p className="mt-1 text-[10px] text-zinc-400 font-light">Inícios de mensagem</p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-zinc-900/70 p-4 backdrop-blur-sm">
                 <div className="flex items-center justify-between text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
-                  <span>Custo p/ Lead</span>
-                  <TrendingUp className="size-4 text-cyan-400" />
+                  <span>Custo / Conversa</span>
+                  <Target className="size-4 text-cyan-400" />
                 </div>
                 <div className="mt-2 text-2xl font-bold font-display text-cyan-300">
-                  {kpis.custoPorConversa > 0 ? brl(kpis.custoPorConversa) : "—"}
+                  {kpis.custoConversa > 0 ? brl(kpis.custoConversa) : "—"}
+                </div>
+                <p className="mt-1 text-[10px] text-zinc-400 font-light">Investimento ÷ conv.</p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-zinc-900/70 p-4 backdrop-blur-sm">
+                <div className="flex items-center justify-between text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
+                  <span>Taxa de Resposta</span>
+                  <Activity className="size-4 text-purple-400" />
+                </div>
+                <div className="mt-2 text-2xl font-bold font-display text-purple-300">
+                  {pct(kpis.responseRate)}
+                </div>
+                <p className="mt-1 text-[10px] text-zinc-400 font-light">Eficiência comercial</p>
+              </div>
+            </div>
+
+            {/* Grid Secundário de KPIs de Alcance e Engajamento */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
+              <div className="rounded-2xl border border-white/5 bg-zinc-950/60 p-3.5">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium flex items-center justify-between">
+                  <span>Visualizações (Impressões)</span>
+                  <Eye className="size-3.5 text-zinc-400" />
+                </div>
+                <div className="mt-1.5 text-lg font-bold font-display text-zinc-100">
+                  {n(kpis.impressions)}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4 backdrop-blur-sm">
-                <div className="flex items-center justify-between text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
-                  <span>Visualizações</span>
-                  <Eye className="size-4 text-purple-400" />
+              <div className="rounded-2xl border border-white/5 bg-zinc-950/60 p-3.5">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium flex items-center justify-between">
+                  <span>Cliques no Link</span>
+                  <MousePointerClick className="size-3.5 text-zinc-400" />
                 </div>
-                <div className="mt-2 text-2xl font-bold font-display text-zinc-200">
-                  {n(kpis.totalImpressions)}
+                <div className="mt-1.5 text-lg font-bold font-display text-zinc-100">
+                  {n(kpis.clicks)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/5 bg-zinc-950/60 p-3.5">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium flex items-center justify-between">
+                  <span>CTR Médio (Taxa de Clique)</span>
+                  <TrendingUp className="size-3.5 text-emerald-400" />
+                </div>
+                <div className="mt-1.5 text-lg font-bold font-display text-emerald-400">
+                  {pct(kpis.ctr)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/5 bg-zinc-950/60 p-3.5">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium flex items-center justify-between">
+                  <span>CPC Médio (Custo p/ Clique)</span>
+                  <DollarSign className="size-3.5 text-amber-400" />
+                </div>
+                <div className="mt-1.5 text-lg font-bold font-display text-amber-300">
+                  {kpis.cpc > 0 ? brl(kpis.cpc) : "—"}
                 </div>
               </div>
             </div>
 
-            {/* Galeria de TODOS os Criativos Ativos em Alta Resolução */}
+            {/* Tabela Executiva de Campanhas */}
             <div className="space-y-3 relative z-10">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
                   <Layers className="size-3.5 text-emerald-400" />
-                  <span>Criativos Ativos em Veiculação ({activeCreatives.length})</span>
+                  <span>Desempenho por Campanha ({sortedCampaigns.length})</span>
                 </h3>
                 <span className="text-[11px] text-zinc-400 font-light">
-                  Métricas individuais do período
+                  Resultados consolidados do período
                 </span>
               </div>
 
-              {activeCreatives.length === 0 ? (
+              {sortedCampaigns.length === 0 ? (
                 <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-xs text-zinc-500">
-                  Nenhum criativo ativo com imagem para o período selecionado.
+                  Nenhuma campanha registrada para esta unidade no período selecionado.
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                  {activeCreatives.map((cr, idx) => {
-                    const convs = Number(cr.total_conversas_iniciadas || 0);
-                    const displayName = cr.ad_name || cr.offer_name || `Criativo ${idx + 1}`;
-                    const proxiedImage = cr.ad_image_url
-                      ? `/api/metrics/image-proxy?url=${encodeURIComponent(cr.ad_image_url)}`
-                      : "";
+                <div className="rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-white/[0.03] text-zinc-400 text-[10px] uppercase tracking-wider font-semibold">
+                        <th className="py-3 px-4">Campanha</th>
+                        <th className="py-3 px-3 text-center">Conversas</th>
+                        <th className="py-3 px-3 text-center">Custo/Conv.</th>
+                        <th className="py-3 px-3 text-center">Investimento</th>
+                        <th className="py-3 px-3 text-center">Cliques</th>
+                        <th className="py-3 px-3 text-center">CTR</th>
+                        <th className="py-3 px-3 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {sortedCampaigns.slice(0, 10).map((camp, idx) => {
+                        const convs = Number(camp.total_conversas_iniciadas || 0);
+                        const cost = Number(camp.custo_por_conversa || 0);
+                        const spend = Number(camp.total_spend || 0);
+                        const clicks = Number(camp.total_clicks || 0);
+                        const ctr = Number(camp.avg_ctr || 0);
 
-                    return (
-                      <div
-                        key={cr.id || idx}
-                        className="group aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-zinc-950 relative shadow-md flex flex-col justify-end"
-                      >
-                        {proxiedImage ? (
-                          <img
-                            src={proxiedImage}
-                            alt={displayName}
-                            crossOrigin="anonymous"
-                            className="absolute inset-0 w-full h-full object-contain p-1 bg-zinc-950"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 grid place-items-center bg-zinc-900 text-[10px] text-zinc-500">
-                            Sem imagem
-                          </div>
-                        )}
+                        const isGood = cost > 0 && cost <= 8;
+                        const isWarning = cost > 8 && cost <= 15;
+                        const statusBadge = isGood
+                          ? { label: "Positivo", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" }
+                          : isWarning
+                          ? { label: "Atenção", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" }
+                          : { label: "Alerta", cls: "bg-rose-500/15 text-rose-400 border-rose-500/30" };
 
-                        <div className="relative z-10 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-2 pt-6">
-                          <p className="text-[10px] font-medium text-zinc-200 truncate leading-tight">
-                            {displayName}
-                          </p>
-                          <div className="flex items-center justify-between mt-1 text-[9px] font-mono">
-                            <span className="text-emerald-400 font-bold">{convs} conv.</span>
-                            {cr.custo_por_conversa != null && Number(cr.custo_por_conversa) > 0 ? (
-                              <span className="text-zinc-400">{brl(Number(cr.custo_por_conversa))}</span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        return (
+                          <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="py-3 px-4 font-medium text-white max-w-[220px] truncate" title={camp.campaign_name}>
+                              {camp.campaign_name}
+                            </td>
+                            <td className="py-3 px-3 text-center font-bold text-emerald-400 font-mono">
+                              {convs}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono text-zinc-200">
+                              {cost > 0 ? brl(cost) : "—"}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono text-amber-300/90">
+                              {brl(spend)}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono text-zinc-300">
+                              {n(clicks)}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono text-zinc-300">
+                              {pct(ctr)}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <span className={`inline-block px-2 py-0.5 rounded-full border text-[9px] uppercase font-bold tracking-wider ${statusBadge.cls}`}>
+                                {statusBadge.label}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {sortedCampaigns.length > 10 && (
+                    <div className="py-2.5 px-4 text-center border-t border-white/5 bg-white/[0.01] text-[10px] text-zinc-500">
+                      Exibindo as 10 principais campanhas de {sortedCampaigns.length} no período.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -458,6 +546,3 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
     </div>
   );
 }
-
-
-

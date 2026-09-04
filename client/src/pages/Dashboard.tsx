@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/AppLayout";
+import { DashboardMetricsExportModal } from "@/components/DashboardMetricsExportModal";
 import { DashboardState } from "@/components/DashboardState";
 import { DeepAnalyticsAccordion } from "@/components/DeepAnalyticsAccordion";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -33,6 +34,7 @@ import {
   Clock,
   AlertTriangle,
   Download,
+  Sparkles,
 } from "lucide-react";
 
 // ─── Paleta de destaque dos gráficos ─────────────────────────────────────────
@@ -184,6 +186,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
   const { clients: clientOpts, selectedClientId, selectedClient, setSelectedClientId, loading: clientsLoading, refetch: refetchClients } = useClientContext();
   const metricsRequestGate = useRef(createRequestGate());
 
@@ -423,6 +426,7 @@ export default function DashboardPage() {
 
   const responseRate = calculateResponseRate(kpi.respondidas, kpi.connections);
 
+  const hasMetrics = daily.length > 0 || campaigns.length > 0;
   const canExport = Boolean(selectedClientId);
 
   const exportMetricsForActiveUnit = () => {
@@ -549,7 +553,6 @@ export default function DashboardPage() {
   })), [daily]);
 
   const notSynced = configured === false;
-  const hasMetrics = daily.length > 0 || campaigns.length > 0;
   const dashboardState = clientsLoading || loading
     ? { title: "Atualizando indicadores", description: "Estamos consultando as métricas mais recentes no Supabase.", loading: true }
     : !selectedClientId
@@ -747,6 +750,18 @@ export default function DashboardPage() {
                 <RefreshCw className={`size-3 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
                 <span>Atualizar</span>
               </button>
+              {canExport && (
+                <button
+                  type="button"
+                  onClick={() => setPrintModalOpen(true)}
+                  disabled={loading || !hasMetrics}
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-200 transition-all active:scale-95 hover:bg-zinc-800 disabled:opacity-50"
+                  title="Gerar print executivo para WhatsApp"
+                >
+                  <Sparkles className="size-3.5 text-emerald-400" />
+                  <span>Print</span>
+                </button>
+              )}
               {canExport && (
                 <button
                   type="button"
@@ -980,9 +995,21 @@ export default function DashboardPage() {
               {canExport && (
                 <button
                   type="button"
+                  onClick={() => setPrintModalOpen(true)}
+                  disabled={loading || !hasMetrics}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 text-xs font-bold text-emerald-300 transition-all hover:bg-emerald-500 hover:text-zinc-950 shadow-md shadow-emerald-950/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Gerar print executivo em alta resolução para enviar no WhatsApp"
+                >
+                  <Sparkles className="size-3.5 text-emerald-400" />
+                  <span>Gerar Print (WhatsApp)</span>
+                </button>
+              )}
+              {canExport && (
+                <button
+                  type="button"
                   onClick={exportMetricsForActiveUnit}
                   disabled={loading || !hasMetrics}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 text-xs font-semibold text-emerald-300 transition-all hover:bg-emerald-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-zinc-900/80 px-4 text-xs font-semibold text-zinc-300 transition-all hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                   title="Exportar métricas da unidade em Excel (XLSX)"
                 >
                   <Download className="size-3.5" />
@@ -1302,6 +1329,30 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      <DashboardMetricsExportModal
+        isOpen={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        unitName={selectedClient?.name ?? "Unidade"}
+        periodLabel={periodLabel}
+        kpis={{
+          spend: kpi.spend,
+          conv: kpi.conv,
+          custoConversa: kpi.custoConversa,
+          primeiras: kpi.primeiras,
+          respondidas: kpi.respondidas,
+          connections: kpi.connections,
+          leads: kpi.leads,
+          impressions: kpi.impressions,
+          clicks: kpi.clicks,
+          ctr: kpi.ctr,
+          cpc: kpi.cpc,
+          cpm: kpi.cpm,
+          frequency: kpi.frequency,
+          responseRate,
+        }}
+        campaigns={campaigns}
+      />
     </AppLayout>
   );
 }

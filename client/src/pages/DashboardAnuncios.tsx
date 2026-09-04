@@ -168,9 +168,9 @@ function MetricTile({ label, value, accent }: { label: string; value: string; ac
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start gap-2">
+    <div className="flex items-start gap-2 min-w-0">
       <span className="text-zinc-500 w-32 shrink-0 text-xs font-light">{label}</span>
-      <span className="text-zinc-200 truncate font-medium text-xs" title={value}>{value}</span>
+      <span className="text-zinc-200 truncate font-medium text-xs min-w-0 flex-1" title={value}>{value}</span>
     </div>
   );
 }
@@ -441,7 +441,7 @@ export default function DashboardAnunciosPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-[1540px] space-y-4 sm:space-y-6 p-3.5 sm:p-6 lg:p-10">
+      <div className="mx-auto max-w-[1540px] space-y-4 sm:space-y-6 p-3.5 sm:p-6 lg:p-10 min-w-0 max-w-full overflow-x-clip">
         
         {/* Top Header */}
         <div className="flex flex-col gap-4 border-b border-white/10 pb-4 sm:pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -531,7 +531,7 @@ export default function DashboardAnunciosPage() {
         )}
 
         {/* Filter Control Deck */}
-        <section className="rounded-3xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-black/30">
+        <section className="rounded-3xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-black/30 min-w-0 max-w-full">
           <div className="flex flex-wrap items-center gap-3">
             
             {/* Search Input */}
@@ -558,7 +558,7 @@ export default function DashboardAnunciosPage() {
                   <ChevronDown className="size-3.5 text-zinc-500" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl z-50">
+              <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl z-[100]">
                 <div className="border-b border-white/10 px-5 py-4">
                   <p className="font-display text-base font-bold">Período de análise</p>
                   <p className="mt-1 text-xs leading-5 text-zinc-400">Selecione um intervalo pré-definido ou datas personalizadas.</p>
@@ -618,15 +618,14 @@ export default function DashboardAnunciosPage() {
                 <button
                   type="button"
                   aria-label="Selecionar unidade das métricas"
-                  disabled={!unitMenu.canOpen}
-                  className="inline-flex min-h-11 items-center gap-2.5 rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-2 text-left text-xs font-medium text-zinc-200 transition-all hover:border-white/20 hover:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center gap-2.5 rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-2 text-left text-xs font-medium text-zinc-200 transition-all hover:border-white/20 hover:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
                   <Building2 className="size-4 text-emerald-400" />
                   <span className="max-w-52 truncate">{unitMenu.label}</span>
                   <ChevronDown className="size-3.5 text-zinc-500" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl z-50">
+              <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-zinc-950/95 p-0 text-white shadow-2xl backdrop-blur-2xl z-[100]">
                 <div className="border-b border-white/10 px-5 py-4">
                   <p className="font-display text-base font-bold">Unidades disponíveis</p>
                   <p className="mt-1 text-xs leading-5 text-zinc-400">Selecione a unidade para filtrar os anúncios.</p>
@@ -690,7 +689,7 @@ export default function DashboardAnunciosPage() {
                   <ChevronDown className="size-3 text-zinc-500" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-56 rounded-3xl border border-white/10 bg-zinc-950/95 p-2 text-white shadow-2xl backdrop-blur-2xl z-50">
+              <PopoverContent align="start" className="w-56 rounded-3xl border border-white/10 bg-zinc-950/95 p-2 text-white shadow-2xl backdrop-blur-2xl z-[100]">
                 {(["todas", "ativas", "pausadas"] as StatusFilter[]).map((s) => (
                   <button
                     key={s}
@@ -721,7 +720,7 @@ export default function DashboardAnunciosPage() {
                   <ChevronDown className="size-3 text-zinc-500" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-56 rounded-3xl border border-white/10 bg-zinc-950/95 p-2 text-white shadow-2xl backdrop-blur-2xl z-50">
+              <PopoverContent align="start" className="w-56 rounded-3xl border border-white/10 bg-zinc-950/95 p-2 text-white shadow-2xl backdrop-blur-2xl z-[100]">
                 {PERF_OPTIONS.map((p) => (
                   <button
                     key={p}
@@ -752,7 +751,7 @@ export default function DashboardAnunciosPage() {
                   <ChevronDown className="size-3 text-zinc-500" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-60 rounded-3xl border border-white/10 bg-zinc-950/95 p-2 text-white shadow-2xl backdrop-blur-2xl z-50">
+              <PopoverContent align="start" className="w-60 rounded-3xl border border-white/10 bg-zinc-950/95 p-2 text-white shadow-2xl backdrop-blur-2xl z-[100]">
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -854,7 +853,7 @@ export default function DashboardAnunciosPage() {
 
         {/* ─── Creative Grid mode ─────────────────────────────────────────────── */}
         {viewMode === "creative-grid" && (
-          <section className="space-y-4">
+          <section className="space-y-4 min-w-0 max-w-full">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -929,10 +928,10 @@ export default function DashboardAnunciosPage() {
 
             {/* Split view */}
             {!loading && !error && (
-              <section className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-6">
+              <section className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-6 min-w-0 max-w-full">
                 
                 {/* Left: list */}
-                <div className="rounded-3xl border border-white/10 bg-zinc-900/50 backdrop-blur-xl overflow-hidden flex flex-col shadow-xl shadow-black/30">
+                <div className="rounded-3xl border border-white/10 bg-zinc-900/50 backdrop-blur-xl overflow-hidden flex flex-col shadow-xl shadow-black/30 min-w-0">
                   <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between gap-3 bg-white/[0.015]">
                     <div className="flex items-center gap-2 min-w-0">
                       <h2 className="font-display text-sm font-bold text-white">Lista de Anúncios</h2>
@@ -995,7 +994,7 @@ export default function DashboardAnunciosPage() {
                 </div>
 
                 {/* Right: preview */}
-                <div className="rounded-3xl border border-white/10 bg-zinc-900/50 backdrop-blur-xl overflow-hidden flex flex-col shadow-xl shadow-black/30">
+                <div className="rounded-3xl border border-white/10 bg-zinc-900/50 backdrop-blur-xl overflow-hidden flex flex-col shadow-xl shadow-black/30 min-w-0">
                   <div className="px-5 py-4 border-b border-white/10 bg-white/[0.015]">
                     <h2 className="font-display text-sm font-bold text-white flex items-center gap-2">
                       <Sparkles className="size-4 text-emerald-400" />

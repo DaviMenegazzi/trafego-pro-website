@@ -89,8 +89,68 @@ export function subscribeToFinancialDB(
   return unsubscribe;
 }
 
+// Helper para escrita REST garantida e sem travamentos de WebSocket
+async function restPut(path: string, data: any): Promise<void> {
+  const url = `${firebaseConfig.databaseURL}/${path}.json`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`Firebase REST write failed with status ${res.status}`);
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function restDelete(path: string): Promise<void> {
+  const url = `${firebaseConfig.databaseURL}/${path}.json`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(url, {
+      method: "DELETE",
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`Firebase REST delete failed with status ${res.status}`);
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function fetchEntireFinancialState(): Promise<DatabaseState | null> {
+  try {
+    const res = await fetch(`${firebaseConfig.databaseURL}/trafegopro.json`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const val = await res.json();
+    if (!val) return null;
+    return {
+      clientes: val.clientes || {},
+      cobrancas: val.cobrancas || {},
+      checklists: val.checklists || {},
+      arquivados: val.arquivados || {},
+      despesas: val.despesas || {},
+      atas: val.atas || {},
+      caixa: val.caixa || { saldo: 0, metaFimAno: 0 },
+      despFixas: val.despFixas || {},
+      logs: val.logs || [],
+    };
+  } catch (err) {
+    console.warn("fetchEntireFinancialState error:", err);
+    return null;
+  }
+}
+
 export async function saveEntireFinancialState(state: Partial<DatabaseState>): Promise<void> {
-  await set(ref(db, "trafegopro"), {
+  await restPut("trafegopro", {
     clientes: state.clientes || {},
     cobrancas: state.cobrancas || {},
     checklists: state.checklists || {},
@@ -103,17 +163,19 @@ export async function saveEntireFinancialState(state: Partial<DatabaseState>): P
 }
 
 export async function saveCliente(cliente: Cliente): Promise<void> {
-  await set(ref(db, `trafegopro/clientes/${cliente.id}`), cliente);
+  await restPut(`trafegopro/clientes/${cliente.id}`, cliente);
 }
 
 export async function deleteClienteAndArchive(
   cid: string,
   archiveData: ClienteArquivado
 ): Promise<void> {
-  await set(ref(db, `trafegopro/arquivados/${cid}`), archiveData);
-  await remove(ref(db, `trafegopro/clientes/${cid}`));
-  await remove(ref(db, `trafegopro/cobrancas/${cid}`));
-  await remove(ref(db, `trafegopro/checklists/${cid}`));
+  await restPut(`trafegopro/arquivados/${cid}`, archiveData);
+  await Promise.allSettled([
+    restDelete(`trafegopro/clientes/${cid}`),
+    restDelete(`trafegopro/cobrancas/${cid}`),
+    restDelete(`trafegopro/checklists/${cid}`),
+  ]);
 }
 
 export async function saveCobranca(
@@ -121,7 +183,7 @@ export async function saveCobranca(
   mesKey: string,
   cobranca: Cobranca
 ): Promise<void> {
-  await set(ref(db, `trafegopro/cobrancas/${cid}/${mesKey}`), cobranca);
+  await restPut(`trafegopro/cobrancas/${cid}/${mesKey}`, cobranca);
 }
 
 export async function saveChecklistItem(
@@ -129,37 +191,37 @@ export async function saveChecklistItem(
   itemId: string,
   state: ChecklistItemState
 ): Promise<void> {
-  await set(ref(db, `trafegopro/checklists/${cid}/${itemId}`), state);
+  await restPut(`trafegopro/checklists/${cid}/${itemId}`, state);
 }
 
 export async function deleteChecklistItem(cid: string, itemId: string): Promise<void> {
-  await remove(ref(db, `trafegopro/checklists/${cid}/${itemId}`));
+  await restDelete(`trafegopro/checklists/${cid}/${itemId}`);
 }
 
 export async function saveDespesa(despesa: Despesa): Promise<void> {
-  await set(ref(db, `trafegopro/despesas/${despesa.id}`), despesa);
+  await restPut(`trafegopro/despesas/${despesa.id}`, despesa);
 }
 
 export async function deleteDespesa(id: string): Promise<void> {
-  await remove(ref(db, `trafegopro/despesas/${id}`));
+  await restDelete(`trafegopro/despesas/${id}`);
 }
 
 export async function saveAta(ata: Ata): Promise<void> {
-  await set(ref(db, `trafegopro/atas/${ata.id}`), ata);
+  await restPut(`trafegopro/atas/${ata.id}`, ata);
 }
 
 export async function deleteAta(id: string): Promise<void> {
-  await remove(ref(db, `trafegopro/atas/${id}`));
+  await restDelete(`trafegopro/atas/${id}`);
 }
 
 export async function saveCaixa(caixa: Caixa): Promise<void> {
-  await set(ref(db, "trafegopro/caixa"), caixa);
+  await restPut("trafegopro/caixa", caixa);
 }
 
 export async function saveDespesaFixa(df: DespesaFixa): Promise<void> {
-  await set(ref(db, `trafegopro/despFixas/${df.id}`), df);
+  await restPut(`trafegopro/despFixas/${df.id}`, df);
 }
 
 export async function deleteDespesaFixa(id: string): Promise<void> {
-  await remove(ref(db, `trafegopro/despFixas/${id}`));
+  await restDelete(`trafegopro/despFixas/${id}`);
 }

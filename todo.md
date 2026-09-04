@@ -929,6 +929,18 @@
 - [x] Criar um botão discreto para expandir e recolher as opções administrativas
 - [x] Manter rotas ativas, permissões e navegação mobile após o agrupamento
 
+## Correção de ações de cobrança no Financeiro
+
+- [x] Reproduzir a mudança de Pendente para Confirmado e capturar a escrita Firebase
+- [x] Corrigir a persistência e a atualização visual das ações de cobrança
+- [x] Validar as ações internas no Financeiro & Gestão antes de publicar
+
+## Retorno observável das ações financeiras
+
+- [x] Adicionar atualização otimista e retorno de sucesso nas alterações de cobrança
+- [x] Exibir erro de escrita Firebase de forma clara sem descartar o estado anterior
+- [x] Proteger contra cliques duplicados enquanto uma ação está em andamento
+
 ## Correções de Usuários e Registro
 
 - [x] Diagnosticar por que a ativação ou desativação de usuários não persiste

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 import type {
   Cliente,
   Cobranca,
@@ -106,6 +107,7 @@ export function TabFinanceiro({
 
   // Inline value input states for unconfirmed receipts
   const [inputValoresRec, setInputValoresRec] = useState<Record<string, string>>({});
+  const [savingCobrancas, setSavingCobrancas] = useState<Record<string, boolean>>({});
 
   // Meta ID sync
   const handleMetaAccountSelect = (metaId: string) => {
@@ -296,6 +298,28 @@ export function TabFinanceiro({
     }
   };
 
+  const persistCobranca = async (
+    cid: string,
+    mesKey: string,
+    updated: Cobranca,
+    successMessage: string,
+  ): Promise<boolean> => {
+    const operationKey = `${cid}:${mesKey}`;
+    if (savingCobrancas[operationKey]) return false;
+    setSavingCobrancas((current) => ({ ...current, [operationKey]: true }));
+    try {
+      await saveCobranca(cid, mesKey, updated);
+      toast.success(successMessage);
+      return true;
+    } catch (error) {
+      console.error("Firebase financial write error:", error);
+      toast.error("Não foi possível salvar a alteração no financeiro. Tente novamente.");
+      return false;
+    } finally {
+      setSavingCobrancas((current) => ({ ...current, [operationKey]: false }));
+    }
+  };
+
   const handleToggleCobField = async (
     cid: string,
     field: "boletoGerado" | "nfGerada",
@@ -314,7 +338,7 @@ export function TabFinanceiro({
       ...existing,
       [field]: !currentVal,
     };
-    await saveCobranca(cid, mesCobKey, updated);
+    await persistCobranca(cid, mesCobKey, updated, field === "boletoGerado" ? "Boleto atualizado." : "Nota fiscal atualizada.");
   };
 
   const handleConfirmarRecebimento = async (cid: string, fallbackVal: number) => {
@@ -351,7 +375,7 @@ export function TabFinanceiro({
       },
     };
 
-    await saveCobranca(cid, mesCobKey, updated);
+    await persistCobranca(cid, mesCobKey, updated, "Recebimento confirmado.");
   };
 
   const handleDesconfirmarRecebimento = async (
@@ -377,7 +401,7 @@ export function TabFinanceiro({
         divisao: null,
       };
 
-      await saveCobranca(cid, mesKey, updated);
+      await persistCobranca(cid, mesKey, updated, "Recebimento voltou para pendente.");
     }
   };
 
@@ -415,8 +439,7 @@ export function TabFinanceiro({
       },
     };
 
-    await saveCobranca(cid, mesKey, updated);
-    setEditRecModal(null);
+    if (await persistCobranca(cid, mesKey, updated, "Recebimento atualizado.")) setEditRecModal(null);
   };
 
   const clientesOrdenadosPorVenc = useMemo(() => {

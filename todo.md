@@ -941,6 +941,12 @@
 - [x] Exibir erro de escrita Firebase de forma clara sem descartar o estado anterior
 - [x] Proteger contra cliques duplicados enquanto uma ação está em andamento
 
+## Diagnóstico real de ações financeiras
+
+- [x] Instrumentar a escrita de cobrança sem expor dados sensíveis
+- [x] Reproduzir uma alteração e identificar a resposta do Firebase
+- [x] Corrigir a causa comprovada e validar a persistência
+
 ## Correções de Usuários e Registro
 
 - [x] Diagnosticar por que a ativação ou desativação de usuários não persiste

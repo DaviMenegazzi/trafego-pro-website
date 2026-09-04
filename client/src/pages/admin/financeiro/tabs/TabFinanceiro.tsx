@@ -52,12 +52,14 @@ interface TabFinanceiroProps {
   dbState: DatabaseState;
   onClientRegistered?: (cid: string) => void;
   onSelectClient?: (cid: string) => void;
+  onCobrancaUpdated?: (cid: string, mesKey: string, cobranca: Cobranca) => void;
 }
 
 export function TabFinanceiro({
   dbState,
   onClientRegistered,
   onSelectClient,
+  onCobrancaUpdated,
 }: TabFinanceiroProps) {
   const { clients: metaAccounts } = useClientContext();
 
@@ -309,6 +311,7 @@ export function TabFinanceiro({
     setSavingCobrancas((current) => ({ ...current, [operationKey]: true }));
     try {
       await saveCobranca(cid, mesKey, updated);
+      onCobrancaUpdated?.(cid, mesKey, updated);
       toast.success(successMessage);
       return true;
     } catch (error) {

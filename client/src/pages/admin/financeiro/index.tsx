@@ -128,6 +128,27 @@ export default function AdminFinanceiroPage() {
     toast.info("Unidade encerrada e arquivada.");
   };
 
+  const handleCobrancaUpdated = (clientId: string, mesKey: string, cobranca: DatabaseState["cobrancas"][string][string]) => {
+    setDbState((previous) => {
+      const next = {
+        ...previous,
+        cobrancas: {
+          ...previous.cobrancas,
+          [clientId]: {
+            ...(previous.cobrancas?.[clientId] || {}),
+            [mesKey]: cobranca,
+          },
+        },
+      };
+      try {
+        localStorage.setItem("tp_db", JSON.stringify(next));
+      } catch {
+        // Não impede a atualização visual quando o cache local estiver indisponível.
+      }
+      return next;
+    });
+  };
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1440px] space-y-6 p-4 sm:p-6 lg:p-8 pb-16">
@@ -317,6 +338,7 @@ export default function AdminFinanceiroPage() {
               dbState={dbState}
               onClientRegistered={handleClientRegistered}
               onSelectClient={handleSelectClient}
+              onCobrancaUpdated={handleCobrancaUpdated}
             />
           )}
 

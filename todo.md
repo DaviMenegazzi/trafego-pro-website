@@ -911,6 +911,12 @@
 - [x] Corrigir a configuração Firebase ou as regras que impedem a consulta
 - [x] Validar o carregamento real dos dados financeiros antes de publicar
 
+## Firebase persistente no Financeiro & Gestão
+
+- [x] Capturar a resposta Firebase e os erros de interface da versão publicada
+- [x] Corrigir a leitura ou transformação que impede a exibição dos dados
+- [x] Validar na tela as unidades e cobranças reais do Realtime Database
+
 ## Correções de Usuários e Registro
 
 - [x] Diagnosticar por que a ativação ou desativação de usuários não persiste

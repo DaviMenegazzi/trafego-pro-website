@@ -39,36 +39,38 @@ export function subscribeToFinancialDB(
   onError?: (err: Error) => void
 ): () => void {
   const rootRef = ref(db, "trafegopro");
+  const emitSnapshot = (snapshot: { exists: () => boolean; val: () => any }) => {
+    if (snapshot.exists()) {
+      const val = snapshot.val();
+      onData({
+        clientes: val.clientes || {},
+        cobrancas: val.cobrancas || {},
+        checklists: val.checklists || {},
+        arquivados: val.arquivados || {},
+        despesas: val.despesas || {},
+        atas: val.atas || {},
+        caixa: val.caixa || { saldo: 0, metaFimAno: 0 },
+        despFixas: val.despFixas || {},
+        logs: val.logs || [],
+      });
+      return;
+    }
+    onData({
+      clientes: {}, cobrancas: {}, checklists: {}, arquivados: {}, despesas: {}, atas: {},
+      caixa: { saldo: 0, metaFimAno: 0 }, despFixas: {}, logs: [],
+    });
+  };
+
+  // Carregamento inicial por leitura pontual: evita que uma falha transitória da
+  // conexão persistente deixe o painel vazio, mantendo a assinatura para atualizações.
+  get(rootRef).then(emitSnapshot).catch((err) => {
+    console.warn("Firebase financial initial read error:", err);
+    onError?.(err);
+  });
+
   const unsubscribe = onValue(
     rootRef,
-    (snapshot) => {
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        onData({
-          clientes: val.clientes || {},
-          cobrancas: val.cobrancas || {},
-          checklists: val.checklists || {},
-          arquivados: val.arquivados || {},
-          despesas: val.despesas || {},
-          atas: val.atas || {},
-          caixa: val.caixa || { saldo: 0, metaFimAno: 0 },
-          despFixas: val.despFixas || {},
-          logs: val.logs || [],
-        });
-      } else {
-        onData({
-          clientes: {},
-          cobrancas: {},
-          checklists: {},
-          arquivados: {},
-          despesas: {},
-          atas: {},
-          caixa: { saldo: 0, metaFimAno: 0 },
-          despFixas: {},
-          logs: [],
-        });
-      }
-    },
+    emitSnapshot,
     (err) => {
       console.warn("Firebase financial sync error:", err);
       if (onError) onError(err);

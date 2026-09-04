@@ -953,6 +953,12 @@
 - [x] Gerar um XLSX com cadastro, cobranças e checklist da unidade ativa
 - [x] Validar que a exportação não inclua dados financeiros de outra unidade
 
+## Exportação de métricas de tráfego por unidade
+
+- [x] Exibir a ação somente para administrador e unidade selecionada na dashboard
+- [x] Gerar XLSX com métricas consolidadas e série diária do período ativo
+- [x] Validar isolamento por unidade e período antes de publicar
+
 ## Correções de Usuários e Registro
 
 - [x] Diagnosticar por que a ativação ou desativação de usuários não persiste

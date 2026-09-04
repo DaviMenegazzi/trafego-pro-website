@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
+import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/AppLayout";
 import { DashboardState } from "@/components/DashboardState";
 import { DeepAnalyticsAccordion } from "@/components/DeepAnalyticsAccordion";
@@ -11,6 +12,7 @@ import { calculateResponseRate } from "@/lib/dashboardPresentation";
 import { getDashboardUnitMenuState, selectAuthorizedDashboardUnit } from "@/lib/dashboardUnitMenu";
 import { MetricsSessionError, readMetricsResponse } from "@/lib/metricsResponse";
 import { createRequestGate } from "@/lib/requestGate";
+import { toast } from "sonner";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
@@ -30,6 +32,7 @@ import {
   Database,
   Clock,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 
 // ─── Paleta de destaque dos gráficos ─────────────────────────────────────────
@@ -200,6 +203,14 @@ export default function DashboardPage() {
     ? `Personalizado · ${formatDashboardDateRange(activeRange)}`
     : (PERIOD_SHORTCUTS.find((item) => item.value === period)?.label ?? "Últimos 30 dias");
   const unitMenu = getDashboardUnitMenuState(clientOpts, selectedClientId, clientsLoading);
+  const isAdmin = useMemo(() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+      return storedUser?.role === "admin" || storedUser?.allowedClientIds?.includes("*");
+    } catch {
+      return false;
+    }
+  }, [token]);
 
   const selectPresetPeriod = (value: string) => {
     setPeriod(value);
@@ -411,6 +422,76 @@ export default function DashboardPage() {
   }, [daily]);
 
   const responseRate = calculateResponseRate(kpi.respondidas, kpi.connections);
+
+  const exportMetricsForActiveUnit = () => {
+    if (!isAdmin || !selectedClient || !selectedClientId) return;
+    if (!daily.length && !campaigns.length) {
+      toast.error("Não há métricas disponíveis para exportar neste período.");
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const unitName = selectedClient.name;
+    const metadataRows = [{
+      unidade: unitName,
+      conta_meta: selectedClientId,
+      período: formatDashboardDateRange(activeRange),
+      fonte: dataSource === "meta_direct" ? "Meta Graph API" : dataSource === "supabase" ? "Supabase" : "Não informada",
+      exportado_em: new Date().toLocaleString("pt-BR"),
+    }];
+    const summaryRows = [{
+      total_investido: kpi.spend,
+      conversas_iniciadas: kpi.conv,
+      custo_por_conversa: kpi.custoConversa,
+      primeiras_respostas: kpi.primeiras,
+      conversas_respondidas: kpi.respondidas,
+      taxa_de_resposta: responseRate,
+      conexões_de_mensagens: kpi.connections,
+      leads_meta: kpi.leads,
+      impressões: kpi.impressions,
+      cliques: kpi.clicks,
+      ctr: kpi.ctr,
+      cpc: kpi.cpc,
+      cpm: kpi.cpm,
+      frequência: kpi.frequency,
+    }];
+    const dailyRows = daily.map((row) => ({
+      data: row.date_start,
+      investimento: num(row.total_spend),
+      conversas_iniciadas: num(row.total_conversas_iniciadas),
+      conexões_de_mensagens: num(row.total_messaging_connections),
+      primeiras_respostas: num(row.total_primeiras_respostas),
+      conversas_respondidas: num(row.total_conversas_respondidas),
+      leads_meta: num(row.total_leads_meta),
+      impressões: num(row.total_impressions),
+      cliques: num(row.total_clicks),
+      custo_por_conversa: num(row.custo_por_conversa),
+      cpc: num(row.avg_cpc),
+      cpm: num(row.avg_cpm),
+      ctr: num(row.avg_ctr),
+      frequência: num(row.avg_frequency),
+    }));
+    const campaignRows = campaigns.map((row) => ({
+      campanha: row.campaign_name,
+      investimento: num(row.total_spend),
+      conversas_iniciadas: num(row.total_conversas_iniciadas),
+      custo_por_conversa: num(row.custo_por_conversa),
+      leads_meta: num(row.total_leads_meta),
+      impressões: num(row.total_impressions),
+      cliques: num(row.total_clicks),
+      ctr: num(row.avg_ctr),
+      cpc: num(row.avg_cpc),
+      cpm: num(row.avg_cpm),
+    }));
+
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(metadataRows), "Referência");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), "Resumo");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(dailyRows), "Métricas diárias");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(campaignRows), "Campanhas");
+    const slug = unitName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    XLSX.writeFile(workbook, `metricas-trafego-${slug}-${activeRange.start}-a-${activeRange.end}.xlsx`);
+    toast.success(`Excel de métricas de ${unitName} gerado.`);
+  };
 
   const primaryKpis = [
     {
@@ -664,6 +745,17 @@ export default function DashboardPage() {
                 <RefreshCw className={`size-3 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
                 <span>Atualizar</span>
               </button>
+              {isAdmin && selectedClientId && (
+                <button
+                  type="button"
+                  onClick={exportMetricsForActiveUnit}
+                  disabled={loading || !hasMetrics}
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-300 transition-all active:scale-95 hover:bg-emerald-500 hover:text-zinc-950 disabled:opacity-50"
+                >
+                  <Download className="size-3.5" />
+                  <span>Excel</span>
+                </button>
+              )}
             </div>
 
             {/* Horizontal Scrollable Preset Chips */}
@@ -881,21 +973,33 @@ export default function DashboardPage() {
               </Popover>
             </div>
 
-            {/* Refresh Button */}
-            <button
-              onClick={() => {
-                if (selectedClientId) {
-                  const cacheKey = `${selectedClientId}:${activeRange.start}:${activeRange.end}`;
-                  dashboardMemoryCache.delete(cacheKey);
-                }
-                setRefreshIndex((value) => value + 1);
-              }}
-              disabled={loading || clientsLoading || !selectedClientId}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-5 text-xs font-semibold text-zinc-200 transition-all hover:bg-white/10 hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw className={`size-3.5 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
-              <span>Atualizar dados</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {isAdmin && selectedClientId && (
+                <button
+                  type="button"
+                  onClick={exportMetricsForActiveUnit}
+                  disabled={loading || !hasMetrics}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 text-xs font-semibold text-emerald-300 transition-all hover:bg-emerald-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="size-3.5" />
+                  <span>Exportar unidade</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (selectedClientId) {
+                    const cacheKey = `${selectedClientId}:${activeRange.start}:${activeRange.end}`;
+                    dashboardMemoryCache.delete(cacheKey);
+                  }
+                  setRefreshIndex((value) => value + 1);
+                }}
+                disabled={loading || clientsLoading || !selectedClientId}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-5 text-xs font-semibold text-zinc-200 transition-all hover:bg-white/10 hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`size-3.5 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
+                <span>Atualizar dados</span>
+              </button>
+            </div>
           </div>
         </section>
 

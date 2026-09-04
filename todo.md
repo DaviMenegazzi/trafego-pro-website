@@ -923,6 +923,12 @@
 - [x] Adicionar nova tentativa e estado de erro observável para a carga financeira
 - [x] Confirmar em recargas sucessivas que os dados reais são exibidos
 
+## Agrupamento de áreas administrativas
+
+- [x] Identificar os módulos administrativos exibidos diretamente na sidebar
+- [x] Criar um botão discreto para expandir e recolher as opções administrativas
+- [x] Manter rotas ativas, permissões e navegação mobile após o agrupamento
+
 ## Correções de Usuários e Registro
 
 - [x] Diagnosticar por que a ativação ou desativação de usuários não persiste

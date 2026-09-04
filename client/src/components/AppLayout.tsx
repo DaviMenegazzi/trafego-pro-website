@@ -234,10 +234,16 @@ function AmbientBackground() {
 export function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [pathname] = useLocation();
 
   const admin = isAdminUser();
-  const nav = admin ? [...NAV_BASE, ...NAV_ADMIN_ONLY] : NAV_BASE;
+
+  useEffect(() => {
+    if (NAV_ADMIN_ONLY.some((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))) {
+      setAdminMenuOpen(true);
+    }
+  }, [pathname]);
 
   const sidebarWidth = collapsed ? 64 : 256;
 
@@ -277,7 +283,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Nav */}
       <nav className={`flex-1 space-y-1 ${isCollapsed ? "px-2 pt-4" : "px-3 pt-4"}`}>
-        {nav.map((item) => {
+        {NAV_BASE.map((item) => {
           const active = pathname === item.to || (item.to !== "/dashboard" && pathname.startsWith(item.to));
           const Icon = item.icon;
           return (
@@ -308,6 +314,40 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </Link>
           );
         })}
+        {admin && (
+          <div className={isCollapsed ? "pt-1" : "pt-2"}>
+            {!isCollapsed && <div className="mb-1 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Administração</div>}
+            <button
+              type="button"
+              onClick={() => setAdminMenuOpen((open) => !open)}
+              title={isCollapsed ? "Abrir administração" : undefined}
+              aria-expanded={adminMenuOpen}
+              className={`group flex w-full items-center gap-3 overflow-hidden rounded-xl text-sm text-muted-foreground transition-all duration-200 hover:bg-white/[0.045] hover:text-foreground ${
+                isCollapsed ? "size-10 justify-center px-0 py-0" : "px-3 py-2.5"
+              }`}
+            >
+              <ShieldCheck className="size-4 shrink-0 group-hover:text-zinc-200" />
+              <span className="flex min-w-0 flex-1 items-center justify-between whitespace-nowrap overflow-hidden" style={{ maxWidth: isCollapsed ? 0 : 160, opacity: isCollapsed ? 0 : 1, transition: `max-width ${DURATION} ${EASE}, opacity ${DURATION} ${EASE}` }}>
+                <span>Administração</span>
+                <ChevronDown className={`size-3.5 shrink-0 transition-transform ${adminMenuOpen ? "rotate-180" : ""}`} />
+              </span>
+            </button>
+            {adminMenuOpen && !isCollapsed && (
+              <div className="mt-1 space-y-0.5 border-l border-white/10 py-1 pl-2">
+                {NAV_ADMIN_ONLY.map((item) => {
+                  const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+                  const Icon = item.icon;
+                  return (
+                    <Link key={item.to} href={item.to} onClick={() => setMobileSidebarOpen(false)} className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-xs transition-colors ${active ? "bg-white/10 text-white" : "text-zinc-500 hover:bg-white/[0.045] hover:text-zinc-200"}`}>
+                      <Icon className={`size-3.5 shrink-0 ${active ? "text-white" : "group-hover:text-zinc-300"}`} />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* User */}

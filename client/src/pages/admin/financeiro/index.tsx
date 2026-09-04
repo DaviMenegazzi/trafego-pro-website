@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/AppLayout";
 import type { DatabaseState } from "./types";
 import { subscribeToFinancialDB } from "./lib/firebase";
@@ -17,6 +18,7 @@ import {
   Sparkles,
   Search,
   Landmark,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,6 +55,7 @@ export default function AdminFinanceiroPage() {
   const [activeTab, setActiveTab] = useState<"fin" | "desp" | "dash" | "ata" | "cli">("fin");
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string>("admin");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [unitSearch, setUnitSearch] = useState("");
   const [unitDropdownOpen, setUnitDropdownOpen] = useState(false);
 
@@ -63,6 +66,7 @@ export default function AdminFinanceiroPage() {
       if (stored.name || stored.email || stored.login) {
         setCurrentUser(stored.name || stored.email || stored.login);
       }
+      setIsAdmin(stored.role === "admin" || stored.allowedClientIds?.includes("*"));
     } catch {
       // fallback
     }
@@ -147,6 +151,47 @@ export default function AdminFinanceiroPage() {
       }
       return next;
     });
+  };
+
+  const handleExportActiveUnit = () => {
+    if (!isAdmin || !activeClientId || !activeClient) return;
+    const cobrancas = Object.entries(dbState.cobrancas?.[activeClientId] || {}).map(([mesKey, item]) => ({
+      periodo: mesKey,
+      mes: item.mes,
+      boleto_gerado: item.boletoGerado ? "Sim" : "Não",
+      nf_gerada: item.nfGerada ? "Sim" : "Não",
+      recebimento: item.recebido ? "Confirmado" : "Pendente",
+      valor_recebido: item.valorRecebido ?? "",
+      caixa: item.divisao?.caixa ?? "",
+      patrono: item.divisao?.patrono ?? "",
+      socio_3: item.divisao?.socio3 ?? "",
+      davi: item.divisao?.davi ?? "",
+      lucas: item.divisao?.lucas ?? "",
+      ana: item.divisao?.ana ?? "",
+    }));
+    const checklist = Object.entries(dbState.checklists?.[activeClientId] || {}).map(([id, item]) => ({
+      id,
+      grupo: item.grupo ?? "",
+      item: item.texto ?? "",
+      status: item.marcado ? "Concluído" : "Pendente",
+      realizado_por: item.por ?? "",
+      realizado_em: item.quando ?? "",
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{
+      unidade: activeClient.nome,
+      cnpj: activeClient.cnpj,
+      conta_meta: activeClient.metaId ?? "",
+      mensalidade: activeClient.mensalidade,
+      vencimento: activeClient.vencDia,
+      responsavel_unidade: activeClient.respUnid ?? "",
+      responsavel_financeiro: activeClient.respFin ?? "",
+      email_boleto: activeClient.emailBol ?? "",
+    }]), "Unidade");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(cobrancas), "Cobranças");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(checklist), "Checklist");
+    XLSX.writeFile(workbook, `financeiro-${activeClient.nome.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}.xlsx`);
+    toast.success(`Excel de ${activeClient.nome} gerado.`);
   };
 
   return (
@@ -268,6 +313,16 @@ export default function AdminFinanceiroPage() {
                 )}
               </div>
             </div>
+            {isAdmin && activeClient && (
+              <button
+                type="button"
+                onClick={handleExportActiveUnit}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-300 transition-colors hover:bg-emerald-500 hover:text-zinc-950"
+              >
+                <Download className="size-4" />
+                Exportar unidade
+              </button>
+            )}
           </div>
 
           {/* Navigation Tabs - Modern Pill Bar */}

@@ -947,6 +947,12 @@
 - [x] Reproduzir uma alteração e identificar a resposta do Firebase
 - [x] Corrigir a causa comprovada e validar a persistência
 
+## Exportação financeira por unidade
+
+- [x] Exibir a ação de exportar somente para administradores e com unidade selecionada
+- [x] Gerar um XLSX com cadastro, cobranças e checklist da unidade ativa
+- [x] Validar que a exportação não inclua dados financeiros de outra unidade
+
 ## Correções de Usuários e Registro
 
 - [x] Diagnosticar por que a ativação ou desativação de usuários não persiste

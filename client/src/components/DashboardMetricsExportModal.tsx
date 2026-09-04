@@ -355,17 +355,17 @@ _Relatório de performance gerado pela Tráfego Pro._`;
             <div className="absolute bottom-0 left-0 translate-y-12 -translate-x-12 size-72 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
 
             {/* Header do Card com Logo Oficial */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-5 relative z-10 gap-4">
-              <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>RELATÓRIO EXECUTIVO DE PERFORMANCE</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-5 relative z-10 gap-4">
+              <div className="space-y-2 min-w-0 flex-1">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl sm:rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] sm:text-xs font-semibold tracking-wide max-w-full">
+                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="whitespace-nowrap truncate">RELATÓRIO EXECUTIVO DE PERFORMANCE</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
+                <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5 break-words">
                   <span>{unitName}</span>
                 </h1>
                 <p className="text-xs text-zinc-400 flex items-center gap-1.5 font-light">
-                  <Calendar className="size-3.5 text-zinc-400" />
+                  <Calendar className="size-3.5 text-zinc-400 shrink-0" />
                   <span>Período de referência: <strong>{periodLabel}</strong></span>
                 </p>
               </div>

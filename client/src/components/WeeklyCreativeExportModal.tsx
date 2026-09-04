@@ -227,7 +227,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-zinc-900/60">
+        <div className="shrink-0 relative z-20 flex items-center justify-between px-5 py-4 border-b border-white/10 bg-zinc-900/90 backdrop-blur-md">
           <div className="flex items-center gap-2.5">
             <div className="size-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
               <Sparkles className="size-4" />
@@ -254,7 +254,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
         </div>
 
         {/* Modal Actions Bar */}
-        <div className="px-5 py-3 border-b border-white/10 bg-zinc-900/40 flex flex-wrap items-center justify-between gap-3">
+        <div className="shrink-0 relative z-20 px-5 py-3 border-b border-white/10 bg-zinc-900/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-zinc-300">
             <span className="font-medium text-zinc-400">Unidade:</span>
             <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 font-semibold text-white">
@@ -311,11 +311,11 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
         </div>
 
         {/* Modal Body / Preview */}
-        <div className="flex-1 overflow-y-auto p-5 bg-zinc-950/80 flex justify-center">
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-8 bg-zinc-950/90 flex flex-col items-center">
           {/* ─── CARD EXECUTIVO QUE SERÁ CAPTURADO COMO IMAGEM ──────────────── */}
           <div
             ref={cardRef}
-            className="w-full max-w-[860px] rounded-3xl border border-white/15 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 p-6 sm:p-8 shadow-2xl text-white space-y-6 relative overflow-hidden box-border"
+            className="w-full max-w-[860px] rounded-3xl border border-white/15 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 p-6 sm:p-8 shadow-2xl text-white space-y-6 relative overflow-hidden box-border my-1"
             style={{ fontFamily: "Montserrat, Inter, sans-serif" }}
           >
             {/* Background Glow Emitters */}

@@ -917,6 +917,12 @@
 - [x] Corrigir a leitura ou transformação que impede a exibição dos dados
 - [x] Validar na tela as unidades e cobranças reais do Realtime Database
 
+## Carregamento determinístico do Financeiro & Gestão
+
+- [x] Comparar a leitura Firebase direta com a assinatura executada pela página
+- [x] Adicionar nova tentativa e estado de erro observável para a carga financeira
+- [x] Confirmar em recargas sucessivas que os dados reais são exibidos
+
 ## Correções de Usuários e Registro
 
 - [x] Diagnosticar por que a ativação ou desativação de usuários não persiste

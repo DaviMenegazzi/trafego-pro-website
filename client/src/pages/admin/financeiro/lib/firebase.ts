@@ -39,6 +39,7 @@ export function subscribeToFinancialDB(
   onError?: (err: Error) => void
 ): () => void {
   const rootRef = ref(db, "trafegopro");
+  let receivedInitialData = false;
   const emitSnapshot = (snapshot: { exists: () => boolean; val: () => any }) => {
     if (snapshot.exists()) {
       const val = snapshot.val();
@@ -53,20 +54,29 @@ export function subscribeToFinancialDB(
         despFixas: val.despFixas || {},
         logs: val.logs || [],
       });
+      receivedInitialData = true;
       return;
     }
+    if (receivedInitialData) return;
     onData({
       clientes: {}, cobrancas: {}, checklists: {}, arquivados: {}, despesas: {}, atas: {},
       caixa: { saldo: 0, metaFimAno: 0 }, despFixas: {}, logs: [],
     });
   };
 
-  // Carregamento inicial por leitura pontual: evita que uma falha transitória da
-  // conexão persistente deixe o painel vazio, mantendo a assinatura para atualizações.
-  get(rootRef).then(emitSnapshot).catch((err) => {
-    console.warn("Firebase financial initial read error:", err);
-    onError?.(err);
-  });
+  // O endpoint REST do Realtime Database é mais determinístico em browsers
+  // corporativos/restritos do que a conexão persistente do SDK. Mantemos onValue
+  // apenas para receber alterações após o snapshot inicial.
+  fetch(`${firebaseConfig.databaseURL}/trafegopro.json`)
+    .then(async (response) => {
+      if (!response.ok) throw new Error(`Firebase respondeu ${response.status}`);
+      const value = await response.json();
+      emitSnapshot({ exists: () => value !== null, val: () => value });
+    })
+    .catch((err) => {
+      console.warn("Firebase financial initial read error:", err);
+      onError?.(err instanceof Error ? err : new Error("Falha ao carregar dados financeiros"));
+    });
 
   const unsubscribe = onValue(
     rootRef,

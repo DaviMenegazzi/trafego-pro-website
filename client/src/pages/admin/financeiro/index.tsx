@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/AppLayout";
 import type { DatabaseState } from "./types";
@@ -19,11 +20,53 @@ import {
   Search,
   Landmark,
   Download,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminFinanceiroPage() {
+  const [, setLocation] = useLocation();
+
+  // Validação síncrona rigorosa de permissão de administrador
+  const isAuthorizedAdmin = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const token = localStorage.getItem("tp_token");
+    if (!token) return false;
+    try {
+      const user = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+      return user?.role === "admin" || user?.allowedClientIds?.includes("*") === true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Redirecionamento imediato e expurgo de dados caso usuário não seja admin
+  useEffect(() => {
+    if (!isAuthorizedAdmin) {
+      try {
+        localStorage.removeItem("tp_db");
+      } catch {
+        // ignore
+      }
+      toast.error("Acesso negado: o módulo financeiro é restrito a administradores.");
+      setLocation("/dashboard");
+    }
+  }, [isAuthorizedAdmin, setLocation]);
+
   const [dbState, setDbState] = useState<DatabaseState>(() => {
+    if (!isAuthorizedAdmin) {
+      return {
+        clientes: {},
+        cobrancas: {},
+        checklists: {},
+        arquivados: {},
+        despesas: {},
+        atas: {},
+        caixa: { saldo: 0, metaFimAno: 0 },
+        despFixas: {},
+        logs: [],
+      };
+    }
     try {
       const raw = JSON.parse(localStorage.getItem("tp_db") || "{}");
       return {
@@ -55,7 +98,7 @@ export default function AdminFinanceiroPage() {
   const [activeTab, setActiveTab] = useState<"fin" | "desp" | "dash" | "ata" | "cli">("fin");
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string>("admin");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(isAuthorizedAdmin);
   const [unitSearch, setUnitSearch] = useState("");
   const [unitDropdownOpen, setUnitDropdownOpen] = useState(false);
 
@@ -66,14 +109,16 @@ export default function AdminFinanceiroPage() {
       if (stored.name || stored.email || stored.login) {
         setCurrentUser(stored.name || stored.email || stored.login);
       }
-      setIsAdmin(stored.role === "admin" || stored.allowedClientIds?.includes("*"));
+      setIsAdmin(stored.role === "admin" || stored.allowedClientIds?.includes("*") === true);
     } catch {
       // fallback
     }
   }, []);
 
-  // Firebase Realtime subscription
+  // Firebase Realtime subscription - EXCLUSIVAMENTE para administradores autorizados
   useEffect(() => {
+    if (!isAuthorizedAdmin) return;
+
     const unsubscribe = subscribeToFinancialDB(
       (data) => {
         setDbState(data);
@@ -89,7 +134,22 @@ export default function AdminFinanceiroPage() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [isAuthorizedAdmin]);
+
+  // Se não for admin, bloqueia imediatamente qualquer renderização de dados financeiros
+  if (!isAuthorizedAdmin) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center text-white">
+        <div className="size-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4">
+          <ShieldAlert className="size-8" />
+        </div>
+        <h1 className="text-xl font-bold">Acesso Restrito</h1>
+        <p className="text-sm text-zinc-400 mt-1 max-w-sm">
+          Você não possui permissão de administrador para acessar o módulo Financeiro. Redirecionando para a Dashboard...
+        </p>
+      </div>
+    );
+  }
 
   const payingClientsList = useMemo(() => {
     return Object.values(dbState.clientes || {}).sort((a, b) =>

@@ -25,6 +25,7 @@ import TalentBankAdmin from "./pages/TalentBankAdmin";
 import EvolutionAdmin from "./pages/EvolutionAdmin";
 import SocialPublishingAdmin from "./pages/SocialPublishingAdmin";
 
+import { AdminRoute } from "./components/AdminRoute";
 import AdminFinanceiro from "./pages/admin/financeiro";
 
 function ExistingSiteRoutes() {
@@ -41,8 +42,8 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/"} component={Dashboard} />
       <Route path={"/dashboard/pipeline"} component={DashboardPipeline} />
       <Route path={"/dashboard/pipeline/"} component={DashboardPipeline} />
-      <Route path={"/dashboard/pagamentos"} component={DashboardPagamentos} />
-      <Route path={"/dashboard/pagamentos/"} component={DashboardPagamentos} />
+      <AdminRoute path={"/dashboard/pagamentos"} component={DashboardPagamentos} />
+      <AdminRoute path={"/dashboard/pagamentos/"} component={DashboardPagamentos} />
       <Route path={"/dashboard/meu-trabalho"} component={DashboardMeuTrabalho} />
       <Route path={"/dashboard/meu-trabalho/"} component={DashboardMeuTrabalho} />
       <Route path={"/dashboard/atualizacoes"} component={DashboardAtualizacoes} />
@@ -51,22 +52,22 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/configuracoes/"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/feedback-leads"} component={DashboardFeedbackLeads} />
       <Route path={"/dashboard/feedback-leads/"} component={DashboardFeedbackLeads} />
-      <Route path={"/dashboard/feedback-leads/list"} component={DashboardFeedbackLeadsList} />
-      <Route path={"/dashboard/feedback-leads/list/"} component={DashboardFeedbackLeadsList} />
+      <AdminRoute path={"/dashboard/feedback-leads/list"} component={DashboardFeedbackLeadsList} />
+      <AdminRoute path={"/dashboard/feedback-leads/list/"} component={DashboardFeedbackLeadsList} />
       <Route path={"/dashboard/anuncios"} component={DashboardAnuncios} />
       <Route path={"/dashboard/anuncios/"} component={DashboardAnuncios} />
-      <Route path={"/dashboard/usuarios"} component={DashboardUsuarios} />
-      <Route path={"/dashboard/usuarios/"} component={DashboardUsuarios} />
-      <Route path={"/dashboard/integracoes-ia"} component={DashboardExternalAiTokens} />
-      <Route path={"/dashboard/integracoes-ia/"} component={DashboardExternalAiTokens} />
-      <Route path={"/admin/metricas"} component={AdminMetricsOverview} />
-      <Route path={"/admin/metricas/"} component={AdminMetricsOverview} />
-      <Route path={"/admin/financeiro"} component={AdminFinanceiro} />
-      <Route path={"/admin/financeiro/"} component={AdminFinanceiro} />
-      <Route path={"/dashboard/financeiro"} component={AdminFinanceiro} />
-      <Route path={"/dashboard/financeiro/"} component={AdminFinanceiro} />
-      <Route path={"/dashboard/metricas"} component={AdminMetricsOverview} />
-      <Route path={"/dashboard/metricas/"} component={AdminMetricsOverview} />
+      <AdminRoute path={"/dashboard/usuarios"} component={DashboardUsuarios} />
+      <AdminRoute path={"/dashboard/usuarios/"} component={DashboardUsuarios} />
+      <AdminRoute path={"/dashboard/integracoes-ia"} component={DashboardExternalAiTokens} />
+      <AdminRoute path={"/dashboard/integracoes-ia/"} component={DashboardExternalAiTokens} />
+      <AdminRoute path={"/admin/metricas"} component={AdminMetricsOverview} />
+      <AdminRoute path={"/admin/metricas/"} component={AdminMetricsOverview} />
+      <AdminRoute path={"/admin/financeiro"} component={AdminFinanceiro} />
+      <AdminRoute path={"/admin/financeiro/"} component={AdminFinanceiro} />
+      <AdminRoute path={"/dashboard/financeiro"} component={AdminFinanceiro} />
+      <AdminRoute path={"/dashboard/financeiro/"} component={AdminFinanceiro} />
+      <AdminRoute path={"/dashboard/metricas"} component={AdminMetricsOverview} />
+      <AdminRoute path={"/dashboard/metricas/"} component={AdminMetricsOverview} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

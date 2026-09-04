@@ -3,6 +3,7 @@ import type express from "express";
 import jwt from "jsonwebtoken";
 import { getSupabaseForAccessToken } from "./supabase.js";
 import { uniqueGrantedClientIds } from "./clientAccess.js";
+import { KNOWN_DEFAULT_CLIENTS } from "./metaDirectService.js";
 
 // ─── JWT Authentication (HS256 com validação estrita de expiração) ──────────
 export const JWT_SECRET =
@@ -158,34 +159,44 @@ export async function listDashboardClientsFromSupabase(
   sb: any,
   claims: JwtClaims,
 ): Promise<{ clients: SupabaseDashboardClient[]; error?: string }> {
-  let clientIds = claims.allowedClientIds.filter((id) => id !== "*");
+  const isFullAdmin = isAdminRole(claims.role) || claims.allowedClientIds.includes("*");
 
-  if (isAdminRole(claims.role)) {
-    const { data: accessRows, error: accessError } = await sb
-      .from("user_client_access")
-      .select("client_id");
-    if (accessError) return { clients: [], error: accessError.message };
-    clientIds = uniqueGrantedClientIds(accessRows ?? []);
+  if (isFullAdmin) {
+    const { data, error } = await sb
+      .from("clients")
+      .select("id, name, client_group")
+      .order("name");
+    if (!error && data && data.length > 0) {
+      return { clients: data };
+    }
+    // Fallback garantido se a tabela clients estiver vazia ou com RLS restritivo
+    return {
+      clients: KNOWN_DEFAULT_CLIENTS.map((c) => ({
+        id: c.id,
+        name: c.name,
+        client_group: c.client_group,
+      })),
+    };
   }
 
+  let clientIds = claims.allowedClientIds.filter((id) => id !== "*");
   if (clientIds.length > 0) {
     const { data, error } = await sb
       .from("clients")
       .select("id, name, client_group")
       .in("id", clientIds)
       .order("name");
-    if (error) return { clients: [], error: error.message };
-    return { clients: data ?? [] };
-  }
-
-  if (claims.allowedClientIds.includes("*") && !isAdminRole(claims.role)) {
-    const { data, error } = await sb
-      .from("clients")
-      .select("id, name, client_group")
-      .eq("client_group", "marketing_pro")
-      .order("name");
-    if (error) return { clients: [], error: error.message };
-    return { clients: data ?? [] };
+    if (!error && data && data.length > 0) {
+      return { clients: data };
+    }
+    const matchedKnown = KNOWN_DEFAULT_CLIENTS.filter((c) =>
+      clientIds.includes(c.id) || (c.account_id && clientIds.includes(c.account_id)) || (c.account_id && clientIds.includes(`act_${c.account_id}`))
+    );
+    if (matchedKnown.length > 0) {
+      return {
+        clients: matchedKnown.map((c) => ({ id: c.id, name: c.name, client_group: c.client_group })),
+      };
+    }
   }
 
   return { clients: [] };

@@ -20,6 +20,7 @@ import {
   isMetaDirectSuspended,
   isUserAllowedForMetaAccount,
   normalizeUnitString,
+  KNOWN_DEFAULT_CLIENTS,
 } from "../metaDirectService.js";
 import { isSupabaseConfigured } from "../supabase.js";
 import { validateMetricsClientSelection } from "../metricsAccess.js";
@@ -153,70 +154,93 @@ metricsRouter.get("/metrics/status", requireAuth, (_req, res) => {
 // ─── GET /api/metrics/clients ───────────────────────────────────────────────
 metricsRouter.get("/metrics/clients", requireAuth, async (req, res) => {
   try {
-  const isFullAdmin = req.claims && (isAdminRole(req.claims.role) || req.claims.allowedClientIds.includes("*"));
+    const isFullAdmin = req.claims && (isAdminRole(req.claims.role) || req.claims.allowedClientIds.includes("*"));
 
-  if (isMetaDirectActive()) {
-    try {
-      const allMetaClients = await getMetaDirectClients();
-      if (isFullAdmin) {
-        res.json({
-          configured: true,
-          clients: allMetaClients,
-          source: "meta_direct",
-          rateLimited: false,
-          cooldownRemainingSeconds: 0,
-        });
-        return;
+    if (isMetaDirectActive()) {
+      try {
+        const allMetaClients = await getMetaDirectClients();
+        if (allMetaClients && allMetaClients.length > 0) {
+          if (isFullAdmin) {
+            res.json({
+              configured: true,
+              clients: allMetaClients,
+              source: "meta_direct",
+              rateLimited: false,
+              cooldownRemainingSeconds: 0,
+            });
+            return;
+          }
+
+          const sb = getSupabaseForRequest(req);
+          let authorizedClients: SupabaseDashboardClient[] = [];
+          if (sb && req.claims) {
+            const result = await listDashboardClientsFromSupabase(sb, req.claims);
+            authorizedClients = result.clients || [];
+          }
+
+          const filteredClients = allMetaClients.filter((metaAcc) =>
+            isUserAllowedForMetaAccount(metaAcc, authorizedClients, req.claims),
+          );
+
+          res.json({
+            configured: true,
+            clients: filteredClients,
+            source: "meta_direct",
+            rateLimited: false,
+            cooldownRemainingSeconds: 0,
+          });
+          return;
+        }
+      } catch (err: any) {
+        console.warn(
+          "[meta-direct] Falha ou rate limit ao listar clientes Meta, redirecionando para Supabase:",
+          err.message,
+        );
       }
-
-      const sb = getSupabaseForRequest(req);
-      let authorizedClients: SupabaseDashboardClient[] = [];
-      if (sb && req.claims) {
-        const result = await listDashboardClientsFromSupabase(sb, req.claims);
-        authorizedClients = result.clients || [];
-      }
-
-      const filteredClients = allMetaClients.filter((metaAcc) =>
-        isUserAllowedForMetaAccount(metaAcc, authorizedClients, req.claims),
-      );
-
-      res.json({
-        configured: true,
-        clients: filteredClients,
-        source: "meta_direct",
-        rateLimited: false,
-        cooldownRemainingSeconds: 0,
-      });
-      return;
-    } catch (err: any) {
-      console.warn(
-        "[meta-direct] Falha ou rate limit ao listar clientes Meta, redirecionando para Supabase:",
-        err.message,
-      );
     }
-  }
 
-  const sb = getSupabaseForRequest(req);
-  if (!sb) {
-    res.status(401).json({ error: "Sessão Supabase expirada" });
-    return;
-  }
-  const result = await listDashboardClientsFromSupabase(sb, req.claims!);
-  if (result.error) {
-    res.status(502).json({ error: result.error });
-    return;
-  }
-  res.json({
-    configured: true,
-    clients: result.clients,
-    source: "supabase",
-    rateLimited: isMetaDirectSuspended(),
-    cooldownRemainingSeconds: Math.round(getMetaDirectSuspensionRemainingMs() / 1000),
-  });
+    const sb = getSupabaseForRequest(req);
+    if (!sb) {
+      res.status(401).json({ error: "Sessão Supabase expirada" });
+      return;
+    }
+
+    let clients: SupabaseDashboardClient[] = [];
+    if (req.claims) {
+      const result = await listDashboardClientsFromSupabase(sb, req.claims);
+      clients = result.clients || [];
+    }
+
+    // Se o Supabase estiver vazio ou indisponível, faz fallback para as unidades conhecidas
+    if (clients.length === 0) {
+      if (isFullAdmin) {
+        clients = KNOWN_DEFAULT_CLIENTS.map((c) => ({
+          id: c.id,
+          name: c.name,
+          client_group: c.client_group,
+        }));
+      } else if (req.claims?.allowedClientIds) {
+        const allowed = req.claims.allowedClientIds;
+        clients = KNOWN_DEFAULT_CLIENTS.filter((c) =>
+          allowed.includes(c.id) ||
+          (c.account_id && allowed.includes(c.account_id)) ||
+          (c.account_id && allowed.includes(`act_${c.account_id}`))
+        ).map((c) => ({ id: c.id, name: c.name, client_group: c.client_group }));
+      }
+    }
+
+    res.json({
+      configured: true,
+      clients,
+      source: "supabase",
+      rateLimited: isMetaDirectSuspended(),
+      cooldownRemainingSeconds: Math.round(getMetaDirectSuspensionRemainingMs() / 1000),
+    });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Falha inesperada ao carregar unidades";
     console.error("[metrics/clients] Falha ao carregar unidades:", message);
-    res.status(502).json({ error: message, clients: [] });
+    const fallback = KNOWN_DEFAULT_CLIENTS.map((c) => ({ id: c.id, name: c.name, client_group: c.client_group }));
+    res.json({ configured: true, clients: fallback, source: "fallback" });
   }
 });
 

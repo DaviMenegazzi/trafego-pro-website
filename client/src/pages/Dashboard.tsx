@@ -423,15 +423,17 @@ export default function DashboardPage() {
 
   const responseRate = calculateResponseRate(kpi.respondidas, kpi.connections);
 
+  const canExport = Boolean(selectedClientId);
+
   const exportMetricsForActiveUnit = () => {
-    if (!isAdmin || !selectedClient || !selectedClientId) return;
+    if (!selectedClientId) return;
     if (!daily.length && !campaigns.length) {
       toast.error("Não há métricas disponíveis para exportar neste período.");
       return;
     }
 
     const workbook = XLSX.utils.book_new();
-    const unitName = selectedClient.name;
+    const unitName = selectedClient?.name || selectedClientId;
     const metadataRows = [{
       unidade: unitName,
       conta_meta: selectedClientId,
@@ -745,12 +747,13 @@ export default function DashboardPage() {
                 <RefreshCw className={`size-3 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
                 <span>Atualizar</span>
               </button>
-              {isAdmin && selectedClientId && (
+              {canExport && (
                 <button
                   type="button"
                   onClick={exportMetricsForActiveUnit}
                   disabled={loading || !hasMetrics}
                   className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-300 transition-all active:scale-95 hover:bg-emerald-500 hover:text-zinc-950 disabled:opacity-50"
+                  title="Exportar métricas da unidade em Excel (XLSX)"
                 >
                   <Download className="size-3.5" />
                   <span>Excel</span>
@@ -974,15 +977,16 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {isAdmin && selectedClientId && (
+              {canExport && (
                 <button
                   type="button"
                   onClick={exportMetricsForActiveUnit}
                   disabled={loading || !hasMetrics}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 text-xs font-semibold text-emerald-300 transition-all hover:bg-emerald-500 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Exportar métricas da unidade em Excel (XLSX)"
                 >
                   <Download className="size-3.5" />
-                  <span>Exportar unidade</span>
+                  <span>Exportar Excel</span>
                 </button>
               )}
               <button

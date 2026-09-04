@@ -93,7 +93,25 @@ type CacheEntry<T> = {
 
 const memoryCache = new Map<string, CacheEntry<any>>();
 const inFlightPromises = new Map<string, Promise<any>>();
-let lastKnownClientsSnapshot: MetaDashboardClient[] | null = null;
+export const KNOWN_DEFAULT_CLIENTS: MetaDashboardClient[] = [
+  { id: "act_2889337907990166", name: "Vida Card Alegrete", client_group: "Vida Card", account_id: "2889337907990166", status: 1 },
+  { id: "act_918438482061312", name: "Vida Card Bento Gonçalves", client_group: "Vida Card", account_id: "918438482061312", status: 1 },
+  { id: "act_343587184793003", name: "Vida Card BH Barreiro", client_group: "Vida Card", account_id: "343587184793003", status: 1 },
+  { id: "act_2498975800561890", name: "Vida Card Canela", client_group: "Vida Card", account_id: "2498975800561890", status: 1 },
+  { id: "act_827335518078085", name: "Vida Card Caxias do Sul", client_group: "Vida Card", account_id: "827335518078085", status: 1 },
+  { id: "act_2853331541612919", name: "Vida Card Ijuí", client_group: "Vida Card", account_id: "2853331541612919", status: 1 },
+  { id: "act_3662817983996981", name: "Vida Card Itaqui", client_group: "Vida Card", account_id: "3662817983996981", status: 1 },
+  { id: "act_282141710195066", name: "Vida Card Júlio de Castilhos", client_group: "Vida Card", account_id: "282141710195066", status: 1 },
+  { id: "act_1372787666543646", name: "Vida Card Lajeado", client_group: "Vida Card", account_id: "1372787666543646", status: 1 },
+  { id: "act_2734549853534435", name: "Vida Card Passo Fundo", client_group: "Vida Card", account_id: "2734549853534435", status: 1 },
+  { id: "act_1778679539198076", name: "Vida Card Santa Maria", client_group: "Vida Card", account_id: "1778679539198076", status: 1 },
+  { id: "act_1351209115630705", name: "Vida Card Santo Ângelo", client_group: "Vida Card", account_id: "1351209115630705", status: 1 },
+  { id: "act_192733382826302", name: "Vida Card Tupanciretã", client_group: "Vida Card", account_id: "192733382826302", status: 1 },
+  { id: "act_242407284808237", name: "Vida Card Uruguaiana", client_group: "Vida Card", account_id: "242407284808237", status: 1 },
+  { id: "act_682248017129697", name: "Vida Card Centro", client_group: "Vida Card", account_id: "682248017129697", status: 1 },
+];
+
+let lastKnownClientsSnapshot: MetaDashboardClient[] = [...KNOWN_DEFAULT_CLIENTS];
 let metaRateLimitSuspendedUntil = 0;
 
 export function getCached<T>(key: string): T | null {
@@ -139,8 +157,10 @@ export async function dedupeInFlight<T>(key: string, fn: () => Promise<T>): Prom
   return promise;
 }
 
-export function getLastKnownClients(): MetaDashboardClient[] | null {
-  return lastKnownClientsSnapshot;
+export function getLastKnownClients(): MetaDashboardClient[] {
+  return lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0
+    ? lastKnownClientsSnapshot
+    : KNOWN_DEFAULT_CLIENTS;
 }
 
 // ─── Rate Limit & Circuit Breaker ───────────────────────────────────────────
@@ -382,19 +402,14 @@ export function isUserAllowedForMetaAccount(
  */
 async function fetchMetaDirectClients(): Promise<MetaDashboardClient[]> {
   const token = getMetaDirectToken();
-  if (!token) return [];
+  if (!token) return getLastKnownClients();
 
   const cacheKey = "meta:clients:all";
   const cached = getCached<MetaDashboardClient[]>(cacheKey);
   if (cached) return cached;
 
   if (isMetaDirectSuspended()) {
-    if (lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0) {
-      return lastKnownClientsSnapshot;
-    }
-    throw new MetaRateLimitError(
-      "Integração Meta temporariamente suspensa por limite de requisições da Meta (cooldown ativo)",
-    );
+    return getLastKnownClients();
   }
 
   return dedupeInFlight(cacheKey, async () => {
@@ -413,20 +428,14 @@ async function fetchMetaDirectClients(): Promise<MetaDashboardClient[]> {
           const errMsg = errData.error?.message || "Falha ao consultar contas de anúncio na Meta";
           if (isMetaRateLimitError(errData.error || errMsg)) {
             triggerMetaRateLimitCooldown(errMsg);
-            if (lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0) {
-              return lastKnownClientsSnapshot;
-            }
-            throw new MetaRateLimitError(errMsg);
+            return getLastKnownClients();
           }
           throw new Error(errMsg);
         }
         const data: any = await res.json();
         if (data.error && isMetaRateLimitError(data.error)) {
           triggerMetaRateLimitCooldown(data.error.message);
-          if (lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0) {
-            return lastKnownClientsSnapshot;
-          }
-          throw new MetaRateLimitError(data.error.message);
+          return getLastKnownClients();
         }
         if (Array.isArray(data.data)) {
           allAccounts = allAccounts.concat(data.data);
@@ -476,11 +485,8 @@ async function fetchMetaDirectClients(): Promise<MetaDashboardClient[]> {
     } catch (err: any) {
       if (isMetaRateLimitError(err)) {
         triggerMetaRateLimitCooldown(err.message);
-        if (lastKnownClientsSnapshot && lastKnownClientsSnapshot.length > 0) {
-          return lastKnownClientsSnapshot;
-        }
       }
-      throw err;
+      return getLastKnownClients();
     }
   });
 }

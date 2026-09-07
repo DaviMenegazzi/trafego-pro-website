@@ -994,3 +994,9 @@
 - [ ] Capturar as claims administrativas e a resposta de `/api/metrics/clients` após login
 - [ ] Corrigir a resolução de todas as unidades para perfil admin
 - [ ] Validar seleção de unidade e métricas com sessão administrativa real
+
+## Ícone do site
+
+- [x] Criar favicon quadrado coerente com a identidade do Tráfego Pro
+- [x] Integrar favicon e ícones para navegador, dispositivos móveis e barra de tarefas
+- [x] Validar a presença do ícone no navegador e publicar a atualização

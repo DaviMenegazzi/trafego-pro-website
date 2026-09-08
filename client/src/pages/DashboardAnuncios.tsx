@@ -12,7 +12,7 @@ import {
   isValidDashboardDateRange,
 } from "@/lib/dashboardDateRange";
 import { getDashboardUnitMenuState, selectAuthorizedDashboardUnit } from "@/lib/dashboardUnitMenu";
-import { AdRow, ConsolidatedAdRow, cleanDisplayName, consolidateAdsList } from "@/lib/adConsolidation";
+import { AdRow, ConsolidatedAdRow, cleanDisplayName, consolidateAdsList, filterActiveCreativesWithConversations } from "@/lib/adConsolidation";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -1219,14 +1219,7 @@ export default function DashboardAnunciosPage() {
           onClose={() => setExportModalOpen(false)}
           unitName={selectedClient?.name ?? "Todas as Unidades"}
           periodLabel={periodLabel}
-          creatives={rows.filter((r) => {
-            const isAtivo = 
-              r.status_formatado === "Ativa" || 
-              r.offer_status === "ACTIVE" || 
-              (r as any).effective_status === "ACTIVE" ||
-              (r as any).status === "ACTIVE";
-            return Boolean(r.ad_image_url) && isAtivo;
-          })}
+          creatives={filterActiveCreativesWithConversations(rows)}
           kpis={{
             totalLeads,
             totalConversas,

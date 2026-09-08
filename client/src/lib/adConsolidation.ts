@@ -149,3 +149,31 @@ export function consolidateAdsList(ads: AdRow[]): ConsolidatedAdRow[] {
 
   return result;
 }
+
+export function isAdActive(ad: Partial<AdRow>): boolean {
+  const statusStr = String(
+    ad.status_formatado ||
+    ad.offer_status ||
+    (ad as any)?.effective_status ||
+    (ad as any)?.status ||
+    ""
+  ).toUpperCase();
+  return (
+    statusStr === "ATIVA" ||
+    statusStr === "ACTIVE" ||
+    statusStr.includes("ATIV") ||
+    ad.status_formatado === "Ativa"
+  );
+}
+
+export function adHasConversations(ad: Partial<AdRow>): boolean {
+  const convs = Number(ad.total_conversas_iniciadas || 0);
+  const leads = Number(ad.total_leads_meta || 0);
+  const conns = Number(ad.total_messaging_connections || 0);
+  return convs > 0 || leads > 0 || conns > 0;
+}
+
+export function filterActiveCreativesWithConversations<T extends Partial<AdRow>>(ads: T[]): T[] {
+  return ads.filter((ad) => Boolean(ad.ad_image_url) && isAdActive(ad) && adHasConversations(ad));
+}
+

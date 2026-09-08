@@ -68,11 +68,23 @@ export function WeeklyCreativeExportModal({
     }
   }, []);
 
-  // Filtra e consolida anúncios com imagem válida
+  // Filtra e consolida anúncios com imagem válida e que tiveram conversas no período
   const activeCreatives = useMemo(() => {
-    const valid = creatives.filter((c) => Boolean(c.ad_image_url));
+    const valid = creatives.filter((c) => {
+      if (!c.ad_image_url) return false;
+      const convs = Number(c.total_conversas_iniciadas || 0);
+      const leads = Number(c.total_leads_meta || 0);
+      const conns = Number((c as any).total_messaging_connections || 0);
+      return convs > 0 || leads > 0 || conns > 0;
+    });
+
     if (viewAllAds) {
-      return valid;
+      return [...valid].sort((a, b) => {
+        const convA = Number(a.total_conversas_iniciadas || 0) || Number(a.total_leads_meta || 0);
+        const convB = Number(b.total_conversas_iniciadas || 0) || Number(b.total_leads_meta || 0);
+        if (convB !== convA) return convB - convA;
+        return Number(b.total_spend || 0) - Number(a.total_spend || 0);
+      });
     }
 
     // Agrupa criativos únicos por imagem canônica e agrega métricas
@@ -95,7 +107,7 @@ export function WeeklyCreativeExportModal({
         key = c.ad_image_url?.split("?")[0] || String(c.id);
       }
 
-      const convs = Number(c.total_conversas_iniciadas || 0);
+      const convs = Number(c.total_conversas_iniciadas || 0) || Number(c.total_leads_meta || 0) || Number((c as any).total_messaging_connections || 0);
       const spend = Number(c.total_spend || 0);
       const imps = Number(c.total_impressions || 0);
 
@@ -138,7 +150,7 @@ export function WeeklyCreativeExportModal({
       return Number(b.total_spend || 0) - Number(a.total_spend || 0);
     });
 
-    return unique;
+    return unique.filter((u) => Number(u.total_conversas_iniciadas || 0) > 0);
   }, [creatives, viewAllAds]);
 
   if (!isOpen || !isAdmin) return null;
@@ -260,7 +272,7 @@ export function WeeklyCreativeExportModal({
 💬 *Leads / Conversas no WhatsApp:* ${totalConvs}
 🎯 *Custo por Lead (CPL):* ${cpl}
 👁️ *Visualizações / Impressões:* ${impressions}
-🖼️ *Criativos Ativos em Veiculação:* ${activeCreatives.length}
+🖼️ *Criativos Ativos com Conversas:* ${activeCreatives.length}
 
 🔗 *Acompanhe os resultados completos na Dashboard:*
 👉 https://www.trafego.pro/dashboard
@@ -450,7 +462,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
                   <Layers className="size-3.5 text-emerald-400" />
-                  <span>Criativos Ativos em Veiculação ({activeCreatives.length})</span>
+                  <span>Criativos Ativos com Conversas ({activeCreatives.length})</span>
                 </h3>
                 <span className="text-[11px] text-zinc-400 font-light">
                   Métricas individuais do período
@@ -459,12 +471,12 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
 
               {activeCreatives.length === 0 ? (
                 <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-xs text-zinc-500">
-                  Nenhum criativo ativo com imagem para o período selecionado.
+                  Nenhum criativo ativo com conversas no período selecionado.
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
                   {activeCreatives.map((cr, idx) => {
-                    const convs = Number(cr.total_conversas_iniciadas || 0);
+                    const convs = Number(cr.total_conversas_iniciadas || 0) || Number(cr.total_leads_meta || 0) || Number((cr as any).total_messaging_connections || 0);
                     const displayName = cr.ad_name || cr.offer_name || `Criativo ${idx + 1}`;
                     const proxiedImage = cr.ad_image_url
                       ? `/api/metrics/image-proxy?url=${encodeURIComponent(cr.ad_image_url)}`

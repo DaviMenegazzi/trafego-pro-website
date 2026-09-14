@@ -37,6 +37,7 @@ import { evolutionRouter } from "./routes/evolutionRoutes.js";
 import { socialRouter } from "./routes/socialRoutes.js";
 import { externalAiRouter } from "./routes/externalAiRoutes.js";
 import { feedbackRouter } from "./routes/feedbackRoutes.js";
+import { formRouter } from "./routes/formRoutes.js";
 import { userAccessRouter } from "./routes/userAccessRoutes.js";
 import { healthRouter } from "./routes/healthRoutes.js";
 import { startDailyMetricsBackupScheduler } from "./dailyMetricsBackupService.js";
@@ -106,6 +107,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.use("/api", socialRouter);
   app.use("/api", externalAiRouter);
   app.use("/api", feedbackRouter);
+  app.use("/api", formRouter);
   app.use("/api", userAccessRouter);
   app.use("/api", healthRouter);
 

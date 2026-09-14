@@ -114,6 +114,8 @@ temp/
 # O arquivo de exemplo data/db.example.json continua versionado.
 data/db.json
 data/external_ai_tokens.json
+data/form_api_keys.json
+data/form_submissions.json
 
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
@@ -122,3 +124,6 @@ data/external_ai_tokens.json
 client/public/__manus__/version.json
 .project-config.json
 scratch/
+server/scripts/
+vidacard_*.csv
+vidacard_*.json

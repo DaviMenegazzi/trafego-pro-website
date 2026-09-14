@@ -23,6 +23,7 @@ import {
   Building2,
   BarChart3,
   DollarSign,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
@@ -64,6 +65,7 @@ const NAV_ADMIN_ONLY = [
   { to: "/dashboard/feedback-leads/list", label: "Feedbacks enviados", icon: Inbox },
   { to: "/dashboard/usuarios", label: "Usuários", icon: ShieldCheck },
   { to: "/dashboard/integracoes-ia", label: "Integrações de IA", icon: Link2 },
+  { to: "/dashboard/formularios", label: "Formulários & Endpoints", icon: FileSpreadsheet },
 ];
 
 function ClientSelector({ collapsed, variant = "sidebar" }: { collapsed: boolean; variant?: "sidebar" | "compact" }) {

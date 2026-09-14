@@ -7,6 +7,7 @@ import type { FormApiKeyRecord, FormSubmissionRecord } from "./formSubmissionPol
 // ─── MySQL Pool ─────────────────────────────────────────────────────────────
 
 let pool: Pool | null = null;
+let schemaReady: Promise<void> | null = null;
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const KEYS_FILE = path.join(DATA_DIR, "form_api_keys.json");
 const SUBMISSIONS_FILE = path.join(DATA_DIR, "form_submissions.json");
@@ -28,6 +29,55 @@ function db(): Pool {
     });
   }
   return pool;
+}
+
+const FORM_SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS form_api_keys (
+    id CHAR(36) NOT NULL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    key_prefix VARCHAR(32) NOT NULL,
+    key_hash CHAR(64) NOT NULL,
+    client_ids JSON NOT NULL,
+    allowed_origins JSON NULL,
+    created_by VARCHAR(255) NOT NULL,
+    expires_at DATETIME NULL,
+    revoked_at DATETIME NULL,
+    rate_window_started_at DATETIME NULL,
+    rate_window_count INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_form_api_keys_hash (key_hash),
+    KEY idx_form_api_keys_created_at (created_at),
+    KEY idx_form_api_keys_active (revoked_at, expires_at)
+  )`,
+  `CREATE TABLE IF NOT EXISTS form_submissions (
+    id CHAR(36) NOT NULL PRIMARY KEY,
+    form_key_id CHAR(36) NOT NULL,
+    form_name VARCHAR(255) NOT NULL,
+    client_id VARCHAR(255) NOT NULL,
+    fields JSON NOT NULL,
+    metadata JSON NULL,
+    ip_hash CHAR(64) NULL,
+    submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_form_submissions_client_date (client_id, submitted_at),
+    KEY idx_form_submissions_key_date (form_key_id, submitted_at),
+    CONSTRAINT fk_form_submissions_key FOREIGN KEY (form_key_id)
+      REFERENCES form_api_keys(id)
+  )`,
+] as const;
+
+/** Lazily provisions the isolated forms tables before their first database use. */
+async function ensureFormSchema(): Promise<void> {
+  if (!getDbUri()) return;
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      for (const statement of FORM_SCHEMA_STATEMENTS) await db().execute(statement);
+    })().catch((error) => {
+      // Allow a later request to retry after a transient database failure.
+      schemaReady = null;
+      throw error;
+    });
+  }
+  await schemaReady;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -193,6 +243,7 @@ export async function createFormApiKeySql(input: {
     return res;
   }
 
+  await ensureFormSchema();
   await db().execute(
     `INSERT INTO form_api_keys (id, name, key_prefix, key_hash, client_ids, allowed_origins, created_by, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -220,6 +271,7 @@ async function getFormApiKeySqlById(id: string): Promise<FormApiKeyRecord | null
     const { rateWindowCount: _c, rateWindowStartedAt: _s, ...res } = found;
     return res;
   }
+  await ensureFormSchema();
   const [rows] = await db().query<KeyRow[]>(
     "SELECT id, name, key_prefix, key_hash, client_ids, allowed_origins, created_by, expires_at, revoked_at, created_at FROM form_api_keys WHERE id = ? LIMIT 1",
     [id],
@@ -235,6 +287,7 @@ export async function findFormApiKeyByHashSql(keyHash: string): Promise<FormApiK
     const { rateWindowCount: _c, rateWindowStartedAt: _s, ...res } = found;
     return res;
   }
+  await ensureFormSchema();
   const [rows] = await db().query<KeyRow[]>(
     "SELECT id, name, key_prefix, key_hash, client_ids, allowed_origins, created_by, expires_at, revoked_at, created_at FROM form_api_keys WHERE key_hash = ? LIMIT 1",
     [keyHash],
@@ -246,6 +299,7 @@ export async function listFormApiKeysSql(): Promise<FormApiKeyRecord[]> {
   if (!getDbUri()) {
     return loadKeysFile().map(({ rateWindowCount: _c, rateWindowStartedAt: _s, ...k }) => k);
   }
+  await ensureFormSchema();
   const [rows] = await db().query<KeyRow[]>(
     "SELECT id, name, key_prefix, key_hash, client_ids, allowed_origins, created_by, expires_at, revoked_at, created_at FROM form_api_keys ORDER BY created_at DESC",
   );
@@ -261,6 +315,7 @@ export async function revokeFormApiKeySql(id: string): Promise<boolean> {
     saveKeysFile(keys);
     return true;
   }
+  await ensureFormSchema();
   const [result] = await db().execute<ResultSetHeader>(
     "UPDATE form_api_keys SET revoked_at = UTC_TIMESTAMP() WHERE id = ? AND revoked_at IS NULL",
     [id],
@@ -290,6 +345,7 @@ export async function consumeFormRateLimitSql(
   }
 
   // MySQL: janela atômica de rate limit (1 minuto)
+  await ensureFormSchema();
   await db().execute(
     `UPDATE form_api_keys SET
        rate_window_count = CASE
@@ -345,6 +401,7 @@ export async function createFormSubmissionSql(input: {
     return submission;
   }
 
+  await ensureFormSchema();
   await db().execute(
     `INSERT INTO form_submissions (id, form_key_id, form_name, client_id, fields, metadata, ip_hash)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -413,6 +470,7 @@ export async function listFormSubmissionsSql(filters: {
   }
 
   // MySQL
+  await ensureFormSchema();
   const clauses: string[] = [];
   const values: (string | number)[] = [];
 
@@ -462,6 +520,7 @@ export async function getFormSubmissionSqlById(id: string): Promise<FormSubmissi
     const submissions = loadSubmissionsFile();
     return submissions.find((s) => s.id === id) ?? null;
   }
+  await ensureFormSchema();
   const [rows] = await db().query<SubmissionRow[]>(
     "SELECT id, form_key_id, form_name, client_id, fields, metadata, ip_hash, submitted_at FROM form_submissions WHERE id = ? LIMIT 1",
     [id],
@@ -478,6 +537,7 @@ export async function deleteFormSubmissionSql(id: string): Promise<boolean> {
     saveSubmissionsFile(submissions);
     return true;
   }
+  await ensureFormSchema();
   const [result] = await db().execute<ResultSetHeader>(
     "DELETE FROM form_submissions WHERE id = ?",
     [id],

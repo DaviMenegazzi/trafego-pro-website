@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { JWT_SECRET, hasUnitAccess, isAdmin, requireAuth, requireAdmin } from "../auth.js";
+import { logger } from "../logger.js";
 import {
   FORM_API_KEY_PREFIX,
   FORM_RATE_LIMIT_PER_MINUTE,
@@ -54,6 +55,10 @@ function requireFormApiKey(req: Request, res: Response, next: NextFunction): voi
     try {
       const keyRecord = await findFormApiKeyByHashSql(hashFormApiKey(rawKey));
       if (!keyRecord || !isFormApiKeyActive(keyRecord)) {
+        logger.warn("[forms] Chave de API rejeitada", {
+          keyPrefix: formApiKeyPrefix(rawKey),
+          reason: !keyRecord ? "not_found" : keyRecord.revokedAt ? "revoked" : "expired",
+        });
         res.status(401).json({ error: "Chave de API ausente, revogada ou expirada" });
         return;
       }
@@ -61,6 +66,12 @@ function requireFormApiKey(req: Request, res: Response, next: NextFunction): voi
       // Verificar Origin
       const origin = req.headers.origin as string | undefined;
       if (!isFormApiKeyOriginAllowed(keyRecord, origin)) {
+        logger.warn("[forms] Origem não autorizada", {
+          keyId: keyRecord.id,
+          keyName: keyRecord.name,
+          origin: origin ?? null,
+          allowedOrigins: keyRecord.allowedOrigins,
+        });
         res.status(403).json({ error: "Origem não autorizada para esta chave" });
         return;
       }
@@ -70,6 +81,7 @@ function requireFormApiKey(req: Request, res: Response, next: NextFunction): voi
       res.setHeader("X-RateLimit-Limit", String(FORM_RATE_LIMIT_PER_MINUTE));
       res.setHeader("X-RateLimit-Remaining", String(Math.max(0, FORM_RATE_LIMIT_PER_MINUTE - rate.count)));
       if (!rate.allowed) {
+        logger.warn("[forms] Rate limit excedido", { keyId: keyRecord.id, keyName: keyRecord.name, count: rate.count });
         res.setHeader("Retry-After", "60");
         res.status(429).json({ error: "Limite de envios excedido. Tente novamente em 1 minuto." });
         return;
@@ -102,6 +114,12 @@ formRouter.post("/forms/submit", requireFormApiKey, async (req: Request, res: Re
 
     // Verificar se a chave permite essa unidade
     if (!isFormApiKeyClientAllowed(keyRecord, clientId)) {
+      logger.warn("[forms] Unidade não autorizada para esta chave", {
+        keyId: keyRecord.id,
+        keyName: keyRecord.name,
+        requestedClientId: clientId,
+        keyClientIds: keyRecord.clientIds,
+      });
       res.status(403).json({ error: "Esta chave de API não tem permissão para esta unidade" });
       return;
     }

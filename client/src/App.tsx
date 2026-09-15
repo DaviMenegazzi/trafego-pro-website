@@ -61,8 +61,8 @@ function ExistingSiteRoutes() {
       <AdminRoute path={"/dashboard/usuarios/"} component={DashboardUsuarios} />
       <AdminRoute path={"/dashboard/integracoes-ia"} component={DashboardExternalAiTokens} />
       <AdminRoute path={"/dashboard/integracoes-ia/"} component={DashboardExternalAiTokens} />
-      <AdminRoute path={"/dashboard/formularios"} component={DashboardFormularios} />
-      <AdminRoute path={"/dashboard/formularios/"} component={DashboardFormularios} />
+      <Route path={"/dashboard/formularios"} component={DashboardFormularios} />
+      <Route path={"/dashboard/formularios/"} component={DashboardFormularios} />
       <AdminRoute path={"/admin/metricas"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/metricas/"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/financeiro"} component={AdminFinanceiro} />

@@ -45,6 +45,7 @@ import {
 import { FormSubmissionDetailModal } from "./forms/FormSubmissionDetailModal";
 import { NewFormEndpointModal } from "./forms/NewFormEndpointModal";
 import { FormIntegrationCodeModal } from "./forms/FormIntegrationCodeModal";
+import { checkAdminAuth } from "@/components/AdminRoute";
 
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem("tp_token");
@@ -58,20 +59,53 @@ export default function DashboardFormularios() {
   const [, setLocation] = useLocation();
   const { clients } = useClientContext();
 
-  // Admin Guard
+  // Guard de acesso:
+  // - Admin: acesso total (submissões + gestão de endpoints/chaves).
+  // - Cliente: só entra se a própria unidade já tiver ao menos 1 endpoint
+  //   ativo (verificado no servidor, sem expor nada sobre as chaves). Quando
+  //   entra, só vê os resultados — a gestão de endpoints fica invisível.
+  const [access, setAccess] = useState<{ ready: boolean; isAdmin: boolean }>({
+    ready: false,
+    isAdmin: false,
+  });
+
   useEffect(() => {
-    document.title = "Tráfego Pro — Formulários & Endpoints";
-    try {
-      const user = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
-      if (!localStorage.getItem("tp_token")) {
-        setLocation("/login");
-      } else if (user.role !== "admin") {
-        toast.error("Acesso restrito a administradores");
+    document.title = "Tráfego Pro — Formulários";
+    const { isAuthenticated, isAdmin } = checkAdminAuth();
+    if (!isAuthenticated) {
+      setLocation("/login");
+      return;
+    }
+    if (isAdmin) {
+      setAccess({ ready: true, isAdmin: true });
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/forms/keys/exists", { headers: authHeaders() });
+        if (res.status === 401) {
+          setLocation("/login");
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok || !data.hasEndpoint) {
+          toast.error("Nenhum formulário disponível para sua unidade ainda.");
+          setLocation("/dashboard");
+          return;
+        }
+        setAccess({ ready: true, isAdmin: false });
+      } catch {
+        if (cancelled) return;
+        toast.error("Falha ao verificar acesso aos formulários");
         setLocation("/dashboard");
       }
-    } catch {
-      setLocation("/login");
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [setLocation]);
 
   // Tabs
@@ -151,9 +185,10 @@ export default function DashboardFormularios() {
   }, []);
 
   useEffect(() => {
+    if (!access.ready) return;
     void fetchSubmissions();
-    void fetchKeys();
-  }, [fetchSubmissions, fetchKeys]);
+    if (access.isAdmin) void fetchKeys();
+  }, [access.ready, access.isAdmin, fetchSubmissions, fetchKeys]);
 
   // Delete submission
   const handleDeleteSubmission = async (id: string) => {
@@ -298,6 +333,19 @@ export default function DashboardFormularios() {
     toast.success("Planilha exportada com sucesso!");
   };
 
+  if (!access.ready) {
+    return (
+      <AppLayout>
+        <main className="mx-auto max-w-[1280px] px-4 py-16 text-center">
+          <RefreshCw className="mx-auto size-7 animate-spin text-emerald-400 mb-3" />
+          <p className="text-xs text-zinc-400">Carregando...</p>
+        </main>
+      </AppLayout>
+    );
+  }
+
+  const isAdmin = access.isAdmin;
+
   return (
     <AppLayout>
       <main className="mx-auto max-w-[1280px] space-y-6 px-4 py-6 md:px-8">
@@ -306,13 +354,15 @@ export default function DashboardFormularios() {
           <div>
             <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
               <Layers className="size-3.5" />
-              Gestão de Formulários Externos
+              {isAdmin ? "Gestão de Formulários Externos" : "Formulários da sua unidade"}
             </p>
             <h1 className="font-display text-2xl font-semibold tracking-tight text-zinc-100">
-              Formulários & Endpoints
+              {isAdmin ? "Formulários & Endpoints" : "Resultados de Formulários"}
             </h1>
             <p className="mt-1 max-w-2xl text-xs text-zinc-400 leading-relaxed">
-              Integre formulários de landing pages externas com o Tráfego Pro e visualize todas as respostas de forma padronizada e dinâmica por unidade.
+              {isAdmin
+                ? "Integre formulários de landing pages externas com o Tráfego Pro e visualize todas as respostas de forma padronizada e dinâmica por unidade."
+                : "Acompanhe aqui todas as respostas recebidas pelos formulários configurados para a sua unidade."}
             </p>
           </div>
 
@@ -321,7 +371,7 @@ export default function DashboardFormularios() {
               type="button"
               onClick={() => {
                 void fetchSubmissions();
-                void fetchKeys();
+                if (isAdmin) void fetchKeys();
               }}
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-white/10 hover:text-white transition"
               title="Atualizar dados"
@@ -332,19 +382,21 @@ export default function DashboardFormularios() {
               Atualizar
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowNewKeyModal(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-xs font-semibold text-zinc-950 transition shadow-sm active:scale-95"
-            >
-              <Plus className="size-4 stroke-[2.5]" />
-              Novo Formulário / Endpoint
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowNewKeyModal(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-xs font-semibold text-zinc-950 transition shadow-sm active:scale-95"
+              >
+                <Plus className="size-4 stroke-[2.5]" />
+                Novo Formulário / Endpoint
+              </button>
+            )}
           </div>
         </header>
 
         {/* Top Metric Cards — Exactly like TalentBankAdmin */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className={`grid grid-cols-2 gap-3 ${isAdmin ? "sm:grid-cols-4" : "sm:grid-cols-2"}`}>
           <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4 shadow-sm">
             <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
               Total de Submissões
@@ -363,62 +415,68 @@ export default function DashboardFormularios() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4 shadow-sm">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
-              Franquias Ativas
-            </span>
-            <div className="mt-1 text-2xl font-bold text-zinc-100 font-display">
-              {metrics.activeUnits}
+          {isAdmin && (
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4 shadow-sm">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
+                Franquias Ativas
+              </span>
+              <div className="mt-1 text-2xl font-bold text-zinc-100 font-display">
+                {metrics.activeUnits}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4 shadow-sm">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
-              Endpoints Configurados
-            </span>
-            <div className="mt-1 text-2xl font-bold text-zinc-100 font-display">
-              {metrics.activeKeysCount}
+          {isAdmin && (
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4 shadow-sm">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
+                Endpoints Configurados
+              </span>
+              <div className="mt-1 text-2xl font-bold text-zinc-100 font-display">
+                {metrics.activeKeysCount}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Main Tabs Navigation */}
-        <div className="flex items-center gap-2 border-b border-white/10 pb-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("submissions")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-              activeTab === "submissions"
-                ? "bg-white/10 text-white shadow-sm border border-white/10"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border border-transparent"
-            }`}
-          >
-            <FileSpreadsheet className="size-4" />
-            Submissões Recebidas
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
-              {filteredSubmissions.length}
-            </span>
-          </button>
+        {/* Main Tabs Navigation — só admin vê a aba de Endpoints/Chaves */}
+        {isAdmin && (
+          <div className="flex items-center gap-2 border-b border-white/10 pb-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab("submissions")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                activeTab === "submissions"
+                  ? "bg-white/10 text-white shadow-sm border border-white/10"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border border-transparent"
+              }`}
+            >
+              <FileSpreadsheet className="size-4" />
+              Submissões Recebidas
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
+                {filteredSubmissions.length}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("endpoints")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-              activeTab === "endpoints"
-                ? "bg-white/10 text-white shadow-sm border border-white/10"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border border-transparent"
-            }`}
-          >
-            <KeyRound className="size-4" />
-            Endpoints & Chaves de API
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
-              {keys.length}
-            </span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("endpoints")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                activeTab === "endpoints"
+                  ? "bg-white/10 text-white shadow-sm border border-white/10"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border border-transparent"
+              }`}
+            >
+              <KeyRound className="size-4" />
+              Endpoints & Chaves de API
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
+                {keys.length}
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* TAB 1: SUBMISSIONS LIST */}
-        {activeTab === "submissions" && (
+        {(!isAdmin || activeTab === "submissions") && (
           <div className="space-y-4">
             {/* Filter and Action Bar — Talent Candidates Style */}
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 rounded-2xl border border-white/10 bg-zinc-900/50 p-4 backdrop-blur-sm">
@@ -450,19 +508,21 @@ export default function DashboardFormularios() {
                   ))}
                 </select>
 
-                {/* Form Filter */}
-                <select
-                  value={selectedKeyFilter}
-                  onChange={(e) => setSelectedKeyFilter(e.target.value)}
-                  className="rounded-xl border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none transition"
-                >
-                  <option value="all">Todos os Formulários</option>
-                  {keys.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.name}
-                    </option>
-                  ))}
-                </select>
+                {/* Form Filter — depende da lista de chaves, só carregada para admin */}
+                {isAdmin && (
+                  <select
+                    value={selectedKeyFilter}
+                    onChange={(e) => setSelectedKeyFilter(e.target.value)}
+                    className="rounded-xl border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none transition"
+                  >
+                    <option value="all">Todos os Formulários</option>
+                    {keys.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
                 {/* Export Button */}
                 <button
@@ -636,8 +696,8 @@ export default function DashboardFormularios() {
           </div>
         )}
 
-        {/* TAB 2: ENDPOINTS & KEYS */}
-        {activeTab === "endpoints" && (
+        {/* TAB 2: ENDPOINTS & KEYS — nunca renderizado para clientes */}
+        {isAdmin && activeTab === "endpoints" && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-white/10 bg-zinc-900/50 p-4">
               <div>
@@ -728,6 +788,7 @@ export default function DashboardFormularios() {
                             k.clientIds.map((cId) => (
                               <span
                                 key={cId}
+                                title={`ID da conta Meta: ${cId}`}
                                 className="rounded-md bg-emerald-500/5 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/15"
                               >
                                 {clientNameMap.get(cId) || cId}
@@ -790,8 +851,8 @@ export default function DashboardFormularios() {
         />
       )}
 
-      {/* MODAL: Novo Endpoint */}
-      {showNewKeyModal && (
+      {/* MODAL: Novo Endpoint — gestão de endpoints é exclusiva de admin */}
+      {isAdmin && showNewKeyModal && (
         <NewFormEndpointModal
           clients={clients}
           onClose={() => setShowNewKeyModal(false)}
@@ -807,7 +868,7 @@ export default function DashboardFormularios() {
       )}
 
       {/* MODAL: Código de Integração */}
-      {codeModalData && (
+      {isAdmin && codeModalData && (
         <FormIntegrationCodeModal
           formKey={codeModalData.formKey}
           apiKey={codeModalData.apiKey}
@@ -816,7 +877,7 @@ export default function DashboardFormularios() {
       )}
 
       {/* MODAL: Confirmação de Revogação de Chave */}
-      {revokingKey && (
+      {isAdmin && revokingKey && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="glass-card w-full max-w-sm rounded-3xl border border-red-500/20 bg-zinc-950 p-6 shadow-2xl">
             <div className="flex items-center gap-3 text-red-400 mb-2">

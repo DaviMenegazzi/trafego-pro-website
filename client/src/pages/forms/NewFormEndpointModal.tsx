@@ -183,6 +183,13 @@ export function NewFormEndpointModal({
               </div>
             </div>
 
+            <p className="mb-2 flex items-start gap-1.5 text-[11px] text-zinc-500">
+              <ShieldCheck className="mt-0.5 size-3 shrink-0 text-zinc-600" />
+              O nome aqui é só um rótulo. O que a chave realmente grava e usa para filtrar é o{" "}
+              <span className="font-mono text-zinc-400">ID da conta de anúncios (Meta)</span> mostrado
+              abaixo de cada unidade — não o nome da franquia.
+            </p>
+
             <div className="relative mb-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-500" />
               <input
@@ -212,7 +219,10 @@ export function NewFormEndpointModal({
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <Building2 className={`size-3.5 shrink-0 ${isChecked ? "text-emerald-400" : "text-zinc-500"}`} />
-                        <span className="truncate font-medium">{u.name}</span>
+                        <div className="min-w-0">
+                          <span className="block truncate font-medium">{u.name}</span>
+                          <span className="block truncate font-mono text-[10px] text-zinc-500">{u.id}</span>
+                        </div>
                       </div>
                       <div
                         className={`flex size-4 items-center justify-center rounded border transition shrink-0 ${

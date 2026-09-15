@@ -68,6 +68,15 @@ const NAV_ADMIN_ONLY = [
   { to: "/dashboard/formularios", label: "Formulários & Endpoints", icon: FileSpreadsheet },
 ];
 
+// Item exibido para clientes (não-admin) — só quando a unidade já tem ao
+// menos 1 endpoint de formulário ativo. Endpoints em si nunca aparecem aqui,
+// só os resultados recebidos.
+const CLIENT_FORMS_RESULTS_ITEM = {
+  to: "/dashboard/formularios",
+  label: "Formulários",
+  icon: FileSpreadsheet,
+};
+
 function ClientSelector({ collapsed, variant = "sidebar" }: { collapsed: boolean; variant?: "sidebar" | "compact" }) {
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
   const [open, setOpen] = useState(false);
@@ -241,6 +250,46 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   const admin = isAdminUser();
 
+  // Clientes (não-admin): descobre, sem expor nada sobre as chaves em si, se
+  // a unidade já tem ao menos 1 endpoint de formulário ativo — só então o
+  // link "Resultados de Formulários" aparece no menu.
+  const [clientFormsVisible, setClientFormsVisible] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem("tp_forms_endpoint_visible") === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (admin) return;
+    const token = localStorage.getItem("tp_token");
+    if (!token) return;
+    let cancelled = false;
+    fetch("/api/forms/keys/exists", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const visible = Boolean(data.hasEndpoint);
+        setClientFormsVisible(visible);
+        try {
+          sessionStorage.setItem("tp_forms_endpoint_visible", visible ? "1" : "0");
+        } catch {
+          // ignore
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [admin]);
+
+  const visibleNavBase = useMemo(
+    () => (!admin && clientFormsVisible ? [...NAV_BASE, CLIENT_FORMS_RESULTS_ITEM] : NAV_BASE),
+    [admin, clientFormsVisible],
+  );
+
   useEffect(() => {
     if (NAV_ADMIN_ONLY.some((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))) {
       setAdminMenuOpen(true);
@@ -285,7 +334,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Nav */}
       <nav className={`flex-1 space-y-1 ${isCollapsed ? "px-2 pt-4" : "px-3 pt-4"}`}>
-        {NAV_BASE.map((item) => {
+        {visibleNavBase.map((item) => {
           const active = pathname === item.to || (item.to !== "/dashboard" && pathname.startsWith(item.to));
           const Icon = item.icon;
           return (

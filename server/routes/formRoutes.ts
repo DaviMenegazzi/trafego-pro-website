@@ -319,6 +319,36 @@ formRouter.delete("/forms/submissions/:id", requireAuth, requireAdmin, async (re
   }
 });
 
+// ─── GET /api/forms/keys/exists ─────────────────────────────────────────────
+// Acessível a qualquer usuário autenticado (não só admin). Não expõe nenhum
+// dado da chave — só informa se existe ao menos um endpoint ativo para as
+// unidades do usuário, usado pelo cliente para decidir se a aba de resultados
+// e o link no menu devem aparecer.
+formRouter.get("/forms/keys/exists", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const claims = req.claims!;
+    if (isAdmin(claims)) {
+      res.json({ hasEndpoint: true });
+      return;
+    }
+    const allowed = claims.allowedClientIds.filter((id) => id !== "*");
+    if (allowed.length === 0) {
+      res.json({ hasEndpoint: false });
+      return;
+    }
+    const keys = await listFormApiKeysSql();
+    const hasEndpoint = keys.some(
+      (key) =>
+        isFormApiKeyActive(key) &&
+        (key.clientIds.includes("*") || key.clientIds.some((id) => allowed.includes(id))),
+    );
+    res.json({ hasEndpoint });
+  } catch (error) {
+    console.error("[forms] Falha ao verificar existência de endpoint:", error);
+    res.status(503).json({ error: "Não foi possível verificar os endpoints" });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // GERENCIAMENTO DE CHAVES — Admin only
 // ═══════════════════════════════════════════════════════════════════════════

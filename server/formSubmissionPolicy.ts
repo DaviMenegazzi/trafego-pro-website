@@ -68,7 +68,8 @@ export function isFormApiKeyActive(key: FormApiKeyRecord): boolean {
 
 export function isFormApiKeyClientAllowed(key: FormApiKeyRecord, clientId: string): boolean {
   if (key.clientIds.includes("*")) return true;
-  return key.clientIds.includes(clientId);
+  const normalized = clientId.toLowerCase();
+  return key.clientIds.some((id) => id.toLowerCase() === normalized);
 }
 
 export function isFormApiKeyOriginAllowed(key: FormApiKeyRecord, origin: string | undefined): boolean {

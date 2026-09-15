@@ -88,8 +88,16 @@ function iso(value: Date | string | null): string | null {
   return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
 }
 
-function parseJson<T>(value: string | null | undefined, fallback: T): T {
-  if (!value) return fallback;
+/**
+ * Colunas MySQL do tipo JSON já chegam decodificadas pelo driver mysql2
+ * (array/objeto nativo), não como texto — só o fallback baseado em arquivo
+ * local entrega string crua. Por isso aceitamos os dois formatos aqui: um
+ * `JSON.parse` redundante sobre um valor já decodificado falha silenciosamente
+ * e some com os dados (ex.: clientIds sempre voltando vazio do banco).
+ */
+function parseJson<T>(value: unknown, fallback: T): T {
+  if (value == null) return fallback;
+  if (typeof value !== "string") return value as T;
   try {
     return JSON.parse(value) as T;
   } catch {
@@ -161,8 +169,9 @@ type KeyRow = RowDataPacket & {
   name: string;
   key_prefix: string;
   key_hash: string;
-  client_ids: string;
-  allowed_origins: string | null;
+  // Coluna JSON: mysql2 entrega já decodificada (array), não como string.
+  client_ids: unknown;
+  allowed_origins: unknown;
   created_by: string;
   expires_at: Date | string | null;
   revoked_at: Date | string | null;
@@ -174,8 +183,9 @@ type SubmissionRow = RowDataPacket & {
   form_key_id: string;
   form_name: string;
   client_id: string;
-  fields: string;
-  metadata: string | null;
+  // Coluna JSON: mysql2 entrega já decodificada (objeto), não como string.
+  fields: unknown;
+  metadata: unknown;
   ip_hash: string | null;
   submitted_at: Date | string;
 };

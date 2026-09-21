@@ -97,6 +97,7 @@ export async function listTalentFormsForClient(clientId: string): Promise<Talent
     const row = value as Record<string, unknown>;
     const f = form(row, asArray(row.talent_form_fields).map((item) => field(asObject(item))));
     f.candidateCount = countMap[f.id] || 0;
+    f.clientId = clientId;
     return f;
   });
 }
@@ -115,6 +116,7 @@ export async function getTalentFormForClient(clientId: string, formId?: string):
   if (!data) return null;
   const row = data as Record<string, unknown>;
   const f = form(row, asArray(row.talent_form_fields).map((item) => field(asObject(item))));
+  f.clientId = clientId;
 
   const { count } = await sb
     .from("talent_submissions")
@@ -129,7 +131,9 @@ export async function createTalentFormForClient(input: { clientId: string; publi
   const uuid = toTalentClientUuid(input.clientId);
   const { data, error } = await sb.from("talent_forms").insert({ client_id: uuid, public_slug: input.publicSlug, title: input.title, subtitle: input.subtitle }).select().single();
   if (error) throw new Error(error.message);
-  return form(data as Record<string, unknown>, []);
+  const f = form(data as Record<string, unknown>, []);
+  f.clientId = input.clientId;
+  return f;
 }
 
 export async function saveTalentForm(input: {
@@ -159,7 +163,8 @@ export async function saveTalentForm(input: {
       success_message: input.successMessage,
       is_published: input.isPublished,
     })
-    .eq("id", input.formId);
+    .eq("id", input.formId)
+    .eq("client_id", uuid);
   if (formError) throw new Error(formError.message);
   const { error: deleteError } = await sb.from("talent_form_fields").delete().eq("form_id", input.formId);
   if (deleteError) throw new Error(deleteError.message);
@@ -179,7 +184,7 @@ export async function saveTalentForm(input: {
     const { error } = await sb.from("talent_form_fields").insert(rows);
     if (error) throw new Error(error.message);
   }
-  const saved = await getTalentFormForClient(uuid, input.formId);
+  const saved = await getTalentFormForClient(input.clientId, input.formId);
   if (!saved) throw new Error("Formulário não encontrado após salvar");
   return saved;
 }
@@ -239,14 +244,13 @@ export async function listTalentSubmissions(input: {
   const uuid = toTalentClientUuid(input.clientId);
   let query = getTalentSupabase()
     .from("talent_submissions")
-    .select("*");
-  
+    .select("*")
+    .eq("client_id", uuid);
+
   if (input.formId) {
     query = query.eq("form_id", input.formId);
-  } else {
-    query = query.eq("client_id", uuid);
   }
-  
+
   query = query
     .order("created_at", { ascending: false })
     .limit(Math.min(Math.max(input.limit ?? 200, 1), 500));
@@ -262,16 +266,24 @@ export async function listTalentSubmissions(input: {
   }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => submission(row as Record<string, unknown>));
+  return (data ?? []).map((row) => {
+    const s = submission(row as Record<string, unknown>);
+    s.clientId = input.clientId;
+    return s;
+  });
 }
 
 export async function updateTalentSubmission(input: { id: string; clientId: string; status?: TalentSubmissionStatus; notes?: string | null }): Promise<TalentSubmission | null> {
   const patch: Record<string, unknown> = {};
   if (input.status) patch.status = input.status;
   if (input.notes !== undefined) patch.notes = input.notes;
-  const { data, error } = await getTalentSupabase().from("talent_submissions").update(patch).eq("id", input.id).select().maybeSingle();
+  const uuid = toTalentClientUuid(input.clientId);
+  const { data, error } = await getTalentSupabase().from("talent_submissions").update(patch).eq("id", input.id).eq("client_id", uuid).select().maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? submission(data as Record<string, unknown>) : null;
+  if (!data) return null;
+  const s = submission(data as Record<string, unknown>);
+  s.clientId = input.clientId;
+  return s;
 }
 
 export async function createTalentAttachmentUrl(storageKey: string): Promise<string> { const { data, error } = await getTalentSupabase().storage.from("talent-resumes").createSignedUrl(storageKey, 60 * 10); if (error || !data?.signedUrl) throw new Error(error?.message ?? "Não foi possível assinar o currículo"); return data.signedUrl; }

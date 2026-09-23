@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
-import { Settings, User, Lock, Bell, Palette, Save, Eye, EyeOff } from "lucide-react";
+import { Settings, User, Lock, Save, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+
+function authHeaders(): HeadersInit {
+  const token = localStorage.getItem("tp_token");
+  return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
+async function readError(response: Response, fallback: string): Promise<string> {
+  const data = await response.json().catch(() => ({}));
+  return typeof data?.error === "string" ? data.error : fallback;
+}
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
@@ -12,31 +22,58 @@ function useAuthGuard() {
 export default function DashboardConfiguracoesPage() {
   useAuthGuard();
   useEffect(() => { document.title = "Tráfego Pro - Configurações"; }, []);
-  const [tab, setTab] = useState<"profile" | "security" | "notifications">("profile");
+  const [tab, setTab] = useState<"profile" | "security">("profile");
   const [showPwd, setShowPwd] = useState(false);
   const [profile, setProfile] = useState(() => {
     try { return JSON.parse(localStorage.getItem("tp_user") ?? "{}"); } catch { return {}; }
   });
   const [pwdForm, setPwdForm] = useState({ current: "", next: "", confirm: "" });
-  const [notifs, setNotifs] = useState({ newClient: true, payment: true, pipeline: false });
+  const [saving, setSaving] = useState(false);
 
-  function saveProfile() {
-    localStorage.setItem("tp_user", JSON.stringify(profile));
-    toast.success("Perfil atualizado");
+  // O nome é gravado no servidor; e-mail e perfil de acesso só a administração altera.
+  async function saveProfile() {
+    if ((profile.name ?? "").trim().length < 3) { toast.error("O nome deve ter pelo menos 3 caracteres"); return; }
+    setSaving(true);
+    try {
+      const response = await fetch("/api/auth/profile", {
+        method: "PATCH", headers: authHeaders(), credentials: "include", body: JSON.stringify({ name: profile.name }),
+      });
+      if (!response.ok) { toast.error(await readError(response, "Não foi possível salvar o nome")); return; }
+      const data = await response.json();
+      localStorage.setItem("tp_token", data.token);
+      localStorage.setItem("tp_user", JSON.stringify(data.user));
+      setProfile(data.user);
+      toast.success("Nome atualizado");
+    } catch {
+      toast.error("Sem conexão com o servidor");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function changePwd() {
+  async function changePwd() {
     if (!pwdForm.current || !pwdForm.next) { toast.error("Preencha todos os campos"); return; }
     if (pwdForm.next !== pwdForm.confirm) { toast.error("As senhas não coincidem"); return; }
     if (pwdForm.next.length < 6) { toast.error("A senha deve ter pelo menos 6 caracteres"); return; }
-    toast.success("Senha alterada com sucesso");
-    setPwdForm({ current: "", next: "", confirm: "" });
+    setSaving(true);
+    try {
+      const response = await fetch("/api/auth/password", {
+        method: "POST", headers: authHeaders(), credentials: "include",
+        body: JSON.stringify({ currentPassword: pwdForm.current, newPassword: pwdForm.next }),
+      });
+      if (!response.ok) { toast.error(await readError(response, "Não foi possível alterar a senha")); return; }
+      toast.success("Senha alterada com sucesso");
+      setPwdForm({ current: "", next: "", confirm: "" });
+    } catch {
+      toast.error("Sem conexão com o servidor");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const tabs = [
     { id: "profile" as const, label: "Perfil", icon: User },
     { id: "security" as const, label: "Segurança", icon: Lock },
-    { id: "notifications" as const, label: "Notificações", icon: Bell },
   ];
 
   return (
@@ -69,17 +106,12 @@ export default function DashboardConfiguracoesPage() {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">E-mail</label>
-                <input value={profile.email ?? ""} onChange={e => setProfile((p: any) => ({ ...p, email: e.target.value }))} type="email"
-                  className="w-full text-sm rounded-lg border border-border bg-muted/20 px-3 py-2 outline-none focus:ring-1 focus:ring-primary" />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs text-muted-foreground mb-1 block">Cargo / Função</label>
-                <input value={profile.role_label ?? ""} onChange={e => setProfile((p: any) => ({ ...p, role_label: e.target.value }))} placeholder="Ex: Gestor de Tráfego"
-                  className="w-full text-sm rounded-lg border border-border bg-muted/20 px-3 py-2 outline-none focus:ring-1 focus:ring-primary" />
+                <input value={profile.email ?? ""} readOnly disabled type="email" title="Para trocar o e-mail, fale com um administrador"
+                  className="w-full text-sm rounded-lg border border-border bg-muted/20 px-3 py-2 outline-none opacity-60" />
               </div>
             </div>
             <div className="flex justify-end">
-              <button onClick={saveProfile} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+              <button onClick={() => void saveProfile()} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
                 <Save className="size-3.5" /> Salvar
               </button>
             </div>
@@ -110,41 +142,13 @@ export default function DashboardConfiguracoesPage() {
               ))}
             </div>
             <div className="flex justify-end">
-              <button onClick={changePwd} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+              <button onClick={() => void changePwd()} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
                 <Lock className="size-3.5" /> Alterar senha
               </button>
             </div>
           </div>
         )}
 
-        {tab === "notifications" && (
-          <div className="glass-card p-6 space-y-4">
-            <h2 className="text-sm font-semibold">Preferências de Notificação</h2>
-            <div className="space-y-3">
-              {[
-                { key: "newClient" as const, label: "Novo cliente cadastrado", desc: "Receber alerta quando um novo cliente for adicionado" },
-                { key: "payment" as const, label: "Pagamento registrado", desc: "Receber alerta quando um pagamento for registrado" },
-                { key: "pipeline" as const, label: "Atualizações do Pipeline", desc: "Receber alerta quando cards forem movidos ou criados" },
-              ].map(n => (
-                <div key={n.key} className="flex items-center justify-between p-3 rounded-lg border border-border/50">
-                  <div>
-                    <div className="text-sm font-medium">{n.label}</div>
-                    <div className="text-xs text-muted-foreground">{n.desc}</div>
-                  </div>
-                  <button onClick={() => setNotifs(s => ({ ...s, [n.key]: !s[n.key] }))}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${notifs[n.key] ? "bg-primary" : "bg-muted/50"}`}>
-                    <span className={`inline-block size-3.5 rounded-full bg-white shadow transition-transform ${notifs[n.key] ? "translate-x-4" : "translate-x-0.5"}`} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end">
-              <button onClick={() => toast.success("Preferências salvas")} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
-                <Save className="size-3.5" /> Salvar
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </AppLayout>
   );

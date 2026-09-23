@@ -15,6 +15,11 @@ type MetaCandidate = { facebookPageId: string; facebookPageName: string; instagr
 type PostForm = { unitId: string; connectionId: string; title: string; caption: string; linkUrl: string; contentFormat: SocialPost["contentFormat"]; mediaUrls: string; targetFacebook: boolean; targetInstagram: boolean; scheduledFor: string };
 
 const statusLabel: Record<string, string> = { draft: "Rascunho", scheduled: "Agendado", publishing: "Publicando", published: "Publicado", partially_published: "Parcial", failed: "Falhou", cancelled: "Cancelado", waiting_connection: "Aguardando Meta" };
+function toLocalInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 const formatLabel: Record<SocialPost["contentFormat"], string> = { image: "Imagem", carousel: "Carrossel", video: "Vídeo", reel: "Reel" };
 const fieldClass = "mt-1.5 block w-full rounded-lg border border-white/10 bg-[#101416] px-3 py-2 text-sm normal-case tracking-normal text-zinc-100 outline-none focus:border-cyan-300/60";
 const compactFieldClass = "w-full rounded-md border border-white/10 bg-[#101416] px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-cyan-300/60";
@@ -183,7 +188,9 @@ export default function SocialPublishingAdmin() {
   }
 
   async function editPostSchedule(post: SocialPost) {
-    const value = window.prompt("Nova data e horário (AAAA-MM-DDTHH:MM)", post.scheduledFor ? new Date(post.scheduledFor).toISOString().slice(0, 16) : "");
+    // O valor sugerido precisa estar no fuso local: toISOString() mostrava a hora em UTC
+    // e, ao salvar, new Date(value) a lia como local, deslocando o horário em 3h.
+    const value = window.prompt("Nova data e horário (AAAA-MM-DDTHH:MM)", post.scheduledFor ? toLocalInputValue(new Date(post.scheduledFor)) : "");
     if (!value) return;
     try {
       const response = await fetch(`/api/social/posts/${post.id}`, { method: "PATCH", headers: requestHeaders(), body: JSON.stringify({ scheduledFor: new Date(value).toISOString() }) });

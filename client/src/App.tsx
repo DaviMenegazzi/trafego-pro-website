@@ -9,10 +9,6 @@ import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-import DashboardPipeline from "./pages/DashboardPipeline";
-import DashboardPagamentos from "./pages/DashboardPagamentos";
-import DashboardMeuTrabalho from "./pages/DashboardMeuTrabalho";
-import DashboardAtualizacoes from "./pages/DashboardAtualizacoes";
 import DashboardConfiguracoes from "./pages/DashboardConfiguracoes";
 import DashboardAnuncios from "./pages/DashboardAnuncios";
 import DashboardFeedbackLeads, { StandaloneFeedbackLeads } from "./pages/DashboardFeedbackLeads";
@@ -41,14 +37,6 @@ function ExistingSiteRoutes() {
       <Route path={"/feedback-leads/"} component={StandaloneFeedbackLeads} />
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/dashboard/"} component={Dashboard} />
-      <Route path={"/dashboard/pipeline"} component={DashboardPipeline} />
-      <Route path={"/dashboard/pipeline/"} component={DashboardPipeline} />
-      <AdminRoute path={"/dashboard/pagamentos"} component={DashboardPagamentos} />
-      <AdminRoute path={"/dashboard/pagamentos/"} component={DashboardPagamentos} />
-      <Route path={"/dashboard/meu-trabalho"} component={DashboardMeuTrabalho} />
-      <Route path={"/dashboard/meu-trabalho/"} component={DashboardMeuTrabalho} />
-      <Route path={"/dashboard/atualizacoes"} component={DashboardAtualizacoes} />
-      <Route path={"/dashboard/atualizacoes/"} component={DashboardAtualizacoes} />
       <Route path={"/dashboard/configuracoes"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/configuracoes/"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/feedback-leads"} component={DashboardFeedbackLeads} />

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { getSupabase } from "../supabase.js";
+import { createIsolatedSupabase, getSupabase } from "../supabase.js";
 import {
   fetchUserAccess,
   requireAuth,
@@ -10,6 +10,7 @@ import {
   APP_TOKEN_COOKIE,
   APP_COOKIE_MAX_AGE_MS,
 } from "../auth.js";
+import { changeOwnPassword, updateOwnName, validatePasswordChange, validateProfileName } from "../accountSettings.js";
 import { notifyAdminNewRegistration } from "../lib/notifications.js";
 import { buildPendingRegistrationBio } from "../registrationPolicy.js";
 
@@ -284,6 +285,84 @@ authRouter.post("/login", authRateLimiter, async (req, res) => {
 // ─── GET /api/auth/me ───────────────────────────────────────────────────────
 authRouter.get("/me", requireAuth, (req, res) => {
   res.json(req.claims);
+});
+
+// ─── POST /api/auth/password ────────────────────────────────────────────────
+// Troca a senha da própria conta, exigindo a senha atual.
+const passwordRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: process.env.NODE_ENV === "test" ? 1000 : 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Muitas tentativas de troca de senha. Aguarde 15 minutos." },
+});
+
+authRouter.post("/password", requireAuth, passwordRateLimiter, async (req, res) => {
+  const { currentPassword, newPassword } = req.body as { currentPassword?: unknown; newPassword?: unknown };
+  const validation = validatePasswordChange(currentPassword, newPassword);
+  if (!validation.ok) {
+    res.status(validation.status).json({ error: validation.error });
+    return;
+  }
+
+  const client = createIsolatedSupabase("publishable");
+  if (!client) {
+    res.status(503).json({ error: "Serviço de autenticação temporariamente indisponível" });
+    return;
+  }
+
+  try {
+    const result = await changeOwnPassword(client, req.claims!.email, currentPassword as string, newPassword as string);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    console.error("[auth-password] Falha ao trocar senha:", err);
+    res.status(500).json({ error: "Não foi possível alterar a senha agora. Tente novamente." });
+  }
+});
+
+// ─── PATCH /api/auth/profile ────────────────────────────────────────────────
+// Atualiza o nome exibido. Reemite o token para o novo nome valer já nesta sessão.
+authRouter.patch("/profile", requireAuth, async (req, res) => {
+  const validation = validateProfileName((req.body as { name?: unknown }).name);
+  if (!validation.ok) {
+    res.status(validation.status).json({ error: validation.error });
+    return;
+  }
+
+  const client = createIsolatedSupabase("service");
+  if (!client) {
+    res.status(503).json({ error: "Edição de perfil indisponível neste ambiente" });
+    return;
+  }
+
+  try {
+    const result = await updateOwnName(client, req.claims!.id, validation.name);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+
+    // Mantém o vencimento original: editar o nome não pode estender a sessão.
+    const { iat: _iat, exp, ...claims } = req.claims!;
+    const remainingSeconds = exp ? Math.max(1, exp - Math.floor(Date.now() / 1000)) : APP_COOKIE_MAX_AGE_MS / 1000;
+    const user = { ...claims, name: validation.name };
+    const token = signToken(user, remainingSeconds);
+    res.cookie(APP_TOKEN_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: remainingSeconds * 1000,
+      path: "/",
+    });
+    res.json({ token, user });
+  } catch (err) {
+    console.error("[auth-profile] Falha ao atualizar perfil:", err);
+    res.status(500).json({ error: "Não foi possível salvar o nome agora. Tente novamente." });
+  }
 });
 
 // ─── POST /api/auth/logout ──────────────────────────────────────────────────

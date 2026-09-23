@@ -56,6 +56,20 @@ export function getSupabaseForAccessToken(accessToken: string | undefined): Supa
   });
 }
 
+/**
+ * Cliente novo e isolado, sem sessão compartilhada. Use quando a operação abre
+ * uma sessão (signInWithPassword) ou precisa garantir o papel service_role:
+ * uma sessão aberta no cliente compartilhado passaria a valer para todas as
+ * consultas seguintes do servidor.
+ */
+export function createIsolatedSupabase(kind: "publishable" | "service"): SupabaseClient | null {
+  const key = kind === "service" ? SERVICE_KEY : PUBLISHABLE_KEY || SERVICE_KEY;
+  if (!SUPABASE_URL || !key) return null;
+  return createClient(SUPABASE_URL, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
+
 // Client com privilégio elevado (service_role) reservado estritamente para jobs de sistema.
 export function getServiceSupabase(): SupabaseClient | null {
   return baseClient();

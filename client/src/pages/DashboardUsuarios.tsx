@@ -22,6 +22,7 @@ import {
   AlertCircle,
   UserCheck,
   Sparkles,
+  ScanLine,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -54,6 +55,7 @@ type ProfileRow = {
   status: string;
   bio: string;
   avatar_url: string | null;
+  pixel_access: boolean;
   created_at: string;
   updated_at: string;
   client_access: Array<{
@@ -166,6 +168,7 @@ export default function DashboardUsuariosPage() {
   // Grant access inline state
   const [grantingUserId, setGrantingUserId] = useState<string | null>(null);
   const [grantClientId, setGrantClientId] = useState("");
+  const [updatingPixelUserId, setUpdatingPixelUserId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -444,6 +447,30 @@ export default function DashboardUsuariosPage() {
       fetchData();
     } catch {
       toast.error("Erro de conexão");
+    }
+  }
+
+  async function handlePixelAccessChange(profile: ProfileRow, enabled: boolean) {
+    if (profile.role === "admin") return;
+    setUpdatingPixelUserId(profile.id);
+    try {
+      const res = await fetch(`/api/user-access/${profile.id}`, {
+        method: "PUT",
+        headers: authHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ pixel_access: enabled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Erro ao alterar a permissão do Pixel");
+        return;
+      }
+      setProfiles((current) => current.map((item) => item.id === profile.id ? { ...item, pixel_access: enabled } : item));
+      toast.success(enabled ? "Pixel liberado para o usuário" : "Acesso ao Pixel revogado");
+    } catch {
+      toast.error("Erro de conexão");
+    } finally {
+      setUpdatingPixelUserId(null);
     }
   }
 
@@ -832,6 +859,26 @@ export default function DashboardUsuariosPage() {
                             <option value="admin">Admin</option>
                             <option value="none">Sem acesso</option>
                           </select>
+
+                          <button
+                            type="button"
+                            disabled={profile.role === "admin" || updatingPixelUserId === profile.id}
+                            aria-pressed={profile.role === "admin" || profile.pixel_access}
+                            onClick={() => void handlePixelAccessChange(profile, !profile.pixel_access)}
+                            className={`flex h-8 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+                              profile.role === "admin" || profile.pixel_access
+                                ? "border-violet-500/35 bg-violet-500/12 text-violet-300"
+                                : "border-zinc-800 bg-zinc-950 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
+                            }`}
+                            title={profile.role === "admin" ? "Administradores sempre possuem acesso ao Pixel" : "Liberar ou revogar o acesso ao Pixel"}
+                          >
+                            <ScanLine className="size-3.5" />
+                            {updatingPixelUserId === profile.id
+                              ? "Salvando..."
+                              : profile.role === "admin" || profile.pixel_access
+                                ? "Pixel liberado"
+                                : "Liberar Pixel"}
+                          </button>
 
                           {/* Botão Redefinir Senha */}
                           <button

@@ -7,6 +7,7 @@ export interface AdminUser {
   role: string;
   name: string;
   allowedClientIds?: string[];
+  pixelAccess?: boolean;
 }
 
 export function useAdminAuth() {
@@ -44,6 +45,7 @@ export function useAdminAuth() {
             name: serverClaims.name,
             role: serverClaims.role,
             allowedClientIds: serverClaims.allowedClientIds,
+            pixelAccess: serverClaims.pixelAccess,
           };
 
           if (shouldRedirectToLogin(token || "cookie-authenticated", JSON.stringify(verifiedUser), true)) {

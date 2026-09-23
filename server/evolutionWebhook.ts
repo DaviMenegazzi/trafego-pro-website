@@ -56,6 +56,22 @@ function safePreview(value: string | null): string | null {
   return value.replace(/\s+/g, " ").trim().slice(0, 180);
 }
 
+const REF_TAG_PATTERN = /\[REF:([a-zA-Z0-9_-]{1,64})\]/i;
+const URL_PATTERN = /https?:\/\/\S+/i;
+
+// Cobre atribuição sem referral nativo do Baileys: tag `[REF:xyz]` colada na
+// landing page/anúncio, ou um link com UTM (ex.: wa.me pré-preenchido) que o
+// contato acabou enviando como texto da mensagem.
+function extractTextOriginSignals(rawText: string | null): { ref_tag?: string; source_url?: string } {
+  if (!rawText) return {};
+  const signals: { ref_tag?: string; source_url?: string } = {};
+  const refMatch = rawText.match(REF_TAG_PATTERN);
+  if (refMatch) signals.ref_tag = refMatch[1];
+  const urlMatch = rawText.match(URL_PATTERN);
+  if (urlMatch) signals.source_url = urlMatch[0].replace(/[),.;]+$/, "");
+  return signals;
+}
+
 function parseOccurredAt(value: unknown): Date | null {
   const numeric = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return null;
@@ -95,7 +111,7 @@ export function normalizeEvolutionWebhook(payload: unknown): NormalizedEvolution
     : "system";
   const rawMessageText = extractMessageText(message);
   const messageText = rawMessageText ? maskPiiInText(rawMessageText) : null;
-  const origin = extractEvolutionOrigin(root, data, message);
+  const origin = extractEvolutionOrigin(root, data, message, extractTextOriginSignals(rawMessageText));
   const timestamp = parseOccurredAt(data.messageTimestamp);
   const contactUpdate = extractContactUpdate(eventType, instanceName, data, root);
   const stableId = messageId ?? `${eventType}:${instanceName}:${remoteJid ?? "none"}:${timestamp?.toISOString() ?? "none"}`;

@@ -4,6 +4,7 @@ import { getSupabase } from "../supabase.js";
 import {
   fetchUserAccess,
   requireAuth,
+  resolvePixelAccessForRequest,
   signToken,
   SUPABASE_ACCESS_COOKIE,
   SUPABASE_COOKIE_MAX_AGE_MS,
@@ -241,6 +242,7 @@ authRouter.post("/login", authRateLimiter, async (req, res) => {
       role: access.role,
       id: data.user.id,
       allowedClientIds: access.allowedClientIds,
+      pixelAccess: access.pixelAccess,
     });
 
       const isProduction = process.env.NODE_ENV === "production";
@@ -272,6 +274,7 @@ authRouter.post("/login", authRateLimiter, async (req, res) => {
           role: access.role,
           id: data.user.id,
           allowedClientIds: access.allowedClientIds,
+          pixelAccess: access.pixelAccess,
         },
       });
     } catch (err) {
@@ -282,8 +285,9 @@ authRouter.post("/login", authRateLimiter, async (req, res) => {
 });
 
 // ─── GET /api/auth/me ───────────────────────────────────────────────────────
-authRouter.get("/me", requireAuth, (req, res) => {
-  res.json(req.claims);
+authRouter.get("/me", requireAuth, async (req, res) => {
+  const pixel = await resolvePixelAccessForRequest(req);
+  res.json({ ...req.claims, pixelAccess: pixel.allowed });
 });
 
 // ─── POST /api/auth/logout ──────────────────────────────────────────────────

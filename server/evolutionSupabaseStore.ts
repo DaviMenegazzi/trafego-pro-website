@@ -29,6 +29,7 @@ export type EvolutionLead = {
   crmStage: EvolutionCrmStage;
   crmStageUpdatedAt: string | null;
   crmStageUpdatedBy: string | null;
+  isQuarantine: boolean;
 };
 
 export type EvolutionCrmStageHistory = {
@@ -83,6 +84,7 @@ export type EvolutionMetaAttribution = {
   adName: string | null;
   creativeId: string | null;
   creativeName: string | null;
+  adImageUrl: string | null;
   matchedBy: string;
   matchStatus: "matched" | "unresolved";
   matchedAt: string;
@@ -93,11 +95,15 @@ export type EvolutionMetaAttributionInput = Omit<EvolutionMetaAttribution, "matc
 export type EvolutionInstance = {
   instanceName: string;
   displayName: string | null;
+  unitId: string | null;
   unitName: string | null;
+  metaAccountId: string | null;
   connectionStatus: string;
   lastEventAt: string | null;
   lastMessageAt: string | null;
 };
+
+const EVOLUTION_INSTANCE_SELECT = "instance_name, display_name, unit_id, unit_name, meta_account_id, connection_status, last_event_at, last_message_at";
 
 export type EvolutionAiAutomationSettings = {
   enabled: boolean;
@@ -173,8 +179,11 @@ function asLead(row: Row): EvolutionLead {
     metaCtwaClid: text(row.meta_ctwa_clid), googleClickId: text(row.google_click_id), originDetectedAt: iso(row.origin_detected_at),
     crmStage: (text(row.crm_stage) as EvolutionCrmStage | null) ?? "lead_not_responded",
     crmStageUpdatedAt: iso(row.crm_stage_updated_at), crmStageUpdatedBy: text(row.crm_stage_updated_by),
+    isQuarantine: row.is_quarantine === true,
   };
 }
+
+const EVOLUTION_LEAD_SELECT = "id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by, is_quarantine";
 
 function asCrmHistory(row: Row): EvolutionCrmStageHistory {
   return {
@@ -208,11 +217,50 @@ function asAttribution(row: Row): EvolutionMetaAttribution {
     leadId: String(row.lead_id), sourceEventId: text(row.source_event_id), clientId: text(row.client_id), accountId: text(row.account_id),
     campaignId: text(row.campaign_id), campaignName: text(row.campaign_name), adsetId: text(row.adset_id), adsetName: text(row.adset_name),
     adId: text(row.ad_id), adName: text(row.ad_name), creativeId: text(row.creative_id), creativeName: text(row.creative_name),
+    adImageUrl: text(row.ad_image_url),
     matchedBy: String(row.matched_by), matchStatus: row.match_status === "matched" ? "matched" : "unresolved", matchedAt: iso(row.matched_at)!,
   };
 }
 
-export async function recordEvolutionEventSupabase(event: NormalizedEvolutionEvent): Promise<{ eventId: string; duplicate: boolean }> {
+const EVOLUTION_ATTRIBUTION_SELECT = "lead_id, source_event_id, client_id, account_id, campaign_id, campaign_name, adset_id, adset_name, ad_id, ad_name, creative_id, creative_name, ad_image_url, matched_by, match_status, matched_at";
+
+type EvolutionEventPersistenceResult = {
+  eventId: string | null;
+  duplicate: boolean;
+  ignored: boolean;
+};
+
+async function findEvolutionLeadClassification(
+  instanceName: string,
+  contactKey: string,
+): Promise<EvolutionLeadClassification | null> {
+  const { data, error } = await getEvolutionSupabase()
+    .from("evolution_leads")
+    .select("classification")
+    .eq("instance_name", instanceName)
+    .eq("contact_key", contactKey)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? (data.classification as EvolutionLeadClassification) : null;
+}
+
+// Determinístico: todo primeiro contato é persistido (em quarentena, se sem evidência de
+// anúncio — ver record_evolution_event/is_quarantine). Só bloqueia quem já foi classificado
+// manualmente como "não lead", para não reabrir conversas rejeitadas.
+async function shouldPersistEvolutionContactEvent(event: NormalizedEvolutionEvent): Promise<boolean> {
+  const contactKey = event.contactKey ?? event.contactUpdate?.contactKey ?? null;
+  if (event.eventType === "MESSAGES_UPSERT" && !contactKey) return false;
+  if (!contactKey) return true;
+
+  const classification = await findEvolutionLeadClassification(event.instanceName, contactKey);
+  return classification !== "nao_lead";
+}
+
+export async function recordEvolutionEventSupabase(event: NormalizedEvolutionEvent): Promise<EvolutionEventPersistenceResult> {
+  if (!(await shouldPersistEvolutionContactEvent(event))) {
+    return { eventId: null, duplicate: false, ignored: true };
+  }
+
   const { data, error } = await getEvolutionSupabase().rpc("record_evolution_event", {
     p_event_fingerprint: event.fingerprint,
     p_instance_name: event.instanceName,
@@ -239,33 +287,67 @@ export async function recordEvolutionEventSupabase(event: NormalizedEvolutionEve
   if (error) throw new Error(error.message);
   const result = Array.isArray(data) ? data[0] : data;
   if (!result || typeof result !== "object" || typeof (result as Row).duplicate !== "boolean") throw new Error("Resposta inválida do Supabase Evolution");
-  return { eventId: String((result as Row).event_id), duplicate: Boolean((result as Row).duplicate) };
+  return { eventId: String((result as Row).event_id), duplicate: Boolean((result as Row).duplicate), ignored: false };
 }
 
 export async function listEvolutionInstancesSupabase(): Promise<EvolutionInstance[]> {
-  const { data, error } = await getEvolutionSupabase().from("evolution_instances").select("instance_name, display_name, unit_name, connection_status, last_event_at, last_message_at").order("last_event_at", { ascending: false });
+  const { data, error } = await getEvolutionSupabase().from("evolution_instances").select(EVOLUTION_INSTANCE_SELECT).order("last_event_at", { ascending: false });
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => ({ instanceName: row.instance_name, displayName: row.display_name, unitName: row.unit_name, connectionStatus: row.connection_status, lastEventAt: iso(row.last_event_at), lastMessageAt: iso(row.last_message_at) }));
+  return (data ?? []).map(asInstance);
 }
 
-export async function updateEvolutionInstanceProfileSupabase(instanceName: string, input: { displayName: string; unitName: string }): Promise<EvolutionInstance | null> {
+export async function updateEvolutionInstanceProfileSupabase(instanceName: string, input: { displayName: string; unitId: string; unitName: string; metaAccountId: string }): Promise<EvolutionInstance | null> {
   const displayName = input.displayName.trim().slice(0, 120) || null;
   const unitName = input.unitName.trim().slice(0, 120) || null;
   const { data, error } = await getEvolutionSupabase()
     .from("evolution_instances")
-    .update({ display_name: displayName, unit_name: unitName, updated_at: new Date().toISOString() })
+    .update({ display_name: displayName, unit_id: input.unitId, unit_name: unitName, meta_account_id: input.metaAccountId, updated_at: new Date().toISOString() })
     .eq("instance_name", instanceName)
-    .select("instance_name, display_name, unit_name, connection_status, last_event_at, last_message_at")
+    .select(EVOLUTION_INSTANCE_SELECT)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? {
-    instanceName: data.instance_name,
-    displayName: data.display_name,
-    unitName: data.unit_name,
-    connectionStatus: data.connection_status,
-    lastEventAt: iso(data.last_event_at),
-    lastMessageAt: iso(data.last_message_at),
-  } : null;
+  return data ? asInstance(data) : null;
+}
+
+function asInstance(row: Row): EvolutionInstance {
+  return {
+    instanceName: String(row.instance_name),
+    displayName: text(row.display_name),
+    unitId: text(row.unit_id),
+    unitName: text(row.unit_name),
+    metaAccountId: text(row.meta_account_id),
+    connectionStatus: text(row.connection_status) ?? "unknown",
+    lastEventAt: iso(row.last_event_at),
+    lastMessageAt: iso(row.last_message_at),
+  };
+}
+
+export async function listEvolutionInstancesByUnitSupabase(unitId: string): Promise<EvolutionInstance[]> {
+  const { data, error } = await getEvolutionSupabase()
+    .from("evolution_instances")
+    .select(EVOLUTION_INSTANCE_SELECT)
+    .eq("unit_id", unitId)
+    .order("last_event_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(asInstance);
+}
+
+export async function upsertEvolutionInstanceProfileSupabase(instanceName: string, input: { displayName: string; unitId: string; unitName: string; metaAccountId: string }): Promise<EvolutionInstance> {
+  const { data, error } = await getEvolutionSupabase()
+    .from("evolution_instances")
+    .upsert({
+      instance_name: instanceName,
+      display_name: input.displayName,
+      unit_id: input.unitId,
+      unit_name: input.unitName,
+      meta_account_id: input.metaAccountId,
+      connection_status: "created",
+      last_event_at: new Date().toISOString(),
+    }, { onConflict: "instance_name" })
+    .select(EVOLUTION_INSTANCE_SELECT)
+    .single();
+  if (error) throw new Error(error.message);
+  return asInstance(data);
 }
 
 export async function listEvolutionEventsSupabase(limit = 40): Promise<EvolutionEvent[]> {
@@ -276,14 +358,32 @@ export async function listEvolutionEventsSupabase(limit = 40): Promise<Evolution
 }
 
 export async function listEvolutionLeadsSupabase(): Promise<EvolutionLead[]> {
-  const { data, error } = await getEvolutionSupabase().from("evolution_leads").select("id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by").order("last_message_at", { ascending: false }).limit(200);
+  const { data, error } = await getEvolutionSupabase().from("evolution_leads").select(EVOLUTION_LEAD_SELECT).order("last_message_at", { ascending: false }).limit(200);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => asLead(row));
 }
 
+export async function getEvolutionLeadByIdSupabase(leadId: string): Promise<EvolutionLead | null> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_leads").select(EVOLUTION_LEAD_SELECT).eq("id", leadId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? asLead(data) : null;
+}
+
+export async function listEvolutionLeadsByInstancesSupabase(instanceNames: string[]): Promise<EvolutionLead[]> {
+  if (instanceNames.length === 0) return [];
+  const { data, error } = await getEvolutionSupabase()
+    .from("evolution_leads")
+    .select(EVOLUTION_LEAD_SELECT)
+    .in("instance_name", instanceNames)
+    .order("last_message_at", { ascending: false })
+    .limit(500);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(asLead);
+}
+
 export async function listEvolutionLeadsForAiClassificationSupabase(): Promise<EvolutionLead[]> {
   const sb = getEvolutionSupabase();
-  const select = "id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by";
+  const select = EVOLUTION_LEAD_SELECT;
   const pageSize = 500;
   const rows: Row[] = [];
   for (let from = 0; ; from += pageSize) {
@@ -300,6 +400,21 @@ export async function getEvolutionAiAutomationSettingsSupabase(): Promise<Evolut
     .select("enabled, min_confidence, schedule_cron_task_uid, last_run_status, last_started_at, last_completed_at").eq("automation_key", "daily_lead_stage").maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Configuração da automação diária não encontrada");
+  return {
+    enabled: data.enabled !== false,
+    minConfidence: Number(data.min_confidence ?? 0.8),
+    scheduleCronTaskUid: text(data.schedule_cron_task_uid),
+    lastRunStatus: text(data.last_run_status),
+    lastStartedAt: iso(data.last_started_at),
+    lastCompletedAt: iso(data.last_completed_at),
+  };
+}
+
+export async function getEvolutionAiLiveSettingsSupabase(): Promise<EvolutionAiAutomationSettings> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_ai_automation_settings")
+    .select("enabled, min_confidence, schedule_cron_task_uid, last_run_status, last_started_at, last_completed_at").eq("automation_key", "live_lead_stage").maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Configuração da automação ao vivo não encontrada");
   return {
     enabled: data.enabled !== false,
     minConfidence: Number(data.min_confidence ?? 0.8),
@@ -352,6 +467,26 @@ export async function recordEvolutionAiClassificationRunSupabase(input: Evolutio
   if (error && error.code !== "23505") throw new Error(error.message);
 }
 
+export async function recordEvolutionAiClassificationRunsBatchSupabase(inputs: EvolutionAiClassificationRunInput[]): Promise<void> {
+  if (!inputs.length) return;
+  const { error } = await getEvolutionSupabase().from("evolution_ai_classification_runs").insert(inputs.map((input) => ({
+    lead_id: input.leadId,
+    instance_name: input.instanceName,
+    source_last_message_at: input.sourceLastMessageAt,
+    source_message_count: input.sourceMessageCount,
+    model: input.model,
+    previous_stage: input.previousStage,
+    proposed_stage: input.proposedStage,
+    applied_stage: input.appliedStage,
+    confidence: input.confidence,
+    rationale: input.rationale?.slice(0, 240) ?? null,
+    status: input.status,
+    error_message: input.errorMessage?.slice(0, 500) ?? null,
+    execution_key: input.executionKey,
+  })));
+  if (error && error.code !== "23505") throw new Error(error.message);
+}
+
 export async function listEvolutionCrmStageHistorySupabase(leadId: string): Promise<EvolutionCrmStageHistory[]> {
   const { data, error } = await getEvolutionSupabase().from("evolution_crm_stage_history").select("id, lead_id, instance_name, from_stage, to_stage, changed_by, changed_at, note").eq("lead_id", leadId).order("changed_at", { ascending: false }).limit(100);
   if (error) throw new Error(error.message);
@@ -369,16 +504,78 @@ export async function moveEvolutionLeadCrmStageSupabase(input: { leadId: string;
   return { leadId: String(row.lead_id), crmStage: String(row.crm_stage) as EvolutionCrmStage, crmStageUpdatedAt: iso(row.crm_stage_updated_at)! };
 }
 
+export async function moveEvolutionLeadCrmStageBatchSupabase(
+  updates: { leadId: string; instanceName: string; toStage: EvolutionCrmStage; changedBy: string; note?: string }[],
+): Promise<{ leadId: string; crmStage: EvolutionCrmStage; crmStageUpdatedAt: string }[]> {
+  if (!updates.length) return [];
+  const { data, error } = await getEvolutionSupabase().rpc("move_evolution_lead_stage_batch", {
+    p_updates: updates.map((update) => ({
+      lead_id: update.leadId, instance_name: update.instanceName, to_stage: update.toStage,
+      changed_by: update.changedBy, note: update.note ?? null,
+    })),
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Row[]).map((row) => ({
+    leadId: String(row.lead_id), crmStage: String(row.crm_stage) as EvolutionCrmStage, crmStageUpdatedAt: iso(row.crm_stage_updated_at)!,
+  }));
+}
+
 export async function listEvolutionMessagesSupabase(leadId: string): Promise<EvolutionMessage[]> {
   const { data, error } = await getEvolutionSupabase().from("evolution_messages").select("id, lead_id, instance_name, direction, message_type, body_text, sent_at").eq("lead_id", leadId).order("sent_at", { ascending: true }).limit(500);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => asMessage(row));
 }
 
+// Janela deslizante para a dashboard do Pixel: busca as N mensagens mais recentes
+// (ou anteriores a `before`, para "carregar mais" ao rolar para o topo) sem trazer
+// o histórico inteiro do lead em memória.
+export async function listEvolutionMessagesPageSupabase(
+  leadId: string,
+  options: { limit?: number; before?: string } = {},
+): Promise<EvolutionMessage[]> {
+  const limit = Math.max(1, Math.min(100, options.limit ?? 20));
+  let query = getEvolutionSupabase()
+    .from("evolution_messages")
+    .select("id, lead_id, instance_name, direction, message_type, body_text, sent_at")
+    .eq("lead_id", leadId)
+    .order("sent_at", { ascending: false })
+    .limit(limit);
+  if (options.before) query = query.lt("sent_at", options.before);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => asMessage(row)).reverse();
+}
+
+// Verificação O(1) via SQL indexado: substitui o carregamento de todos os leads
+// da unidade em memória para checar posse (ver getPixelUnitScope).
+export async function verifyLeadBelongsToUnitSupabase(leadId: string, unitId: string): Promise<boolean> {
+  const { data, error } = await getEvolutionSupabase().rpc("verify_lead_unit_access", {
+    p_lead_id: leadId,
+    p_unit_id: unitId,
+  });
+  if (error) throw new Error(error.message);
+  return data === true;
+}
+
 export async function listEvolutionMetaAttributionsSupabase(): Promise<EvolutionMetaAttribution[]> {
-  const { data, error } = await getEvolutionSupabase().from("evolution_meta_attributions").select("lead_id, source_event_id, client_id, account_id, campaign_id, campaign_name, adset_id, adset_name, ad_id, ad_name, creative_id, creative_name, matched_by, match_status, matched_at").order("matched_at", { ascending: false }).limit(200);
+  const { data, error } = await getEvolutionSupabase().from("evolution_meta_attributions").select(EVOLUTION_ATTRIBUTION_SELECT).order("matched_at", { ascending: false }).limit(200);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => asAttribution(row));
+}
+
+// Card do lead no Pixel: qual campanha/conjunto/anúncio/criativo Meta gerou aquela conversa.
+export async function getEvolutionMetaAttributionForLeadSupabase(leadId: string): Promise<EvolutionMetaAttribution | null> {
+  const { data, error } = await getEvolutionSupabase().from("evolution_meta_attributions").select(EVOLUTION_ATTRIBUTION_SELECT).eq("lead_id", leadId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? asAttribution(data) : null;
+}
+
+// Ranking de criativos: busca as atribuições de um conjunto de leads (já isolados por unidade) de uma vez.
+export async function listEvolutionMetaAttributionsForLeadsSupabase(leadIds: string[]): Promise<EvolutionMetaAttribution[]> {
+  if (leadIds.length === 0) return [];
+  const { data, error } = await getEvolutionSupabase().from("evolution_meta_attributions").select(EVOLUTION_ATTRIBUTION_SELECT).in("lead_id", leadIds);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(asAttribution);
 }
 
 export async function findEvolutionLeadIdSupabase(instanceName: string, contactKey: string): Promise<string | null> {
@@ -403,6 +600,7 @@ export async function upsertEvolutionMetaAttributionSupabase(input: EvolutionMet
     lead_id: input.leadId, source_event_id: input.sourceEventId, client_id: input.clientId, account_id: input.accountId,
     campaign_id: input.campaignId, campaign_name: input.campaignName, adset_id: input.adsetId, adset_name: input.adsetName,
     ad_id: input.adId, ad_name: input.adName, creative_id: input.creativeId, creative_name: input.creativeName,
+    ad_image_url: input.adImageUrl,
     matched_by: input.matchedBy, match_status: input.matchStatus, updated_at: new Date().toISOString(),
   }, { onConflict: "lead_id" });
   if (error) throw new Error(error.message);
@@ -424,9 +622,22 @@ export async function getEvolutionSummarySupabase(): Promise<{ totalLeads: numbe
 }
 
 export async function updateEvolutionLeadSupabase(id: string, input: { classification: EvolutionLeadClassification; funnelStage: EvolutionLeadStage; note: string; classifiedByEmail: string }): Promise<EvolutionLead | null> {
-  const { data, error } = await getEvolutionSupabase().from("evolution_leads").update({ classification: input.classification, funnel_stage: input.funnelStage, classification_note: input.note || null, classified_by_email: input.classifiedByEmail, classified_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", id).select("id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by").maybeSingle();
+  // Classificação manual é definitiva: tira o lead da quarentena mesmo sem evidência de anúncio.
+  const { data, error } = await getEvolutionSupabase().from("evolution_leads").update({ classification: input.classification, funnel_stage: input.funnelStage, classification_note: input.note || null, classified_by_email: input.classifiedByEmail, classified_at: new Date().toISOString(), is_quarantine: false, updated_at: new Date().toISOString() }).eq("id", id).select(EVOLUTION_LEAD_SELECT).maybeSingle();
   if (error) throw new Error(error.message);
   return data ? asLead(data) : null;
+}
+
+// Job diário de expurgo: remove leads em quarentena (sem evidência de anúncio) além de N horas.
+export async function cleanupExpiredQuarantineLeadsSupabase(hours = 48): Promise<number> {
+  const { data, error } = await getEvolutionSupabase().rpc("cleanup_expired_quarantine_leads", { p_hours: hours });
+  if (error) throw new Error(error.message);
+  return typeof data === "number" ? data : 0;
+}
+
+export async function deleteEvolutionInstanceProfileSupabase(instanceName: string): Promise<void> {
+  const { error } = await getEvolutionSupabase().from("evolution_instances").delete().eq("instance_name", instanceName);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteEvolutionSupabaseTestRows(input: { instanceName: string; contactKey: string | null; fingerprint: string }): Promise<void> {

@@ -6,14 +6,12 @@ import {
   CreditCard,
   ClipboardList,
   Newspaper,
-  Settings,
   Menu,
   X,
   ChevronLeft,
   ChevronRight,
   LogOut,
   User,
-  MessageSquare,
   Inbox,
   ShieldCheck,
   Link2,
@@ -24,10 +22,12 @@ import {
   BarChart3,
   DollarSign,
   FileSpreadsheet,
+  ScanLine,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { canAccessPixel } from "@/lib/pixelAccessPolicy";
 
 const DURATION = "200ms";
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
@@ -38,6 +38,7 @@ function getStoredUser(): {
   email?: string;
   role?: string;
   allowedClientIds?: string[];
+  pixelAccess?: boolean;
 } {
   try {
     return JSON.parse(localStorage.getItem("tp_user") ?? "{}");
@@ -54,9 +55,8 @@ function isAdminUser(): boolean {
 const NAV_BASE = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
-  { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
+  { to: "/dashboard/pixel", label: "Pixel", icon: ScanLine },
   { to: "/dashboard/banco-talentos", label: "Banco de Talentos", icon: UsersRound },
-  { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 const NAV_ADMIN_ONLY = [
@@ -203,7 +203,7 @@ function UserProfileButton({ collapsed }: { collapsed: boolean }) {
     <button
       onClick={handleLogout}
       title="Sair"
-      className={`group flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors overflow-hidden ${collapsed ? "justify-center px-0" : ""}`}
+      className={`group flex items-center w-full rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors overflow-hidden ${collapsed ? "justify-center gap-0 px-0" : "gap-3"}`}
     >
       <div className="size-7 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
         <User className="size-3.5 text-zinc-200" />
@@ -249,6 +249,30 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [pathname] = useLocation();
 
   const admin = isAdminUser();
+  const [pixelAllowed, setPixelAllowed] = useState(() => canAccessPixel(getStoredUser()));
+
+  useEffect(() => {
+    const token = localStorage.getItem("tp_token");
+    if (!token) {
+      setPixelAllowed(false);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((user) => {
+        if (cancelled || !user) return;
+        localStorage.setItem("tp_user", JSON.stringify(user));
+        setPixelAllowed(canAccessPixel(user));
+      })
+      .catch(() => setPixelAllowed(canAccessPixel(getStoredUser())));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Clientes (não-admin): descobre, sem expor nada sobre as chaves em si, se
   // a unidade já tem ao menos 1 endpoint de formulário ativo — só então o
@@ -286,8 +310,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }, [admin]);
 
   const visibleNavBase = useMemo(
-    () => (!admin && clientFormsVisible ? [...NAV_BASE, CLIENT_FORMS_RESULTS_ITEM] : NAV_BASE),
-    [admin, clientFormsVisible],
+    () => {
+      const base = NAV_BASE.filter((item) => item.to !== "/dashboard/pixel" || pixelAllowed);
+      return !admin && clientFormsVisible ? [...base, CLIENT_FORMS_RESULTS_ITEM] : base;
+    },
+    [admin, clientFormsVisible, pixelAllowed],
   );
 
   useEffect(() => {
@@ -343,8 +370,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
               href={item.to}
               title={isCollapsed ? item.label : undefined}
               onClick={() => setMobileSidebarOpen(false)}
-              className={`group flex items-center gap-3 overflow-hidden rounded-xl text-sm transition-all duration-200 ${
-                isCollapsed ? "size-10 justify-center px-0 py-0" : "px-3 py-2.5"
+              className={`group flex items-center overflow-hidden rounded-xl text-sm transition-all duration-200 ${
+                isCollapsed ? "mx-auto size-10 justify-center gap-0 px-0 py-0" : "gap-3 px-3 py-2.5"
               } ${
                 active
                   ? "bg-white/10 text-white shadow-[inset_3px_0_0_#e4e4e7]"
@@ -373,8 +400,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
               onClick={() => setAdminMenuOpen((open) => !open)}
               title={isCollapsed ? "Abrir administração" : undefined}
               aria-expanded={adminMenuOpen}
-              className={`group flex w-full items-center gap-3 overflow-hidden rounded-xl text-sm text-muted-foreground transition-all duration-200 hover:bg-white/[0.045] hover:text-foreground ${
-                isCollapsed ? "size-10 justify-center px-0 py-0" : "px-3 py-2.5"
+              className={`group flex items-center overflow-hidden rounded-xl text-sm text-muted-foreground transition-all duration-200 hover:bg-white/[0.045] hover:text-foreground ${
+                isCollapsed ? "mx-auto size-10 justify-center gap-0 px-0 py-0" : "w-full gap-3 px-3 py-2.5"
               }`}
             >
               <ShieldCheck className="size-4 shrink-0 group-hover:text-zinc-200" />

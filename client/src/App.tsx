@@ -20,6 +20,7 @@ import DashboardFeedbackLeadsList from "./pages/DashboardFeedbackLeadsList";
 import DashboardUsuarios from "./pages/DashboardUsuarios";
 import DashboardExternalAiTokens from "./pages/DashboardExternalAiTokens";
 import DashboardFormularios from "./pages/DashboardFormularios";
+import DashboardPixel from "./pages/DashboardPixel";
 import AdminMetricsOverview from "./pages/AdminMetricsOverview";
 import TalentPublicForm from "./pages/TalentPublicForm";
 import TalentBankAdmin from "./pages/TalentBankAdmin";
@@ -27,6 +28,7 @@ import EvolutionAdmin from "./pages/EvolutionAdmin";
 import SocialPublishingAdmin from "./pages/SocialPublishingAdmin";
 
 import { AdminRoute } from "./components/AdminRoute";
+import { PixelRoute } from "./components/PixelRoute";
 import AdminFinanceiro from "./pages/admin/financeiro";
 
 function ExistingSiteRoutes() {
@@ -63,6 +65,8 @@ function ExistingSiteRoutes() {
       <AdminRoute path={"/dashboard/integracoes-ia/"} component={DashboardExternalAiTokens} />
       <Route path={"/dashboard/formularios"} component={DashboardFormularios} />
       <Route path={"/dashboard/formularios/"} component={DashboardFormularios} />
+      <PixelRoute path={"/dashboard/pixel"} component={DashboardPixel} />
+      <PixelRoute path={"/dashboard/pixel/"} component={DashboardPixel} />
       <AdminRoute path={"/admin/metricas"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/metricas/"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/financeiro"} component={AdminFinanceiro} />

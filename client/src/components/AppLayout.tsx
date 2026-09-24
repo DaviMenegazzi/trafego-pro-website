@@ -272,16 +272,21 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+// Grade de linhas finas e estáticas; a máscara apaga a grade em direção às bordas e ao pé da tela.
+const GRID_MASK = "radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 100%)";
+
 function AmbientBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
       <div
-        className="ambient-glow absolute -top-32 -left-32 size-[600px] rounded-full opacity-[0.07]"
-        style={{ background: "radial-gradient(circle, var(--color-primary) 0%, transparent 70%)" }}
-      />
-      <div
-        className="ambient-glow absolute -bottom-32 -right-32 size-[500px] rounded-full opacity-[0.05]"
-        style={{ background: "radial-gradient(circle, var(--color-primary) 0%, transparent 70%)", animationDelay: "4s" }}
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          maskImage: GRID_MASK,
+          WebkitMaskImage: GRID_MASK,
+        }}
       />
     </div>
   );

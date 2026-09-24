@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
+import { ArrowLeft, CheckCircle2, FileText, Paperclip, X } from "lucide-react";
 import {
-  ArrowLeft,
-  CheckCircle2,
-  ChevronDown,
-  FileText,
-  Loader2,
-  LockKeyhole,
-  Paperclip,
-  Send,
-  X,
-  Building2,
-} from "lucide-react";
+  Button,
+  CheckboxField,
+  DatePicker,
+  Field as DsField,
+  IconButton,
+  Input,
+  RadioGroup,
+  RadioOption,
+  Select,
+  Textarea,
+} from "@/components/ds";
 import { toast } from "sonner";
 import { trackTalentFormSubmission } from "@/lib/tracking";
 
@@ -79,195 +80,142 @@ function FieldControl({
   onChange,
   file,
   onFile,
+  error,
 }: {
   field: Field;
   value: unknown;
   onChange: (value: unknown) => void;
   file?: File;
   onFile: (file: File | undefined) => void;
+  error?: string;
 }) {
-  const base =
-    "mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-950/60 px-3.5 py-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-zinc-400 focus:ring-2 focus:ring-white/10";
   const fieldId = `talent-${field.id}`;
-  const label = (
-    <label htmlFor={fieldId} className="text-sm font-medium text-zinc-100">
-      {field.label}
-      {field.isRequired && <span className="ml-1 text-emerald-300">*</span>}
-    </label>
-  );
-  const hint = field.helpText && (
-    <p className="mt-1.5 text-xs leading-5 text-zinc-500">{field.helpText}</p>
+  // O texto de ajuda do anexo aparece dentro da área de envio, não repetido embaixo.
+  // "Opcional" como ajuda repetiria o "(opcional)" do rótulo.
+  const hint =
+    field.fieldType === "file" || field.helpText?.trim().toLowerCase() === "opcional"
+      ? undefined
+      : field.helpText ?? undefined;
+  const wrap = (control: React.ReactNode) => (
+    <DsField
+      label={field.label}
+      htmlFor={fieldId}
+      required={field.isRequired}
+      optional={!field.isRequired}
+      hint={hint}
+      error={error}
+    >
+      {control}
+    </DsField>
   );
 
   if (field.fieldType === "textarea") {
-    return (
-      <div>
-        {label}
-        <textarea
-          id={fieldId}
-          value={String(value ?? "")}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={field.placeholder ?? ""}
-          rows={4}
-          className={base}
-        />
-        {hint}
-      </div>
+    return wrap(
+      <Textarea
+        id={fieldId}
+        value={String(value ?? "")}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={field.placeholder ?? ""}
+        rows={4}
+        aria-invalid={Boolean(error) || undefined}
+      />
     );
   }
 
   if (field.fieldType === "select") {
-    return (
-      <div>
-        {label}
-        <div className="relative">
-          <select
-            id={fieldId}
-            value={String(value ?? "")}
-            onChange={(event) => onChange(event.target.value)}
-            className={`${base} appearance-none pr-9`}
-          >
-            <option value="">Selecione uma opção</option>
-            {field.options.map((option) => (
-              <option key={option.value} value={option.label}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
-        </div>
-        {hint}
-      </div>
+    return wrap(
+      <Select
+        id={fieldId}
+        size="lg"
+        value={String(value ?? "")}
+        onValueChange={onChange}
+        placeholder="Selecione uma opção"
+        invalid={Boolean(error)}
+        options={field.options.map((option) => ({ value: option.label, label: option.label }))}
+      />
     );
   }
 
   if (field.fieldType === "radio") {
-    return (
-      <div>
-        {label}
-        <div className="mt-3 grid gap-2">
-          {field.options.map((option) => {
-            const isChecked = value === option.label || value === option.value;
-            return (
-              <label
-                key={option.value}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition ${
-                  isChecked
-                    ? "border-emerald-400 bg-emerald-500/10 text-white font-medium"
-                    : "border-zinc-800 text-zinc-400 hover:border-zinc-600"
-                }`}
-              >
-                <input
-                  className="accent-emerald-400"
-                  checked={isChecked}
-                  onChange={() => onChange(option.label)}
-                  type="radio"
-                  name={field.fieldKey}
-                />
-                {option.label}
-              </label>
-            );
-          })}
-        </div>
-        {hint}
-      </div>
+    return wrap(
+      <RadioGroup
+        id={fieldId}
+        value={String(value ?? "")}
+        onValueChange={onChange}
+        aria-label={field.label}
+      >
+        {field.options.map((option, index) => (
+          <RadioOption
+            key={`${option.value}-${index}`}
+            id={`${fieldId}-${index}`}
+            value={option.label}
+            label={option.label}
+          />
+        ))}
+      </RadioGroup>
     );
   }
 
   if (field.fieldType === "checkbox") {
     const selected = Array.isArray(value) ? value : [];
-    return (
-      <div>
-        {label}
-        <div className="mt-3 grid gap-2">
-          {field.options.map((option) => {
-            const isChecked =
-              selected.includes(option.label) || selected.includes(option.value);
-            return (
-              <label
-                key={option.value}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition ${
+    return wrap(
+      <div id={fieldId} className="grid gap-2.5 pt-1">
+        {field.options.map((option, index) => {
+          const isChecked = selected.includes(option.label) || selected.includes(option.value);
+          return (
+            <CheckboxField
+              key={`${option.value}-${index}`}
+              id={`${fieldId}-${index}`}
+              label={option.label}
+              checked={isChecked}
+              onCheckedChange={() =>
+                onChange(
                   isChecked
-                    ? "border-emerald-400 bg-emerald-500/10 text-white font-medium"
-                    : "border-zinc-800 text-zinc-400 hover:border-zinc-600"
-                }`}
-              >
-                <input
-                  className="accent-emerald-400"
-                  checked={isChecked}
-                  onChange={() =>
-                    onChange(
-                      isChecked
-                        ? selected.filter(
-                            (item) =>
-                              item !== option.label && item !== option.value
-                          )
-                        : [...selected, option.label]
-                    )
-                  }
-                  type="checkbox"
-                />
-                {option.label}
-              </label>
-            );
-          })}
-        </div>
-        {hint}
+                    ? selected.filter((item) => item !== option.label && item !== option.value)
+                    : [...selected, option.label]
+                )
+              }
+            />
+          );
+        })}
       </div>
     );
   }
 
   if (field.fieldType === "file") {
-    return (
-      <div>
-        {label}
-        <label
-          htmlFor={fieldId}
-          className="mt-2 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-zinc-700 bg-zinc-950/50 px-4 py-4 transition hover:border-zinc-400 hover:bg-white/[0.04]"
-        >
-          <span className="flex size-9 items-center justify-center rounded-lg bg-white/10 text-zinc-200">
-            <Paperclip className="size-4" />
+    return wrap(
+      <div
+        className={`flex items-center gap-3 rounded-lg border border-dashed px-4 py-3.5 transition-colors ${
+          error ? "border-rose-500/60" : "border-white/15 hover:border-white/30"
+        }`}
+      >
+        <Paperclip className="size-4 shrink-0 text-zinc-400" />
+        <label htmlFor={fieldId} className="min-w-0 flex-1 cursor-pointer">
+          <span className="block truncate text-sm font-medium text-zinc-100">
+            {file?.name ?? "Anexar currículo"}
           </span>
-          <span className="min-w-0 flex-1">
-            <strong className="block truncate text-sm font-medium text-zinc-100">
-              {file?.name ?? "Anexe o seu currículo"}
-            </strong>
-            <span className="mt-0.5 block text-xs text-zinc-500">
-              PDF ou DOCX · até 5 MB
-            </span>
-          </span>
-          {file && (
-            <button
-              onClick={(event) => {
-                event.preventDefault();
-                onFile(undefined);
-              }}
-              className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white"
-            >
-              <X className="size-4" />
-            </button>
-          )}
-          <input
-            id={fieldId}
-            type="file"
-            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="sr-only"
-            onChange={(event) => onFile(event.target.files?.[0])}
-          />
+          <span className="mt-0.5 block text-xs text-zinc-500">{field.helpText || "PDF ou DOCX, até 5 MB"}</span>
         </label>
-        {hint}
+        {file && (
+          <IconButton label="Remover arquivo" variant="ghost" size="sm" icon={<X />} onClick={() => onFile(undefined)} />
+        )}
+        <input
+          id={fieldId}
+          type="file"
+          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="sr-only"
+          onChange={(event) => onFile(event.target.files?.[0])}
+        />
       </div>
     );
   }
 
-  const type =
-    field.fieldType === "email"
-      ? "email"
-      : field.fieldType === "number"
-      ? "number"
-      : field.fieldType === "date"
-      ? "date"
-      : "text";
+  if (field.fieldType === "date") {
+    return wrap(
+      <DatePicker id={fieldId} size="lg" value={String(value ?? "")} onChange={onChange} invalid={Boolean(error)} />
+    );
+  }
+
   const display =
     field.fieldType === "phone"
       ? maskPhone(String(value ?? ""))
@@ -275,27 +223,26 @@ function FieldControl({
       ? maskCpf(String(value ?? ""))
       : String(value ?? "");
 
-  return (
-    <div>
-      {label}
-      <input
-        id={fieldId}
-        type={type}
-        value={display}
-        onChange={(event) =>
-          onChange(
-            field.fieldType === "phone"
-              ? maskPhone(event.target.value)
-              : field.fieldType === "cpf"
-              ? maskCpf(event.target.value)
-              : event.target.value
-          )
-        }
-        placeholder={field.placeholder ?? ""}
-        className={base}
-      />
-      {hint}
-    </div>
+  return wrap(
+    <Input
+      id={fieldId}
+      size="lg"
+      type={field.fieldType === "email" ? "email" : field.fieldType === "number" ? "number" : "text"}
+      inputMode={field.fieldType === "phone" || field.fieldType === "cpf" ? "numeric" : undefined}
+      autoComplete={field.fieldType === "email" ? "email" : field.fieldType === "phone" ? "tel" : undefined}
+      value={display}
+      aria-invalid={Boolean(error) || undefined}
+      onChange={(event) =>
+        onChange(
+          field.fieldType === "phone"
+            ? maskPhone(event.target.value)
+            : field.fieldType === "cpf"
+            ? maskCpf(event.target.value)
+            : event.target.value
+        )
+      }
+      placeholder={field.placeholder ?? ""}
+    />
   );
 }
 
@@ -310,6 +257,7 @@ export default function TalentPublicForm() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const required = useMemo(
     () => form?.fields.filter((field) => field.isRequired) ?? [],
@@ -317,7 +265,7 @@ export default function TalentPublicForm() {
   );
 
   useEffect(() => {
-    document.title = "Trabalhe Conosco — Vida Card";
+    document.title = "Trabalhe conosco";
     setLoading(true);
     fetch(`/api/talent/public/${encodeURIComponent(slug)}`)
       .then(async (response) => ({
@@ -332,47 +280,55 @@ export default function TalentPublicForm() {
         }
         setForm(body);
         if (body.title) {
-          document.title = `${body.title} — Trabalhe Conosco`;
+          document.title = `${body.title} — Trabalhe conosco`;
         }
       })
       .catch(() => toast.error("Não foi possível carregar esta oportunidade"))
       .finally(() => setLoading(false));
   }, [slug]);
 
-  const setAnswer = (key: string, value: unknown) =>
+  const clearError = (key: string) =>
+    setErrors((current) => {
+      if (!current[key]) return current;
+      const { [key]: _removed, ...rest } = current;
+      return rest;
+    });
+
+  const setAnswer = (key: string, value: unknown) => {
     setAnswers((current) => ({ ...current, [key]: value }));
+    clearError(key);
+  };
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!form) return;
 
-    const missing = required.find((field) => {
+    const nextErrors: Record<string, string> = {};
+    for (const field of required) {
       const value = answers[field.fieldKey];
-      return field.fieldType === "file"
-        ? !files[field.fieldKey]
-        : !value || (Array.isArray(value) && !value.length);
-    });
-
-    if (missing) {
-      toast.error(`Preencha o campo obrigatório: ${missing.label}`);
-      return;
+      const empty =
+        field.fieldType === "file"
+          ? !files[field.fieldKey]
+          : !value || (Array.isArray(value) && !value.length);
+      if (empty) nextErrors[field.fieldKey] = "Campo obrigatório";
     }
-
-    if (!accepted) {
-      toast.error(
-        "É necessário aceitar o termo de privacidade para enviar sua candidatura"
-      );
-      return;
-    }
-
-    for (const file of Object.values(files)) {
-      if (
-        file &&
-        (!fileTypes.includes(file.type) || file.size > 5 * 1024 * 1024)
-      ) {
-        toast.error("Os anexos devem ser PDF ou DOCX de até 5 MB");
-        return;
+    for (const [key, file] of Object.entries(files)) {
+      if (file && (!fileTypes.includes(file.type) || file.size > 5 * 1024 * 1024)) {
+        nextErrors[key] = "Envie um PDF ou DOCX de até 5 MB";
       }
+    }
+    if (!accepted) nextErrors.__lgpd = "Aceite o termo para enviar sua candidatura";
+
+    setErrors(nextErrors);
+    const firstKey = Object.keys(nextErrors)[0];
+    if (firstKey) {
+      const target =
+        firstKey === "__lgpd"
+          ? document.getElementById("talent-lgpd")
+          : document.getElementById(`talent-${form.fields.find((f) => f.fieldKey === firstKey)?.id}`);
+      target?.focus();
+      target?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
     }
 
     setSending(true);
@@ -431,13 +387,12 @@ export default function TalentPublicForm() {
           <p className="mt-2 max-w-sm text-sm text-zinc-400">
             Esta oportunidade não está disponível ou ainda não foi publicada.
           </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2.5 text-sm hover:bg-white/10"
-          >
-            <ArrowLeft className="size-4" />
-            Voltar ao início
-          </Link>
+          <Button asChild variant="secondary" className="mt-6">
+            <Link href="/">
+              <ArrowLeft />
+              Voltar ao início
+            </Link>
+          </Button>
         </div>
       </main>
     );
@@ -450,21 +405,15 @@ export default function TalentPublicForm() {
           <span className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300">
             <CheckCircle2 className="size-8" />
           </span>
-          <p className="mt-8 text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
-            Banco de Talentos
-          </p>
-          <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight">
+          <h1 className="mt-8 font-display text-4xl font-semibold tracking-tight">
             {form.successTitle}
           </h1>
           <p className="mt-4 text-base leading-7 text-zinc-400">
             {form.successMessage}
           </p>
-          <button
-            onClick={() => setLocation("/")}
-            className="mt-8 rounded-xl border border-white/15 px-4 py-2.5 text-sm hover:bg-white/10"
-          >
+          <Button variant="secondary" className="mt-8" onClick={() => setLocation("/")}>
             Voltar ao início
-          </button>
+          </Button>
         </div>
       </main>
     );
@@ -472,127 +421,79 @@ export default function TalentPublicForm() {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white">
-      <div className="fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-500 to-transparent" />
-
-      {/* Top Header */}
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5 border-b border-white/5">
-        {form.bannerUrl ? (
-          <div className="flex items-center gap-3">
-            <img
-              src={form.bannerUrl}
-              alt="Logo da Unidade"
-              className="h-10 max-w-[180px] object-contain"
-            />
-          </div>
-        ) : (
-          <Link
-            href="/"
-            className="font-display text-sm font-semibold tracking-[0.16em] text-zinc-100"
-          >
-            TRÁFEGO <span className="text-zinc-500">PRO</span>
-          </Link>
-        )}
-        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-zinc-300">
-          Oportunidade & Recrutamento
-        </span>
-      </header>
-
-      {/* Main Section */}
-      <section className="mx-auto max-w-5xl px-5 pb-16 pt-10 md:pb-24 md:pt-16">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(480px,1.15fr)]">
-          {/* Left Column: Job Description & Logo */}
-          <aside className="lg:sticky lg:top-14 lg:self-start space-y-6">
+      <section className="mx-auto max-w-5xl px-5 pb-12 pt-10 md:pt-16">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(480px,1.15fr)] lg:gap-12">
+          <aside className="space-y-5 lg:sticky lg:top-14 lg:self-start">
             {form.bannerUrl && (
-              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 inline-block">
-                <img
-                  src={form.bannerUrl}
-                  alt="Logo da Vaga"
-                  className="h-16 max-w-[240px] object-contain"
-                />
-              </div>
+              <img src={form.bannerUrl} alt="" className="h-12 max-w-[220px] object-contain" />
             )}
-
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-400">
-                Oportunidades
-              </p>
-              <h1 className="mt-3 font-display text-3xl sm:text-4xl font-bold tracking-tight text-zinc-100">
+              <h1 className="font-display text-3xl font-semibold leading-tight tracking-tight text-zinc-100 sm:text-4xl">
                 {form.title}
               </h1>
-              <p className="mt-4 max-w-md text-sm sm:text-base leading-relaxed text-zinc-400">
-                {form.subtitle}
-              </p>
+              {form.subtitle && (
+                <p className="mt-3 max-w-md text-base leading-relaxed text-zinc-400">{form.subtitle}</p>
+              )}
             </div>
-
-            <div className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <LockKeyhole className="mt-0.5 size-4 shrink-0 text-zinc-300" />
-              <p className="text-xs leading-5 text-zinc-500">
-                Suas informações são tratadas de forma segura e usadas exclusivamente no processo de recrutamento e seleção.
-              </p>
-            </div>
+            <p className="max-w-md text-sm leading-6 text-zinc-500">
+              Seus dados são usados apenas neste processo de recrutamento e seleção.
+            </p>
           </aside>
 
-          {/* Right Column: Submission Form */}
           <form
             onSubmit={submit}
-            className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-2xl shadow-black/20 sm:p-8 space-y-6"
+            noValidate
+            className="space-y-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-8"
           >
-            <div className="border-b border-white/10 pb-5">
-              <h2 className="font-display text-xl font-semibold text-zinc-100">
-                Envie a sua candidatura
-              </h2>
-              <p className="mt-1.5 text-xs text-zinc-400">
-                Campos com <span className="text-emerald-300 font-semibold">*</span> são obrigatórios.
-              </p>
+            <div>
+              <h2 className="font-display text-xl font-semibold text-zinc-100">Envie sua candidatura</h2>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-5">
               {form.fields.map((field) => (
                 <FieldControl
-                  key={field.id}
+                  key={field.fieldKey}
                   field={field}
                   value={answers[field.fieldKey]}
                   onChange={(value) => setAnswer(field.fieldKey, value)}
                   file={files[field.fieldKey]}
-                  onFile={(file) =>
-                    setFiles((current) => ({
-                      ...current,
-                      [field.fieldKey]: file,
-                    }))
-                  }
+                  error={errors[field.fieldKey]}
+                  onFile={(file) => {
+                    setFiles((current) => ({ ...current, [field.fieldKey]: file }));
+                    clearError(field.fieldKey);
+                  }}
                 />
               ))}
             </div>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-xs leading-5 text-zinc-400">
-              <input
+            <div className="space-y-1.5 border-t border-white/10 pt-5">
+              <CheckboxField
+                id="talent-lgpd"
                 checked={accepted}
-                onChange={(event) => setAccepted(event.target.checked)}
-                type="checkbox"
-                className="mt-0.5 size-4 accent-emerald-400"
+                onCheckedChange={(checked) => {
+                  setAccepted(checked === true);
+                  clearError("__lgpd");
+                }}
+                aria-invalid={Boolean(errors.__lgpd) || undefined}
+                label={<span className="text-zinc-300">{form.lgpdDisclaimer}</span>}
               />
-              <span>{form.lgpdDisclaimer}</span>
-            </label>
-
-            <button
-              disabled={sending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 shadow-lg shadow-emerald-950/40"
-            >
-              {sending ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Enviando candidatura...
-                </>
-              ) : (
-                <>
-                  <Send className="size-4" />
-                  Enviar Candidatura
-                </>
+              {errors.__lgpd && (
+                <p role="alert" className="pl-7 text-xs leading-5 text-rose-300">{errors.__lgpd}</p>
               )}
-            </button>
+            </div>
+
+            <Button type="submit" variant="primary" size="lg" loading={sending} className="w-full">
+              {sending ? "Enviando…" : "Enviar candidatura"}
+            </Button>
           </form>
         </div>
       </section>
+      <footer className="mx-auto max-w-5xl px-5 pb-10 text-xs text-zinc-600">
+        Página criada com{" "}
+        <Link href="/" className="text-zinc-500 underline-offset-4 hover:text-zinc-300 hover:underline">
+          Tráfego Pro
+        </Link>
+      </footer>
     </main>
   );
 }

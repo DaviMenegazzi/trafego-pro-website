@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { useClientContext } from "@/contexts/ClientContext";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button, EmptyState, InlineNotice, Page, PageHeader, SegmentedControl, Select, Surface } from "@/components/ds";
 
 import type {
   TalentForm,
@@ -56,7 +56,6 @@ export default function TalentBankAdmin() {
 
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
-  const [unitSearch, setUnitSearch] = useState("");
   const [forms, setForms] = useState<TalentForm[]>([]);
   const [activeForm, setActiveForm] = useState<TalentForm | null>(null);
   const [activeTab, setActiveTab] = useState<"builder" | "candidates">("builder");
@@ -66,8 +65,6 @@ export default function TalentBankAdmin() {
   const [loadingForms, setLoadingForms] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [savingForm, setSavingForm] = useState(false);
-  const [unitDropdownOpen, setUnitDropdownOpen] = useState(false);
-  const [formDropdownOpen, setFormDropdownOpen] = useState(false);
 
   useEffect(() => {
     document.title = "Tráfego Pro — Banco de Talentos";
@@ -384,193 +381,79 @@ export default function TalentBankAdmin() {
     [units, selectedUnitId]
   );
 
-  const filteredUnits = useMemo(() => {
-    if (!unitSearch.trim()) return units;
-    const q = normalizeUnitKey(unitSearch);
-    return units.filter((u) => normalizeUnitKey(u.name).includes(q));
-  }, [units, unitSearch]);
+  // A unidade do contexto global tem correspondente no recrutamento?
+  const contextMatched = useMemo(() => {
+    if (!selectedClientId || units.length === 0) return false;
+    if (units.some((u) => u.id === selectedClientId)) return true;
+    const ctxClient = clients.find((c) => c.id === selectedClientId);
+    if (!ctxClient) return false;
+    const ctxNorm = normalizeUnitKey(ctxClient.name);
+    return units.some((u) => {
+      const uNorm = normalizeUnitKey(u.name);
+      return uNorm === ctxNorm || uNorm.includes(ctxNorm) || ctxNorm.includes(uNorm);
+    });
+  }, [selectedClientId, units, clients]);
+
 
   return (
     <AppLayout>
-      <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Top Breadcrumb / Unit Header */}
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-emerald-400">
-              <UsersRound className="size-3.5" />
-              <span>Recrutamento & Seleção</span>
-            </div>
-            <h1 className="mt-1 font-display text-2xl sm:text-3xl font-bold text-zinc-100">
-              Banco de Talentos
-            </h1>
-          </div>
-
-          {/* Unit Selector Popover */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Popover open={unitDropdownOpen} onOpenChange={setUnitDropdownOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex min-h-11 w-full sm:w-72 items-center justify-between gap-2 rounded-2xl border border-white/10 bg-zinc-900/80 px-4 py-2.5 text-xs text-zinc-200 shadow-sm hover:border-zinc-500 hover:bg-zinc-900 transition"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Building2 className="size-4 text-emerald-400 shrink-0" />
-                    <span className="truncate font-semibold">
-                      {currentUnit?.name || "Selecionar Unidade"}
-                    </span>
-                  </div>
-                  <ChevronDown className="size-4 text-zinc-500 shrink-0" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="end"
-                className="w-72 rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl z-50"
-              >
-                <div className="p-2 border-b border-white/5">
-                  <div className="relative">
-                    <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-                    <input
-                      type="text"
-                      placeholder="Buscar unidade..."
-                      value={unitSearch}
-                      onChange={(e) => setUnitSearch(e.target.value)}
-                      className="w-full bg-zinc-900 border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50"
-                    />
-                  </div>
-                </div>
-                <div className="max-h-60 overflow-y-auto space-y-1 p-1">
-                  {filteredUnits.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-zinc-500">Nenhuma unidade encontrada</div>
-                  ) : (
-                    filteredUnits.map((u) => (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() => {
-                          handleSelectUnit(u.id);
-                          setUnitDropdownOpen(false);
-                          setUnitSearch("");
-                        }}
-                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
-                          u.id === selectedUnitId
-                            ? "bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20"
-                            : "text-zinc-300 hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        <span className="truncate">{u.name}</span>
-                        {u.id === selectedUnitId && (
-                          <Check className="size-3.5 text-emerald-400 shrink-0" />
-                        )}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </header>
+      <Page>
+        <PageHeader
+          title="Banco de Talentos"
+          subtitle={
+            activeForm
+              ? `${currentUnit?.name ?? ""} · ${activeForm.title}`
+              : currentUnit
+                ? `${currentUnit.name} · formulários de recrutamento`
+                : "Formulários de recrutamento"
+          }
+          actions={
+            !contextMatched && units.length > 0 ? (
+              <Select
+                aria-label="Unidade do recrutamento"
+                value={selectedUnitId}
+                onValueChange={(id) => handleSelectUnit(id)}
+                className="w-64"
+                options={units.map((u) => ({ value: u.id, label: u.name }))}
+                placeholder="Selecionar unidade"
+              />
+            ) : undefined
+          }
+        />
+        {!contextMatched && units.length > 0 && selectedClientId && (
+          <InlineNotice tone="info">A unidade escolhida no menu ainda não tem recrutamento; escolha a unidade acima.</InlineNotice>
+        )}
 
         {/* Loading State */}
         {loadingUnits ? (
-          <div className="flex items-center justify-center py-20 text-zinc-500">
-            <Loader2 className="size-8 animate-spin text-emerald-400 mr-3" />
-            <span>Carregando unidades do banco de talentos...</span>
-          </div>
+          <Surface><EmptyState title="Carregando o recrutamento da unidade…" /></Surface>
         ) : !selectedUnitId ? (
-          <div className="rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/20 p-12 text-center text-zinc-500">
-            Nenhuma unidade selecionada.
-          </div>
+          <Surface><EmptyState title="Nenhuma unidade com recrutamento" description="Peça a um administrador para ativar o Banco de Talentos na unidade." /></Surface>
         ) : activeForm ? (
           /* ─── LEVEL 2: ACTIVE FORM WORKSPACE ─── */
           <div className="space-y-6">
-            {/* Navigation bar with Back button & Form Switcher */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-white/10 bg-zinc-900/50 p-4">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveForm(null)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-300 hover:bg-white/15 hover:text-white transition"
-                >
-                  <ArrowLeft className="size-4" />
-                  <span>Voltar para Formulários</span>
-                </button>
-
-                <div className="h-4 w-px bg-zinc-700 hidden sm:block" />
-
-                {/* Form quick switcher */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Button variant="ghost" onClick={() => setActiveForm(null)}>
+                  <ArrowLeft />
+                  Formulários
+                </Button>
                 {forms.length > 1 && (
-                  <Popover open={formDropdownOpen} onOpenChange={setFormDropdownOpen}>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-2 rounded-xl border border-white/5 bg-zinc-950/60 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-700 transition max-w-xs"
-                      >
-                        <span className="truncate">{activeForm.title}</span>
-                        <ChevronDown className="size-3.5 text-zinc-500 shrink-0" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="start"
-                      className="w-80 rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl"
-                    >
-                      <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                        Formulários da Unidade
-                      </div>
-                      <div className="max-h-60 overflow-y-auto space-y-1">
-                        {forms.map((f) => (
-                          <button
-                            key={f.id}
-                            type="button"
-                            onClick={() => {
-                              setActiveForm(f);
-                              setFormDropdownOpen(false);
-                            }}
-                            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
-                              f.id === activeForm.id
-                                ? "bg-emerald-500/10 text-emerald-400 font-semibold"
-                                : "text-zinc-300 hover:bg-white/5"
-                            }`}
-                          >
-                            <span className="truncate">{f.title}</span>
-                            <span className="text-[10px] text-zinc-500">
-                              {f.isPublished ? "Publicado" : "Rascunho"}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  <Select
+                    aria-label="Trocar de formulário"
+                    value={activeForm.id}
+                    onValueChange={(id) => { const f = forms.find((x) => x.id === id); if (f) setActiveForm(f); }}
+                    className="w-72 max-w-full"
+                    options={forms.map((f) => ({ value: f.id, label: f.title, description: f.isPublished ? "Publicado" : "Rascunho" }))}
+                  />
                 )}
               </div>
-
-              {/* Workspace Navigation Tabs */}
-              <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-zinc-950/80 p-1 w-full sm:w-auto justify-center sm:justify-start">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("builder")}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold transition ${
-                    activeTab === "builder"
-                      ? "bg-white text-zinc-950 shadow-md"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  <Settings2 className="size-3.5" />
-                  <span>Construtor de Campos</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("candidates")}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold transition ${
-                    activeTab === "candidates"
-                      ? "bg-white text-zinc-950 shadow-md"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  <Users className="size-3.5" />
-                  <span>Candidatos ({candidates.length})</span>
-                </button>
-              </div>
+              <SegmentedControl
+                aria-label="Seção do formulário"
+                value={activeTab}
+                onValueChange={setActiveTab}
+                options={[{ value: "builder", label: "Perguntas" }, { value: "candidates", label: "Candidatos", count: candidates.length }]}
+              />
             </div>
 
             {/* Tab 1: Form Builder with Drag & Drop */}
@@ -607,7 +490,7 @@ export default function TalentBankAdmin() {
             onDeleteForm={handleDeleteForm}
           />
         )}
-      </main>
+      </Page>
     </AppLayout>
   );
 }

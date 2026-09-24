@@ -1,4 +1,4 @@
-import { Tooltip, useConfirm } from "@/components/ds";
+import { SwitchField, Tooltip, useConfirm } from "@/components/ds";
 import { useState, useRef } from "react";
 import {
   DndContext,
@@ -271,25 +271,17 @@ export function TalentFormBuilder({
             <div className="flex items-center gap-2">
               <Layers className="size-4 text-emerald-400" />
               <h2 className="font-display text-base font-semibold text-zinc-100">
-                Campos do Formulário
+                Perguntas
               </h2>
-              <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-zinc-400 font-mono">
-                {form.fields.length} {form.fields.length === 1 ? "campo" : "campos"}
+              <span className="text-sm text-zinc-500 tabular-nums">
+                {form.fields.length}
               </span>
             </div>
             <p className="mt-1 text-xs text-zinc-400">
-              Arraste os campos pelo ícone de seis pontos para reordenar a sequência de perguntas.
+              Arraste pela alça ou use as setas para mudar a ordem. Clique numa pergunta para editar.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleAddDefaultField}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 shadow-lg shadow-emerald-950/40 transition shrink-0"
-          >
-            <Plus className="size-4 stroke-[2.5]" />
-            Adicionar Pergunta
-          </button>
         </div>
 
         {/* DnD Sortable Container */}
@@ -350,7 +342,7 @@ export function TalentFormBuilder({
               className="inline-flex items-center gap-2 rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/20 px-6 py-3 text-xs font-medium text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/40 hover:text-zinc-200 transition w-full justify-center"
             >
               <Plus className="size-4" />
-              Adicionar outra pergunta ao formulário
+              Adicionar pergunta
             </button>
           </div>
         )}
@@ -384,26 +376,14 @@ export function TalentFormBuilder({
           </div>
 
           {/* Toggle Published */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/5 bg-zinc-950/40 p-3 hover:bg-zinc-950/60 transition">
-            <div className="min-w-0 pr-2">
-              <span className="block text-xs font-medium text-zinc-200">
-                Disponível na Web
-              </span>
-              <span className="block text-[11px] text-zinc-500">
-                {form.isPublished
-                  ? "Candidatos podem acessar e enviar respostas"
-                  : "Link público desativado para novas inscrições"}
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              checked={form.isPublished}
-              onChange={(e) =>
-                onFormChange({ ...form, isPublished: e.target.checked })
-              }
-              className="size-4 rounded border-zinc-700 accent-emerald-500 shrink-0"
-            />
-          </label>
+          <SwitchField
+            id="publicado-na-web"
+            className="rounded-xl border border-white/[0.06] bg-zinc-950/40 p-3"
+            label="Aceitando candidaturas"
+            description={form.isPublished ? "O link público está aberto a novas candidaturas." : "O link público está fechado para novas candidaturas."}
+            checked={form.isPublished}
+            onCheckedChange={(checked) => onFormChange({ ...form, isPublished: checked })}
+          />
 
           {/* Public Link Box */}
           <div className="rounded-xl border border-white/5 bg-zinc-950/40 p-3 space-y-2">
@@ -466,7 +446,7 @@ export function TalentFormBuilder({
             ) : (
               <>
                 <Save className="size-4" />
-                Salvar Formulário
+                Salvar alterações
               </>
             )}
           </button>
@@ -593,7 +573,7 @@ export function TalentFormBuilder({
               onChange={(e) =>
                 onFormChange({ ...form, lgpdDisclaimer: e.target.value })
               }
-              className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] text-zinc-300 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+              className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
@@ -617,7 +597,7 @@ export function TalentFormBuilder({
                 onFormChange({ ...form, successMessage: e.target.value })
               }
               placeholder="Descrição de confirmação..."
-              className="mt-1.5 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] text-zinc-300 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+              className="mt-1.5 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
           </div>
         </div>

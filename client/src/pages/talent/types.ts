@@ -107,7 +107,7 @@ export const TALENT_STATUS_CONFIG: Record<
     dot: "bg-blue-400",
   },
   em_analise: {
-    label: "Em Análise",
+    label: "Em análise",
     bg: "bg-amber-500/10",
     text: "text-amber-400",
     border: "border-amber-500/20",
@@ -135,10 +135,20 @@ export const TALENT_STATUS_CONFIG: Record<
     dot: "bg-red-400",
   },
   banco: {
-    label: "Banco de Talentos",
+    label: "Banco de talentos",
     bg: "bg-zinc-500/10",
     text: "text-zinc-400",
     border: "border-zinc-500/20",
     dot: "bg-zinc-400",
   },
+};
+
+/** Tom do StatusBadge do design system para cada etapa do funil. */
+export const TALENT_STATUS_TONE: Record<TalentSubmissionStatus, "good" | "warning" | "critical" | "info" | "neutral"> = {
+  novo: "info",
+  em_analise: "warning",
+  entrevista: "info",
+  aprovado: "good",
+  reprovado: "critical",
+  banco: "neutral",
 };

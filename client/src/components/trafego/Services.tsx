@@ -1,4 +1,3 @@
-import { ArrowUpRight } from "lucide-react";
 import { Reveal } from "./Reveal";
 
 const services = [
@@ -35,10 +34,9 @@ export function Services() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-border/70 border border-border/70 rounded-3xl overflow-hidden">
         {services.map((s, i) => (
           <Reveal key={s.n} delay={(i % 3) * 100}>
-            <div className="group bg-background p-8 md:p-10 min-h-[240px] h-full flex flex-col justify-between hover:bg-surface transition-colors">
+            <div className="bg-background p-8 md:p-10 min-h-[240px] h-full flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <span className="text-sm text-muted-foreground font-mono">{s.n}</span>
-                <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div>
                 <h3 className="font-display text-2xl md:text-3xl font-semibold tracking-[-0.01em]">

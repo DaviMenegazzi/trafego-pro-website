@@ -11,7 +11,7 @@ const links = [
 export function Nav() {
   return (
     <header className="sticky top-0 z-50 backdrop-blur-md bg-background/70 border-b border-border/40">
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 h-16 md:h-20 flex items-center justify-between gap-4">
+      <div className="mx-auto max-w-[1400px] px-4 sm:px-6 md:px-10 h-16 md:h-20 flex items-center justify-between gap-4">
         <a href="#top" className="font-display font-semibold tracking-[0.14em] text-sm md:text-base shrink-0">
           TRÁFEGO<span className="text-muted-foreground"> PRO</span>
         </a>
@@ -26,14 +26,25 @@ export function Nav() {
             </a>
           ))}
         </nav>
-        <a
-          href={WA_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="rounded-full bg-primary text-primary-foreground px-4 md:px-5 py-2 md:py-2.5 text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          Começar Agora
-        </a>
+        <div className="flex items-center gap-1 md:gap-3">
+          {/* Clientes da agência não tinham caminho da home para o login. */}
+          <a
+            href="/login"
+            aria-label="Área do cliente"
+            className="whitespace-nowrap rounded-full px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground md:px-4"
+          >
+            <span className="md:hidden">Entrar</span>
+            <span className="hidden md:inline">Área do cliente</span>
+          </a>
+          <a
+            href={WA_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full bg-primary text-primary-foreground px-4 md:px-5 py-2 md:py-2.5 text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"
+          >
+            Começar agora
+          </a>
+        </div>
       </div>
     </header>
   );

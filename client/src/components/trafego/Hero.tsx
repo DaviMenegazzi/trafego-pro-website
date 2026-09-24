@@ -6,13 +6,6 @@ export function Hero() {
   return (
     <section id="top" className="relative overflow-hidden border-b border-border/60">
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 pt-20 md:pt-36 pb-24 md:pb-40">
-        <Reveal>
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs text-muted-foreground mb-10">
-            <span className="h-1.5 w-1.5 rounded-full bg-foreground/80" />
-            Impulsione suas vendas com Tráfego Pago
-          </div>
-        </Reveal>
-
         <Reveal delay={80}>
           <h1 className="font-display font-semibold tracking-[-0.035em] leading-[0.92] text-[clamp(3rem,11vw,10rem)] max-w-[15ch]">
             Tráfego que <span className="text-muted-foreground">converte</span> em receita.

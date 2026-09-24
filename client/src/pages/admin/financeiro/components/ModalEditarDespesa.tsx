@@ -1,219 +1,108 @@
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { Button, CurrencyInput, Dialog, Field, Input, SegmentedControl, Select } from "@/components/ds";
 import type { Despesa } from "../types";
-import { MESES, CATEGORIAS_DESP } from "../constants";
-import { Pencil, X } from "lucide-react";
+import { CATEGORIAS_DESP, MESES } from "../constants";
 
 interface ModalEditarDespesaProps {
+  /** Despesa em edição; `null` com `isOpen` abre o lançamento de uma nova. */
   despesa: Despesa | null;
   isOpen: boolean;
+  defaultMes?: string;
   onClose: () => void;
-  onSave: (id: string, updatedData: Partial<Despesa>) => Promise<void>;
+  onSave: (id: string | null, data: Omit<Despesa, "id">) => Promise<void>;
 }
 
-export function ModalEditarDespesa({
-  despesa,
-  isOpen,
-  onClose,
-  onSave,
-}: ModalEditarDespesaProps) {
+type Errors = Partial<Record<"nome" | "cat" | "val" | "dia", string>>;
+
+/** Lançar ou editar uma despesa da operação (mesmo formulário para os dois casos). */
+export function ModalEditarDespesa({ despesa, isOpen, defaultMes = "2026_08", onClose, onSave }: ModalEditarDespesaProps) {
   const [nome, setNome] = useState("");
   const [cat, setCat] = useState("");
-  const [val, setVal] = useState<string | number>("");
-  const [dia, setDia] = useState<string | number>("");
-  const [mes, setMes] = useState("");
+  const [val, setVal] = useState<number | null>(null);
+  const [dia, setDia] = useState("");
+  const [mes, setMes] = useState(defaultMes);
   const [desc, setDesc] = useState("");
   const [status, setStatus] = useState<"pendente" | "paga">("pendente");
+  const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (despesa) {
-      setNome(despesa.nome || "");
-      setCat(despesa.cat || "");
-      setVal(despesa.val || "");
-      setDia(despesa.dia || "");
-      setMes(despesa.mes || "");
-      setDesc(despesa.desc || "");
-      setStatus(despesa.status || "pendente");
-    }
-  }, [despesa, isOpen]);
+    if (!isOpen) return;
+    setNome(despesa?.nome || "");
+    setCat(despesa?.cat || "");
+    setVal(despesa?.val ?? null);
+    setDia(despesa?.dia ? String(despesa.dia) : "");
+    setMes(despesa?.mes || defaultMes);
+    setDesc(despesa?.desc || "");
+    setStatus(despesa?.status || "pendente");
+    setErrors({});
+  }, [despesa, isOpen, defaultMes]);
 
-  if (!isOpen || !despesa) return null;
+  const clear = (key: keyof Errors) => setErrors((c) => ({ ...c, [key]: undefined }));
 
-  const handleSave = async () => {
-    if (!nome.trim()) {
-      toast.error("Informe o nome da despesa.");
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const numDia = Number.parseInt(dia, 10);
+    const next: Errors = {
+      nome: nome.trim() ? undefined : "Informe o nome",
+      cat: cat ? undefined : "Escolha a categoria",
+      val: val && val > 0 ? undefined : "Informe o valor",
+      dia: numDia >= 1 && numDia <= 31 ? undefined : "Dia entre 1 e 31",
+    };
+    setErrors(next);
+    const first = (Object.keys(next) as (keyof Errors)[]).find((k) => next[k]);
+    if (first) {
+      document.getElementById(`despesa-${first}`)?.focus();
       return;
     }
-    const numVal = parseFloat(String(val));
-    if (!numVal || numVal <= 0) {
-      toast.error("Informe um valor válido.");
-      return;
-    }
-    const numDia = parseInt(String(dia));
-    if (!numDia || numDia < 1 || numDia > 31) {
-      toast.error("Informe um dia de pagamento válido (1-31).");
-      return;
-    }
-
+    setSaving(true);
     try {
-      setSaving(true);
-      await onSave(despesa.id, {
-        nome: nome.trim(),
-        cat,
-        val: numVal,
-        dia: numDia,
-        mes,
-        desc: desc.trim(),
-        status,
-      });
+      await onSave(despesa?.id ?? null, { nome: nome.trim(), cat, val: val ?? 0, dia: numDia, mes, desc: desc.trim(), status });
       onClose();
-    } catch (err: any) {
-      toast.error("Erro ao salvar despesa: " + err.message);
+    } catch (error) {
+      toast.error(`Não foi possível salvar a despesa: ${error instanceof Error ? error.message : "erro desconhecido"}`);
     } finally {
       setSaving(false);
     }
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="bg-zinc-950 border border-white/15 rounded-3xl p-6 sm:p-7 w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl text-white">
-        <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-6">
-          <div className="text-sm font-bold tracking-wide uppercase text-white flex items-center gap-2">
-            <Pencil className="size-4 text-emerald-400" />
-            <span>Editar Despesa</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-zinc-400 hover:text-red-400 p-1.5 rounded-xl hover:bg-white/5 transition-colors"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5 sm:col-span-2">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              Nome da Despesa
-            </label>
-            <input
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Meta Ads — Boosts"
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-emerald-500 transition-colors"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              Categoria
-            </label>
-            <select
-              value={cat}
-              onChange={(e) => setCat(e.target.value)}
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-emerald-500 transition-colors"
-            >
-              <option value="">Selecione...</option>
-              {CATEGORIAS_DESP.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              Valor (R$)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={val}
-              onChange={(e) => setVal(e.target.value)}
-              placeholder="0,00"
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-emerald-500 transition-colors"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              Dia do Pagamento (1-31)
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="31"
-              value={dia}
-              onChange={(e) => setDia(e.target.value)}
-              placeholder="Ex: 10"
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-emerald-500 transition-colors"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              Competência (Mês)
-            </label>
-            <select
-              value={mes}
-              onChange={(e) => setMes(e.target.value)}
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-emerald-500 transition-colors"
-            >
-              {MESES.map((m) => (
-                <option key={m.k} value={m.k}>
-                  {m.l}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5 sm:col-span-2">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              Descrição / Para que serve
-            </label>
-            <input
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              placeholder="Breve descrição"
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 outline-none focus:border-emerald-500 transition-colors"
-            />
-          </div>
-
-          <div className="space-y-1.5 sm:col-span-2">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              Status do Pagamento
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as "pendente" | "paga")}
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-emerald-500 transition-colors"
-            >
-              <option value="pendente">Pendente</option>
-              <option value="paga">Paga</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 mt-8 pt-4 border-t border-white/10 flex-wrap">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20"
-          >
-            {saving ? "Salvando..." : "Salvar"}
-          </button>
-          <button
-            onClick={onClose}
-            className="border border-white/10 hover:bg-white/5 text-zinc-400 hover:text-white rounded-xl px-5 py-2.5 text-xs font-medium transition-all"
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => { if (!open) onClose(); }}
+      size="md"
+      title={despesa ? "Editar despesa" : "Nova despesa"}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" form="despesa-form" variant="primary" loading={saving}>{despesa ? "Salvar alterações" : "Lançar despesa"}</Button>
+        </>
+      }
+    >
+      <form id="despesa-form" onSubmit={handleSave} noValidate className="grid gap-4 sm:grid-cols-2">
+        <Field label="Nome" htmlFor="despesa-nome" required error={errors.nome} className="sm:col-span-2">
+          <Input id="despesa-nome" value={nome} aria-invalid={Boolean(errors.nome) || undefined} onChange={(e) => { setNome(e.target.value); clear("nome"); }} placeholder="Ex.: Meta Ads — impulsionamentos" />
+        </Field>
+        <Field label="Categoria" required error={errors.cat}>
+          <Select id="despesa-cat" aria-label="Categoria" value={cat} invalid={Boolean(errors.cat)} placeholder="Escolher" onValueChange={(v) => { setCat(v); clear("cat"); }} options={CATEGORIAS_DESP.map((c) => ({ value: c, label: c }))} />
+        </Field>
+        <Field label="Valor" htmlFor="despesa-val" required error={errors.val}>
+          <CurrencyInput id="despesa-val" value={val} aria-invalid={Boolean(errors.val) || undefined} onValueChange={(v) => { setVal(v); clear("val"); }} />
+        </Field>
+        <Field label="Mês de competência" required>
+          <Select aria-label="Mês de competência" value={mes} onValueChange={setMes} options={MESES.map((m) => ({ value: m.k, label: m.l }))} />
+        </Field>
+        <Field label="Dia do pagamento" htmlFor="despesa-dia" required error={errors.dia}>
+          <Input id="despesa-dia" inputMode="numeric" value={dia} aria-invalid={Boolean(errors.dia) || undefined} onChange={(e) => { setDia(e.target.value.replace(/\D/g, "").slice(0, 2)); clear("dia"); }} placeholder="Ex.: 10" />
+        </Field>
+        <Field label="Descrição" htmlFor="despesa-desc" optional className="sm:col-span-2">
+          <Input id="despesa-desc" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        </Field>
+        <Field label="Situação" className="sm:col-span-2">
+          <SegmentedControl aria-label="Situação" value={status} onValueChange={setStatus} options={[{ value: "pendente", label: "Pendente" }, { value: "paga", label: "Paga" }]} />
+        </Field>
+      </form>
+    </Dialog>
   );
 }

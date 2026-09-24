@@ -80,7 +80,7 @@ export function StatTile({
       <p className={cn("mt-1.5 font-display text-2xl font-semibold tabular-nums tracking-[-0.02em] sm:text-[28px]", tone)}>{value}</p>
       <div className="mt-1 flex min-h-5 flex-wrap items-center gap-x-2 text-xs text-zinc-500">
         {status && <StatusBadge tone={status.tone}>{status.label}</StatusBadge>}
-        {hint && <span className="truncate">{hint}</span>}
+        {hint && <span>{hint}</span>}
       </div>
     </div>
   );

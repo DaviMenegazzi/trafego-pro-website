@@ -11,3 +11,5 @@ export { ConfirmProvider, useConfirm } from "./confirm";
 export { DatePicker, DateRangePicker, isoToDate, dateToIso, type IsoRange } from "./date-picker";
 export { PageHeader, Page, Surface, SurfaceHeader, StatTile, StatusBadge, EmptyState, InlineNotice, type BadgeTone } from "./layout";
 export { toast, toastWithUndo } from "./toast";
+export { CurrencyInput } from "./currency-input";
+export { TabBar } from "./tabs";

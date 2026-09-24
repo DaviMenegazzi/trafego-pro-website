@@ -4,6 +4,7 @@ import { Hero } from "@/components/trafego/Hero";
 import { Logos } from "@/components/trafego/Logos";
 import { About } from "@/components/trafego/About";
 import { Services } from "@/components/trafego/Services";
+import { Products } from "@/components/trafego/Products";
 import { Method } from "@/components/trafego/Method";
 import { CTA } from "@/components/trafego/CTA";
 import { Footer } from "@/components/trafego/Footer";
@@ -27,6 +28,7 @@ export default function TrafegoProHome() {
         <Logos />
         <About />
         <Services />
+        <Products />
         <Method />
         <CTA />
       </main>

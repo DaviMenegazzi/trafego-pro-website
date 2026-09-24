@@ -4,6 +4,7 @@ const WA_URL =
 const links = [
   { href: "#sobre", label: "Sobre" },
   { href: "#servicos", label: "Serviços" },
+  { href: "#produtos", label: "Produtos" },
   { href: "#metodologia", label: "Estratégia" },
   { href: "#contato", label: "Contato" },
 ];

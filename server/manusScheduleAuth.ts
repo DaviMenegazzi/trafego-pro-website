@@ -24,10 +24,22 @@ function verifyManusSession(token: string, secret: string): { openId: string } |
   } catch { return null; }
 }
 
+/** taskUid usado pelo cron da VPS (crontab chamando as rotas com o header X-Cron-Secret). */
+export const VPS_CRON_TASK_UID = "vps-cron";
+
+function matchesCronSecret(req: Pick<Request, "headers">, secret: string | undefined): boolean {
+  const header = req.headers["x-cron-secret"];
+  if (!secret || secret.length < 32 || typeof header !== "string") return false;
+  const expected = crypto.createHash("sha256").update(secret).digest();
+  const received = crypto.createHash("sha256").update(header).digest();
+  return crypto.timingSafeEqual(expected, received);
+}
+
 export async function authenticateScheduledTask(
   req: Pick<Request, "headers">,
-  options: { fetcher?: typeof fetch; oauthUrl?: string; appId?: string; cookieSecret?: string } = {},
+  options: { fetcher?: typeof fetch; oauthUrl?: string; appId?: string; cookieSecret?: string; cronSecret?: string } = {},
 ): Promise<string> {
+  if (matchesCronSecret(req, options.cronSecret ?? process.env.CRON_SECRET)) return VPS_CRON_TASK_UID;
   const token = readCookie(req, "app_session_id");
   const cookieSecret = options.cookieSecret ?? process.env.JWT_SECRET;
   const oauthUrl = options.oauthUrl ?? process.env.OAUTH_SERVER_URL;

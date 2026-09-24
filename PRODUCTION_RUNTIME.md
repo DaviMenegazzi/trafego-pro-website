@@ -25,6 +25,16 @@ O módulo financeiro usa o Firebase Admin apenas no servidor. Configure `FIREBAS
 
 A migração `supabase/migrations/20260923210945_restrict_meta_daily_summary.sql` restringe as métricas às unidades autorizadas. Valide-a no projeto Supabase e mantenha `SUPABASE_SERVICE_KEY` no servidor para a rotina de backup, pois clientes comuns não recebem mais permissão de escrita na tabela.
 
+## VPS (desde 2026-09-24)
+
+O site também roda na VPS da Evolution, em `/opt/trafego-pro`, no container `trafego_pro` (limites: 512 MB de RAM e 0,5 vCPU), atrás do nginx em `https://trafegopro.147.93.10.249.sslip.io`. Os arquivos ficam em `deploy/vps/`.
+
+- Dados próprios do site (feedbacks, formulários, publicações sociais, tokens da API externa) ficam no Supabase `trafegopro-analise` (`db/site_tables_supabase.sql`). Não existe mais MySQL em produção.
+- As mídias das publicações vão para o bucket público `social-media` e os currículos para o bucket `talent-resumes`.
+- As rotas `/api/scheduled/*` aceitam o header `X-Cron-Secret` (`CRON_SECRET`); o cron fica em `/etc/cron.d/trafego-pro`.
+- Deploy: `pnpm build` local → enviar `dist`, `package.json`, `pnpm-lock.yaml`, `patches` e `deploy/vps/*` para `/opt/trafego-pro` → `docker compose build && docker compose up -d`. Nunca rode o `vite build` na VPS.
+- Dados antigos do MySQL do Manus: `scripts/migrate-manus-mysql-to-supabase.mjs`.
+
 ## Verificação
 
 A configuração foi validada com `pnpm check`, `pnpm test` e `pnpm build`. O servidor de desenvolvimento iniciou o Express na porta dinâmica esperada e o checkpoint de produção foi criado pelo hosting gerido.

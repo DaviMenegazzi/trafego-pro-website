@@ -1,0 +1,33 @@
+# Site da Tráfego Pro na VPS da Evolution (KVM 1, 1 vCPU / 4 GB).
+# Limites obrigatórios: se o site estourar, só este container cai — a Evolution segue de pé.
+services:
+  trafego-pro:
+    build: .
+    image: trafego-pro:latest
+    container_name: trafego_pro
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 0.5
+    env_file:
+      - /opt/trafego-pro/.env
+    ports:
+      - "127.0.0.1:3200:3200"
+    networks:
+      - evolution_net # fala com o Laya (laya_classifier:8010) sem sair da máquina
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3200/api/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  evolution_net:
+    external: true
+    name: evolution_evolution_net

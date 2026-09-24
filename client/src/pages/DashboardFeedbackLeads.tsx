@@ -50,7 +50,7 @@ function StandaloneFeedbackShell({ children, userName, onLogout }: { children: R
       <header className="border-b border-white/10 bg-[#080808]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
           <a href="/" className="flex items-center gap-3" aria-label="Voltar para Tráfego Pro">
-            <img src="/manus-storage/logo_trafego_pro_white_9daf2f2e.webp" alt="Tráfego Pro" className="h-6 w-auto" />
+            <img src="/brand/logo_trafego_pro_white_9daf2f2e.webp" alt="Tráfego Pro" className="h-6 w-auto" />
             <span className="hidden border-l border-white/15 pl-3 text-xs font-light tracking-[0.18em] text-white/45 sm:inline">FEEDBACK SEMANAL</span>
           </a>
           <div className="flex items-center gap-3">

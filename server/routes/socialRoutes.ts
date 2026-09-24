@@ -275,7 +275,7 @@ socialRouter.post(
         req.file!.buffer,
         req.file!.mimetype,
       );
-      res.status(201).json({ url: `https://www.trafego.pro${stored.url}`, mediaType: validation.mediaType });
+      res.status(201).json({ url: stored.url, mediaType: validation.mediaType });
     } catch (error) {
       console.error("[social] Falha no upload de mídia:", error);
       res.status(503).json({ error: "Não foi possível armazenar a mídia selecionada" });

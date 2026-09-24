@@ -20,6 +20,12 @@ describe("autenticação de callbacks agendados", () => {
     expect(fetcher).toHaveBeenCalledWith("https://oauth.example/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt", expect.objectContaining({ method: "POST" }));
   });
 
+  it("aceita o cron da VPS apenas com o segredo correto", async () => {
+    const cronSecret = "c".repeat(48);
+    await expect(authenticateScheduledTask({ headers: { "x-cron-secret": cronSecret } }, { cronSecret })).resolves.toBe("vps-cron");
+    await expect(authenticateScheduledTask({ headers: { "x-cron-secret": "errado" } }, { cronSecret, cookieSecret: "secret", oauthUrl: "https://oauth.example", appId: "app-test" })).rejects.toThrow("não autorizado");
+  });
+
   it("rejeita um callback sem sessão cron válida", async () => {
     await expect(authenticateScheduledTask({ headers: {} }, { cookieSecret: "secret", oauthUrl: "https://oauth.example", appId: "app-test" })).rejects.toThrow("não autorizado");
   });

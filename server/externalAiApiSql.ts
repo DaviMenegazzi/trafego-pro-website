@@ -1,8 +1,6 @@
 import crypto from "crypto";
-import fs from "node:fs";
-import path from "node:path";
-import mysql, { type Pool, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 import { parseExternalAiApiScopes, parseExternalAiApiUnitIds, type ExternalAiApiScope } from "./externalAiApiPolicy.js";
+import { getSiteSupabase, unwrap } from "./siteSupabase.js";
 
 export type ExternalAiApiToken = {
   id: string;
@@ -18,79 +16,21 @@ export type ExternalAiApiToken = {
   createdAt: string;
 };
 
-type TokenRow = RowDataPacket & {
+type TokenRow = {
   id: string;
   owner_user_id: string;
   name: string;
   token_prefix: string;
   token_hash: string;
-  scopes_json: string;
-  unit_ids_json: string;
-  expires_at: Date | string;
-  revoked_at: Date | string | null;
-  last_used_at: Date | string | null;
-  created_at: Date | string;
-  rate_window_count: number;
+  scopes_json: unknown;
+  unit_ids_json: unknown;
+  expires_at: string;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
 };
 
-let pool: Pool | null = null;
-const DATA_DIR = path.resolve(process.cwd(), "data");
-const TOKENS_FILE = path.join(DATA_DIR, "external_ai_tokens.json");
-
-function getDbUri(): string | null {
-  const uri = process.env.DATABASE_URL || process.env.DRIZZLE_DATABASE_URL || null;
-  if (!uri && process.env.NODE_ENV === "production") {
-    throw new Error("DATABASE_URL obrigatória para tokens externos em produção");
-  }
-  return uri;
-}
-
-function db(): Pool {
-  const uri = getDbUri();
-  if (!uri) throw new Error("DATABASE_URL não configurada");
-  if (!pool) pool = mysql.createPool({ uri, waitForConnections: true, connectionLimit: 5, queueLimit: 0, enableKeepAlive: true });
-  return pool;
-}
-
-// ─── File-based Storage Fallback ─────────────────────────────────────────────
-interface LocalTokenStoreItem {
-  id: string;
-  ownerUserId: string;
-  name: string;
-  tokenPrefix: string;
-  tokenHash: string;
-  scopes: ExternalAiApiScope[];
-  unitIds: string[];
-  expiresAt: string;
-  revokedAt: string | null;
-  lastUsedAt: string | null;
-  createdAt: string;
-  rateWindowStartedAt?: number;
-  rateWindowCount?: number;
-}
-
-function loadTokensFile(): LocalTokenStoreItem[] {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(TOKENS_FILE)) return [];
-    const content = fs.readFileSync(TOKENS_FILE, "utf-8");
-    const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.warn("[external-ai] Aviso ao ler tokens locais:", err);
-    return [];
-  }
-}
-
-function saveTokensFile(tokens: LocalTokenStoreItem[]): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2), "utf-8");
-  } catch (err) {
-    console.error("[external-ai] Erro ao salvar tokens locais:", err);
-    throw err;
-  }
-}
+const TOKEN_COLUMNS = "id, owner_user_id, name, token_prefix, token_hash, scopes_json, unit_ids_json, expires_at, revoked_at, last_used_at, created_at";
 
 function iso(value: Date | string | null): string | null {
   if (!value) return null;
@@ -98,7 +38,10 @@ function iso(value: Date | string | null): string | null {
   return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
 }
 
-function json(value: string): unknown[] {
+/** jsonb chega como array; dados migrados do MySQL podem vir como texto JSON. */
+function json(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
   try {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : [];
@@ -132,130 +75,52 @@ export async function createExternalAiApiTokenSql(input: {
   unitIds: string[];
   expiresAt: Date;
 }): Promise<ExternalAiApiToken> {
-  const id = crypto.randomUUID();
-
-  if (!getDbUri()) {
-    const tokens = loadTokensFile();
-    const token: LocalTokenStoreItem = {
-      id,
-      ownerUserId: input.ownerUserId,
-      name: input.name,
-      tokenPrefix: input.tokenPrefix,
-      tokenHash: input.tokenHash,
-      scopes: input.scopes,
-      unitIds: input.unitIds,
-      expiresAt: input.expiresAt.toISOString(),
-      revokedAt: null,
-      lastUsedAt: null,
-      createdAt: new Date().toISOString(),
-    };
-    tokens.unshift(token);
-    saveTokensFile(tokens);
-    const { rateWindowCount: _c, rateWindowStartedAt: _s, ...res } = token;
-    return res;
-  }
-
-  await db().execute(
-    "INSERT INTO external_ai_api_tokens (id, owner_user_id, name, token_prefix, token_hash, scopes_json, unit_ids_json, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    [id, input.ownerUserId, input.name, input.tokenPrefix, input.tokenHash, JSON.stringify(input.scopes), JSON.stringify(input.unitIds), input.expiresAt],
-  );
-  const token = await getExternalAiApiTokenSql(id, input.ownerUserId);
-  if (!token) throw new Error("Token criado, mas não pôde ser lido");
-  return token;
+  const row = unwrap(await getSiteSupabase().from("external_ai_api_tokens").insert({
+    id: crypto.randomUUID(),
+    owner_user_id: input.ownerUserId,
+    name: input.name,
+    token_prefix: input.tokenPrefix,
+    token_hash: input.tokenHash,
+    scopes_json: input.scopes,
+    unit_ids_json: input.unitIds,
+    expires_at: input.expiresAt.toISOString(),
+  }).select(TOKEN_COLUMNS).single());
+  return map(row as TokenRow);
 }
 
 export async function listExternalAiApiTokensSql(ownerUserId: string): Promise<ExternalAiApiToken[]> {
-  if (!getDbUri()) {
-    const tokens = loadTokensFile();
-    return tokens.map(({ rateWindowCount: _c, rateWindowStartedAt: _s, ...t }) => t);
-  }
-  const [rows] = await db().query<TokenRow[]>(
-    "SELECT id, owner_user_id, name, token_prefix, token_hash, scopes_json, unit_ids_json, expires_at, revoked_at, last_used_at, created_at FROM external_ai_api_tokens WHERE owner_user_id = ? ORDER BY created_at DESC",
-    [ownerUserId],
-  );
-  return rows.map(map);
-}
-
-async function getExternalAiApiTokenSql(id: string, ownerUserId: string): Promise<ExternalAiApiToken | null> {
-  if (!getDbUri()) {
-    const tokens = loadTokensFile();
-    const found = tokens.find((t) => t.id === id);
-    if (!found) return null;
-    const { rateWindowCount: _c, rateWindowStartedAt: _s, ...res } = found;
-    return res;
-  }
-  const [rows] = await db().query<TokenRow[]>(
-    "SELECT id, owner_user_id, name, token_prefix, token_hash, scopes_json, unit_ids_json, expires_at, revoked_at, last_used_at, created_at FROM external_ai_api_tokens WHERE id = ? AND owner_user_id = ? LIMIT 1",
-    [id, ownerUserId],
-  );
-  return rows[0] ? map(rows[0]) : null;
+  const rows = unwrap(await getSiteSupabase().from("external_ai_api_tokens").select(TOKEN_COLUMNS)
+    .eq("owner_user_id", ownerUserId).order("created_at", { ascending: false }));
+  return (rows as TokenRow[]).map(map);
 }
 
 export async function findExternalAiApiTokenByHashSql(tokenHash: string): Promise<ExternalAiApiToken | null> {
-  if (!getDbUri()) {
-    const tokens = loadTokensFile();
-    const found = tokens.find((t) => t.tokenHash === tokenHash);
-    if (!found) return null;
-    const { rateWindowCount: _c, rateWindowStartedAt: _s, ...res } = found;
-    return res;
-  }
-  const [rows] = await db().query<TokenRow[]>(
-    "SELECT id, owner_user_id, name, token_prefix, token_hash, scopes_json, unit_ids_json, expires_at, revoked_at, last_used_at, created_at FROM external_ai_api_tokens WHERE token_hash = ? LIMIT 1",
-    [tokenHash],
-  );
-  return rows[0] ? map(rows[0]) : null;
+  const row = unwrap(await getSiteSupabase().from("external_ai_api_tokens").select(TOKEN_COLUMNS).eq("token_hash", tokenHash).maybeSingle());
+  return row ? map(row as TokenRow) : null;
 }
 
 export async function revokeExternalAiApiTokenSql(id: string, ownerUserId: string): Promise<boolean> {
-  if (!getDbUri()) {
-    const tokens = loadTokensFile();
-    const item = tokens.find((t) => t.id === id);
-    if (!item || item.revokedAt) return false;
-    item.revokedAt = new Date().toISOString();
-    saveTokensFile(tokens);
-    return true;
-  }
-  const [result] = await db().execute<ResultSetHeader>(
-    "UPDATE external_ai_api_tokens SET revoked_at = UTC_TIMESTAMP() WHERE id = ? AND owner_user_id = ? AND revoked_at IS NULL",
-    [id, ownerUserId],
-  );
-  return result.affectedRows > 0;
+  const rows = unwrap(await getSiteSupabase().from("external_ai_api_tokens")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", id).eq("owner_user_id", ownerUserId).is("revoked_at", null).select("id"));
+  return (rows ?? []).length > 0;
 }
 
 export async function consumeExternalAiApiRateLimitSql(id: string, limit: number): Promise<{ allowed: boolean; count: number }> {
-  if (!getDbUri()) {
-    const tokens = loadTokensFile();
-    const item = tokens.find((t) => t.id === id);
-    if (!item) return { allowed: true, count: 1 };
-    const now = Date.now();
-    if (!item.rateWindowStartedAt || now - item.rateWindowStartedAt > 60_000) {
-      item.rateWindowStartedAt = now;
-      item.rateWindowCount = 1;
-    } else {
-      item.rateWindowCount = (item.rateWindowCount || 0) + 1;
-    }
-    item.lastUsedAt = new Date().toISOString();
-    saveTokensFile(tokens);
-    return { allowed: (item.rateWindowCount || 1) <= limit, count: item.rateWindowCount || 1 };
-  }
-  await db().execute(
-    "UPDATE external_ai_api_tokens SET rate_window_count = CASE WHEN rate_window_started_at IS NULL OR rate_window_started_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 MINUTE) THEN 1 ELSE rate_window_count + 1 END, rate_window_started_at = CASE WHEN rate_window_started_at IS NULL OR rate_window_started_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 MINUTE) THEN UTC_TIMESTAMP() ELSE rate_window_started_at END, last_used_at = UTC_TIMESTAMP() WHERE id = ?",
-    [id],
-  );
-  const [rows] = await db().query<(RowDataPacket & { rate_window_count: number })[]>(
-    "SELECT rate_window_count FROM external_ai_api_tokens WHERE id = ? LIMIT 1",
-    [id],
-  );
-  const count = Number(rows[0]?.rate_window_count ?? limit + 1);
+  const result = unwrap(await getSiteSupabase().rpc("consume_external_ai_token_rate", { p_id: id }));
+  const count = result == null ? limit + 1 : Number(result);
   return { allowed: count <= limit, count };
 }
 
 export async function recordExternalAiApiAuditSql(input: { tokenId: string; method: string; path: string; status: number; outcome: string; ipHash: string | null }): Promise<void> {
-  if (!getDbUri()) return;
   try {
-    await db().execute(
-      "INSERT INTO external_ai_api_audit_logs (token_id, request_method, request_path, http_status, outcome, remote_ip_hash) VALUES (?, ?, ?, ?, ?, ?)",
-      [input.tokenId, input.method.slice(0, 10), input.path.slice(0, 255), input.status, input.outcome.slice(0, 32), input.ipHash],
-    );
+    await getSiteSupabase().from("external_ai_api_audit_logs").insert({
+      token_id: input.tokenId,
+      request_method: input.method.slice(0, 10),
+      request_path: input.path.slice(0, 255),
+      http_status: input.status,
+      outcome: input.outcome.slice(0, 32),
+      remote_ip_hash: input.ipHash,
+    });
   } catch {}
 }

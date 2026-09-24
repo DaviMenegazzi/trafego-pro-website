@@ -59,7 +59,16 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          // GTM/GA4 (index.html) e o que o contêiner do GTM costuma carregar: Google Ads e pixel da Meta.
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            "https://*.googletagmanager.com",
+            "https://www.googleadservices.com",
+            "https://googleads.g.doubleclick.net",
+            "https://connect.facebook.net",
+          ],
           styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
           imgSrc: [
@@ -71,6 +80,11 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
             "https://*.fbcdn.net",
             "https://*.facebook.com",
             "https://*.trafego.pro",
+            "https://*.google-analytics.com",
+            "https://*.googletagmanager.com",
+            "https://*.g.doubleclick.net",
+            "https://www.google.com",
+            "https://www.google.com.br",
           ],
           connectSrc: [
             "'self'",
@@ -80,8 +94,14 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
             "https://*.firebaseio.com",
             "wss://*.firebaseio.com",
             "https://*.googleapis.com",
+            "https://*.google-analytics.com",
+            "https://*.analytics.google.com",
+            "https://*.googletagmanager.com",
+            "https://*.g.doubleclick.net",
+            "https://www.google.com",
+            "https://www.facebook.com",
           ],
-          frameSrc: ["'self'"],
+          frameSrc: ["'self'", "https://www.googletagmanager.com", "https://td.doubleclick.net"],
         },
       },
       crossOriginEmbedderPolicy: false,

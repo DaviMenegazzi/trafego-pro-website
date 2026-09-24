@@ -1,4 +1,4 @@
-import { SwitchField, Tooltip, useConfirm } from "@/components/ds";
+import { Button, SwitchField, Tooltip, useConfirm } from "@/components/ds";
 import { useState, useRef } from "react";
 import {
   DndContext,
@@ -266,7 +266,8 @@ export function TalentFormBuilder({
       {/* Left Column: Form Fields List & DnD Area */}
       <div className="space-y-4">
         {/* Banner with Add Field action */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-white/10 bg-zinc-900/40 p-5 backdrop-blur-sm">
+        {/* Só este cabeçalho acompanha a rolagem: o botão de adicionar fica sempre à mão. */}
+        <div className="sticky top-[4.25rem] z-20 flex flex-col md:top-2 items-start justify-between gap-4 rounded-2xl border border-white/10 bg-zinc-900/95 p-5 shadow-lg shadow-black/40 backdrop-blur-md sm:flex-row sm:items-center">
           <div>
             <div className="flex items-center gap-2">
               <Layers className="size-4 text-emerald-400" />
@@ -281,7 +282,10 @@ export function TalentFormBuilder({
               Arraste pela alça ou use as setas para mudar a ordem. Clique numa pergunta para editar.
             </p>
           </div>
-
+          <Button variant="primary" className="shrink-0" onClick={handleAddDefaultField}>
+            <Plus />
+            Adicionar pergunta
+          </Button>
         </div>
 
         {/* DnD Sortable Container */}

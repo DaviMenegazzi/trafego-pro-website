@@ -9,9 +9,7 @@ import {
   PanelLeftOpen,
   LogOut,
   MessageSquare,
-  Inbox,
   ShieldCheck,
-  Link2,
   UsersRound,
   Tag,
   ChevronsUpDown,
@@ -66,9 +64,7 @@ const NAV_BASE: NavItem[] = [
 const NAV_ADMIN_ONLY: NavItem[] = [
   { to: "/admin/metricas", label: "Métricas da Rede", icon: BarChart3 },
   { to: "/admin/financeiro", label: "Financeiro", icon: DollarSign },
-  { to: "/dashboard/feedback-leads/list", label: "Feedbacks enviados", icon: Inbox },
   { to: "/dashboard/usuarios", label: "Usuários", icon: ShieldCheck },
-  { to: "/dashboard/integracoes-ia", label: "Integrações de IA", icon: Link2 },
   { to: "/dashboard/formularios", label: "Formulários", icon: FileSpreadsheet },
 ];
 
@@ -468,7 +464,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="dashboard-dark relative min-h-screen w-full overflow-x-hidden bg-background text-foreground">
+    <div className="dashboard-dark relative min-h-screen w-full overflow-x-clip bg-background text-foreground">
       <AmbientBackground />
 
       {/* Topo no celular */}
@@ -533,7 +529,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Conteúdo. Sem z-index próprio: modais e popovers precisam ficar acima da sidebar. */}
       <main
-        className="relative min-w-0 overflow-x-hidden md:ml-[var(--dashboard-sidebar-width)] md:!pt-0 md:!pb-0"
+        className="relative min-w-0 overflow-x-clip md:ml-[var(--dashboard-sidebar-width)] md:!pt-0 md:!pb-0"
         style={{
           "--dashboard-sidebar-width": `${sidebarWidth}px`,
           transition: `margin-left ${DURATION} ${EASE}`,

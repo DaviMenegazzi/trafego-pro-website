@@ -122,6 +122,7 @@ export function Popover({
   side = "bottom",
   className,
   tooltip,
+  tooltipSide = "top",
 }: {
   trigger: React.ReactElement;
   children: React.ReactNode;
@@ -131,11 +132,12 @@ export function Popover({
   side?: "top" | "right" | "bottom" | "left";
   className?: string;
   tooltip?: string;
+  tooltipSide?: "top" | "right" | "bottom" | "left";
 }) {
   const triggerNode = <PopoverPrimitive.Trigger asChild>{trigger}</PopoverPrimitive.Trigger>;
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      {tooltip ? <Tooltip content={tooltip}>{triggerNode}</Tooltip> : triggerNode}
+      {tooltip ? <Tooltip content={tooltip} side={tooltipSide}>{triggerNode}</Tooltip> : triggerNode}
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
           align={align}

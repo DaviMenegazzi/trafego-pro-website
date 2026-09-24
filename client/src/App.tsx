@@ -54,6 +54,8 @@ function ExistingSiteRoutes() {
       <AdminRoute path={"/dashboard/usuarios/"} component={DashboardUsuarios} />
       <AdminRoute path={"/dashboard/integracoes-ia"} component={DashboardExternalAiTokens} />
       <AdminRoute path={"/dashboard/integracoes-ia/"} component={DashboardExternalAiTokens} />
+      <Route path={"/dashboard/banco-talentos"} component={TalentBankAdmin} />
+      <Route path={"/dashboard/banco-talentos/"} component={TalentBankAdmin} />
       <Route path={"/dashboard/formularios"} component={DashboardFormularios} />
       <Route path={"/dashboard/formularios/"} component={DashboardFormularios} />
       <AdminRoute path={"/admin/metricas"} component={AdminMetricsOverview} />
@@ -94,8 +96,6 @@ function App() {
             <Route path={"/evolution/"} component={EvolutionAdmin} />
             <Route path={"/publicacoes"} component={SocialPublishingAdmin} />
             <Route path={"/publicacoes/"} component={SocialPublishingAdmin} />
-            <Route path={"/dashboard/banco-talentos"} component={TalentBankAdmin} />
-            <Route path={"/dashboard/banco-talentos/"} component={TalentBankAdmin} />
             <Route path={"/trabalhe-conosco/:slug"} component={TalentPublicForm} />
             <Route component={ExistingSiteWithClientProvider} />
           </Switch>

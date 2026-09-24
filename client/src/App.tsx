@@ -2,8 +2,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfirmProvider } from "@/components/ds";
 import NotFound from "@/pages/NotFound";
-import { lazy, Suspense } from "react";
-import { Route, Switch } from "wouter";
+import { lazy, Suspense, useEffect } from "react";
+import { Route, Switch, useLocation } from "wouter";
+import { AppShell, useInsideAppShell } from "./components/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ClientProvider } from "./contexts/ClientContext";
@@ -16,17 +17,39 @@ import { PixelRoute } from "./components/PixelRoute";
 // Home, login e cadastro vão no pacote inicial (são a porta de entrada).
 // As demais telas carregam sob demanda: quem abre a home não baixa o
 // Financeiro, os gráficos da Dashboard nem o gerador de planilhas.
+const pageLoaders: Array<() => Promise<unknown>> = [];
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function page(load: () => Promise<{ default: React.ComponentType<any> }>) {
   const Lazy = lazy(load);
+  pageLoaders.push(load);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function LazyPage(props: any) {
     return (
-      <Suspense fallback={<div className="min-h-dvh bg-[#050505]" aria-busy="true" />}>
+      <Suspense fallback={<PageFallback />}>
         <Lazy {...props} />
       </Suspense>
     );
   };
+}
+
+// Dentro do painel o menu continua na tela; só a área de conteúdo espera o carregamento.
+function PageFallback() {
+  const insideShell = useInsideAppShell();
+  return insideShell
+    ? <div className="min-h-[60vh]" aria-busy="true" />
+    : <div className="min-h-dvh bg-[#050505]" aria-busy="true" />;
+}
+
+// Depois do login, baixa em segundo plano o código das outras abas: a primeira
+// visita a cada aba deixa de esperar o download.
+let pagesPrefetched = false;
+function prefetchPages() {
+  if (pagesPrefetched) return;
+  pagesPrefetched = true;
+  const run = () => pageLoaders.forEach((load) => void load().catch(() => {}));
+  if ("requestIdleCallback" in window) window.requestIdleCallback(run, { timeout: 4000 });
+  else setTimeout(run, 1500);
 }
 
 const Dashboard = page(() => import("./pages/Dashboard"));
@@ -98,8 +121,28 @@ function ExistingSiteRoutes() {
   );
 }
 
+const SHELL_PATH = /^\/(dashboard|admin)(\/|$)/;
+
+function hasSession(): boolean {
+  try {
+    return Boolean(localStorage.getItem("tp_token"));
+  } catch {
+    return false;
+  }
+}
+
+// Menu lateral montado uma vez para todas as telas do painel.
+function DashboardShellRoutes() {
+  const [pathname] = useLocation();
+  const inShell = SHELL_PATH.test(pathname) && hasSession();
+  useEffect(() => {
+    if (inShell) prefetchPages();
+  }, [inShell]);
+  return inShell ? <AppShell><ExistingSiteRoutes /></AppShell> : <ExistingSiteRoutes />;
+}
+
 function ExistingSiteWithClientProvider() {
-  return <ClientProvider><ExistingSiteRoutes /></ClientProvider>;
+  return <ClientProvider><DashboardShellRoutes /></ClientProvider>;
 }
 
 function App() {

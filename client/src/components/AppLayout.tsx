@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -311,7 +311,22 @@ function NavLink({ item, active, collapsed, onNavigate, dense = false }: { item:
   return collapsed ? <Tooltip content={item.label} side="right">{link}</Tooltip> : link;
 }
 
+// O menu lateral fica montado entre as abas (App.tsx envolve as rotas do painel com o
+// AppShell). As telas continuam usando <AppLayout>, que vira só um repasse quando já
+// existe um shell acima — assim trocar de aba troca só o conteúdo, sem piscar o menu.
+const AppShellContext = createContext(false);
+
+export function useInsideAppShell(): boolean {
+  return useContext(AppShellContext);
+}
+
 export function AppLayout({ children }: { children: ReactNode }) {
+  const insideShell = useContext(AppShellContext);
+  if (insideShell) return <>{children}</>;
+  return <AppShell>{children}</AppShell>;
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(COLLAPSED_KEY) === "1";
@@ -466,6 +481,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 
   return (
+    <AppShellContext.Provider value={true}>
     <div className="dashboard-dark relative min-h-screen w-full overflow-x-clip bg-background text-foreground">
       <AmbientBackground />
 
@@ -575,5 +591,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
         })}
       </nav>
     </div>
+    </AppShellContext.Provider>
   );
 }

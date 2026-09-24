@@ -58,6 +58,8 @@ export function SegmentedControl<T extends string>({
     >
       {options.map((option, index) => {
         const selected = option.value === value;
+        // Sem opção marcada (ex.: período personalizado), a primeira continua alcançável pelo Tab.
+        const focusable = selected || (!options.some((o) => o.value === value) && option === enabled[0]);
         return (
           <button
             key={option.value}
@@ -65,7 +67,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="radio"
             aria-checked={selected}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={focusable ? 0 : -1}
             disabled={option.disabled}
             onClick={() => onValueChange(option.value)}
             className={cn(

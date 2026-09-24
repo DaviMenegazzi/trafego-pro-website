@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import { Tooltip } from "@/components/ds";
 import { useState, useRef, useMemo } from "react";
 import { toBlob, toPng } from "html-to-image";
@@ -226,7 +227,7 @@ export function WeeklyCreativeExportModal({
       link.href = dataUrl;
       link.click();
       
-      toast.success("Imagem Ultra HD baixada com sucesso!");
+      toast.success("Imagem baixada.");
     } catch (err: any) {
       console.error("[export-card] Falha ao baixar PNG:", err);
       toast.error("Não foi possível baixar a imagem.");
@@ -288,6 +289,9 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
 
   return (
     <div 
+      role="dialog"
+      aria-modal="true"
+      aria-label="Imagem de criativos para WhatsApp"
       className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto"
       onClick={onClose}
     >
@@ -303,13 +307,11 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
             </div>
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                Exportar Card Executivo de Criativos
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  Ultra HD
-                </span>
+                Imagem de criativos para WhatsApp
+                
               </h2>
               <p className="text-xs text-zinc-400">
-                Gere um card visual de alta qualidade para enviar nos grupos do WhatsApp.
+                Pré-visualize, copie ou baixe o resumo dos criativos da unidade.
               </p>
             </div>
           </div>
@@ -359,7 +361,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900 text-xs font-semibold text-zinc-200 hover:text-white hover:border-white/20 transition-all"
             >
               {copiedText ? <Check className="size-3.5 text-emerald-400" /> : <MessageSquare className="size-3.5 text-emerald-400" />}
-              <span>{copiedText ? "Copiado!" : "Copiar Texto WhatsApp"}</span>
+              <span>{copiedText ? "Copiado!" : "Copiar texto"}</span>
             </button>
 
             <button
@@ -369,7 +371,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900 text-xs font-semibold text-zinc-200 hover:text-white hover:border-white/20 transition-all disabled:opacity-50"
             >
               <Copy className="size-3.5 text-cyan-400" />
-              <span>{copyingImage ? "Renderizando..." : "Copiar Imagem (Ctrl+V)"}</span>
+              <span>{copyingImage ? "Gerando…" : "Copiar imagem"}</span>
             </button>
 
             <button
@@ -379,7 +381,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 text-zinc-950 text-xs font-bold hover:bg-emerald-400 transition-all shadow-md shadow-emerald-950/40 disabled:opacity-50"
             >
               <Download className="size-3.5" />
-              <span>{downloading ? "Baixando..." : "Baixar PNG (2.5x HD)"}</span>
+              <span>{downloading ? "Baixando…" : "Baixar imagem"}</span>
             </button>
           </div>
         </div>
@@ -430,7 +432,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative z-10">
               <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4 backdrop-blur-sm">
                 <div className="flex items-center justify-between text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
-                  <span>Leads WhatsApp</span>
+                  <span>Conversas</span>
                   <MessageSquare className="size-4 text-emerald-400" />
                 </div>
                 <div className="mt-2 text-2xl font-bold font-display text-emerald-400">
@@ -524,7 +526,7 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
             <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-zinc-400 relative z-10">
               <div className="flex items-center gap-2">
                 <span className="size-1.5 rounded-full bg-emerald-400" />
-                <span>Dashboard Atualizada em Tempo Real</span>
+                <span>Gerado em {formatDateTime(new Date())}</span>
                 <span>·</span>
                 <span className="font-mono text-zinc-300">www.trafego.pro</span>
               </div>

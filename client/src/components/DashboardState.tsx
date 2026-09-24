@@ -4,22 +4,26 @@ type DashboardStateProps = {
   title: string;
   description: string;
   loading?: boolean;
+  action?: React.ReactNode;
 };
 
-export function DashboardState({ title, description, loading = false }: DashboardStateProps) {
+export function DashboardState({ title, description, loading = false, action }: DashboardStateProps) {
   return (
-    <section className="rounded-3xl border border-border bg-surface/25 px-6 py-12 text-center sm:px-10">
-      {loading ? (
-        <div className="mx-auto mb-5 flex w-28 items-end justify-center gap-2" aria-hidden="true">
-          <span className="h-5 w-3 animate-pulse rounded-full bg-emerald-300/30" />
-          <span className="h-10 w-3 animate-pulse rounded-full bg-emerald-300/50 [animation-delay:120ms]" />
-          <span className="h-7 w-3 animate-pulse rounded-full bg-emerald-300/40 [animation-delay:240ms]" />
+    <section
+      className="rounded-2xl border border-white/[0.08] bg-zinc-900/60 px-6 py-14 text-center sm:px-10"
+      aria-busy={loading || undefined}
+      aria-live="polite"
+    >
+      {loading && (
+        <div className="mx-auto mb-5 flex w-20 items-end justify-center gap-1.5" aria-hidden="true">
+          <span className="h-4 w-2 animate-pulse rounded-full bg-zinc-600" />
+          <span className="h-8 w-2 animate-pulse rounded-full bg-zinc-500 [animation-delay:120ms]" />
+          <span className="h-6 w-2 animate-pulse rounded-full bg-zinc-600 [animation-delay:240ms]" />
         </div>
-      ) : (
-        <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-background text-xl text-emerald-300">↗</div>
       )}
-      <h2 className="font-display text-xl font-semibold tracking-[-0.02em]">{title}</h2>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
+      <h2 className="font-display text-lg font-semibold tracking-[-0.01em] text-white">{title}</h2>
+      <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-zinc-400">{description}</p>
+      {action && <div className="mt-5 flex justify-center">{action}</div>}
     </section>
   );
 }

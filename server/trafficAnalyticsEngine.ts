@@ -42,6 +42,8 @@ export interface GoalProbability {
   probability: number; // 0.0 to 1.0
   riskLevel: "ALTA_PROBABILIDADE" | "MODERADA" | "RISCO_ALTO" | "META_ALCANCADA";
   paceExplanation: string;
+  /** true quando a unidade não tem meta própria e foi usado o valor padrão. */
+  targetIsDefault?: boolean;
 }
 
 export interface UnitScore {
@@ -645,6 +647,7 @@ export function buildPredictiveUnitProfile(
   const dateStr = refDate.toISOString().slice(0, 10);
   const daysLeft = calculateDaysLeftInMonth(refDate);
   const target = monthlyTarget ?? DEFAULT_MONTHLY_TARGETS[unitId] ?? 200;
+  const targetIsDefault = monthlyTarget === undefined && DEFAULT_MONTHLY_TARGETS[unitId] === undefined;
 
   const currentMonthPrefix = dateStr.slice(0, 7);
   const monthDays = dailyRows.filter((d) => d.date.startsWith(currentMonthPrefix));
@@ -783,7 +786,7 @@ export function buildPredictiveUnitProfile(
     confidence,
     cplMetrics,
     confidenceInterval: ci,
-    goalProbability,
+    goalProbability: { ...goalProbability, targetIsDefault },
     score,
     diagnosis,
     statusFlag,

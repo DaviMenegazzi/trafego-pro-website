@@ -1,67 +1,420 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { AlertTriangle, Check, Copy, KeyRound, Link2, LockKeyhole, Plus, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
+import { Check, Copy, Plus, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
+import {
+  Button,
+  CheckboxField,
+  Dialog,
+  EmptyState,
+  Field,
+  IconButton,
+  InlineNotice,
+  Input,
+  Page,
+  PageHeader,
+  Popover,
+  SegmentedControl,
+  StatusBadge,
+  Surface,
+  SurfaceHeader,
+  useConfirm,
+} from "@/components/ds";
+import { formatDate, formatDateTime, formatRelative } from "@/lib/format";
 
 type Unit = { id: string; name: string };
-type Token = { id: string; name: string; tokenPrefix: string; scopes: string[]; unitIds: string[]; expiresAt: string; revokedAt: string | null; lastUsedAt: string | null; createdAt: string };
-type PageData = { scopes: string[]; rateLimitPerMinute: number; units: Unit[]; tokens: Token[] };
+type Token = {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: string[];
+  unitIds: string[];
+  expiresAt: string;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+};
+type PageData = {
+  scopes: string[];
+  rateLimitPerMinute: number;
+  units: Unit[];
+  tokens: Token[];
+};
 
-const labels: Record<string, string> = { "metrics:read": "Métricas", "leads:summary:read": "Resumo de leads", "crm:summary:read": "Resumo do CRM" };
-const headers = () => ({ Authorization: `Bearer ${localStorage.getItem("tp_token") ?? ""}`, "Content-Type": "application/json" });
-const dateText = (value: string | null) => value ? new Date(value).toLocaleString("pt-BR", { dateStyle: "medium", timeStyle: "short" }) : "Nunca";
+const SCOPES: Record<string, { label: string; description: string }> = {
+  "metrics:read": { label: "Métricas", description: "Investimento, conversas e custo por unidade" },
+  "leads:summary:read": { label: "Leads", description: "Totais por origem, sem nomes ou telefones" },
+  "crm:summary:read": { label: "CRM", description: "Resumo do funil, sem dados pessoais" },
+  "ads:metrics:read": { label: "Anúncios", description: "Métricas por anúncio" },
+  "leads:read": { label: "Leads individuais", description: "Lista pseudonimizada de leads" },
+  "creatives:read": { label: "Criativos", description: "Criativos ativos por unidade" },
+  "targets:read": { label: "Metas", description: "Metas mensais das unidades" },
+};
+const scopeLabel = (scope: string) => SCOPES[scope]?.label ?? scope;
+
+const headers = () => ({
+  Authorization: `Bearer ${localStorage.getItem("tp_token") ?? ""}`,
+  "Content-Type": "application/json",
+});
+
+const normalize = (text: string) => text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 function useAdminGuard() {
   const [, setLocation] = useLocation();
-  useEffect(() => { try { const user = JSON.parse(localStorage.getItem("tp_user") ?? "{}"); if (!localStorage.getItem("tp_token")) setLocation("/login"); else if (user.role !== "admin") setLocation("/dashboard"); } catch { setLocation("/login"); } }, [setLocation]);
+  useEffect(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
+      if (!localStorage.getItem("tp_token")) setLocation("/login");
+      else if (user.role !== "admin") setLocation("/dashboard");
+    } catch {
+      setLocation("/login");
+    }
+  }, [setLocation]);
 }
 
-function NewTokenModal({ scopes, units, onClose, onCreated }: { scopes: string[]; units: Unit[]; onClose: () => void; onCreated: (token: { token: string; metadata: Token }) => void }) {
+type Errors = Partial<Record<"name" | "scopes" | "units", string>>;
+
+function NewTokenDialog({
+  open,
+  scopes,
+  units,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  scopes: string[];
+  units: Unit[];
+  onClose: () => void;
+  onCreated: (token: { token: string; metadata: Token }) => void;
+}) {
   const [name, setName] = useState("");
-  const [selectedScopes, setSelectedScopes] = useState(scopes);
+  const [selectedScopes, setSelectedScopes] = useState<string[]>(scopes);
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [unitSearch, setUnitSearch] = useState("");
-  const [days, setDays] = useState("90");
+  const [days, setDays] = useState<"30" | "90" | "365">("90");
+  const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
-  const toggle = (value: string, list: string[], setList: (value: string[]) => void) => setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
 
-  const filteredUnits = useMemo(() => {
-    if (!unitSearch.trim()) return units;
-    const term = unitSearch.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    return units.filter((u) => u.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(term));
-  }, [units, unitSearch]);
+  useEffect(() => {
+    if (open) {
+      setName(""); setSelectedScopes(scopes); setSelectedUnits([]); setUnitSearch(""); setDays("90"); setErrors({});
+    }
+  }, [open, scopes]);
+
+  const toggle = (value: string, list: string[], setList: (v: string[]) => void) =>
+    setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
+
+  const filteredUnits = useMemo(
+    () => (unitSearch.trim() ? units.filter((u) => normalize(u.name).includes(normalize(unitSearch))) : units),
+    [units, unitSearch],
+  );
+  const allSelected = units.length > 0 && selectedUnits.length === units.length;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!name.trim() || !selectedScopes.length || !selectedUnits.length) { toast.error("Preencha o nome, os dados e ao menos uma unidade"); return; }
+    const next: Errors = {
+      name: name.trim() ? undefined : "Dê um nome para reconhecer a integração",
+      scopes: selectedScopes.length ? undefined : "Libere ao menos um tipo de dado",
+      units: selectedUnits.length ? undefined : "Escolha ao menos uma unidade",
+    };
+    setErrors(next);
+    if (next.name || next.scopes || next.units) {
+      if (next.name) document.getElementById("token-name")?.focus();
+      return;
+    }
     setSaving(true);
     try {
-      const response = await fetch("/api/external-ai/tokens", { method: "POST", headers: headers(), body: JSON.stringify({ name, scopes: selectedScopes, unitIds: selectedUnits, expiresAt: new Date(Date.now() + Number(days) * 86_400_000).toISOString() }) });
+      const response = await fetch("/api/external-ai/tokens", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          name,
+          scopes: selectedScopes,
+          unitIds: selectedUnits,
+          expiresAt: new Date(Date.now() + Number(days) * 86_400_000).toISOString(),
+        }),
+      });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) { toast.error(body.error ?? "Não foi possível criar o token"); return; }
+      if (!response.ok) {
+        toast.error(body.error ?? "Não foi possível criar o token");
+        return;
+      }
       onCreated(body);
-    } catch { toast.error("Não foi possível conectar ao servidor"); } finally { setSaving(false); }
+    } catch {
+      toast.error("Não foi possível conectar ao servidor");
+    } finally {
+      setSaving(false);
+    }
   }
-  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"><form onSubmit={submit} className="glass-card max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto p-6"><div className="flex items-start justify-between gap-4"><div><h2 className="font-display text-lg font-semibold">Emitir token de integração</h2><p className="mt-1 text-sm text-muted-foreground">Escolha exatamente quais dados e unidades a IA poderá consultar.</p></div><button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground"><X className="size-4" /></button></div><label className="mt-6 block"><span className="mb-1.5 block text-xs font-medium">Nome da integração</span><input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Assistente de performance" maxLength={120} className="w-full rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm outline-none focus:border-zinc-400" /></label><section className="mt-5"><p className="text-xs font-medium">Dados liberados</p><p className="mt-1 text-xs text-muted-foreground">A API retorna apenas dados agregados; não libera nomes, telefones ou conversas.</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{scopes.map((scope) => <button key={scope} type="button" onClick={() => toggle(scope, selectedScopes, setSelectedScopes)} className={`rounded-xl border p-3 text-left text-xs transition-colors ${selectedScopes.includes(scope) ? "border-white/40 bg-white/10" : "border-border hover:border-zinc-500"}`}><span className={`mb-2 flex size-4 items-center justify-center rounded border ${selectedScopes.includes(scope) ? "border-white bg-white text-zinc-950" : "border-zinc-600"}`}>{selectedScopes.includes(scope) && <Check className="size-3" />}</span><strong>{labels[scope] ?? scope}</strong></button>)}</div></section><section className="mt-5"><div className="flex items-center justify-between"><div><p className="text-xs font-medium">Unidades autorizadas ({selectedUnits.length}/{units.length})</p><p className="mt-1 text-xs text-muted-foreground">O token fica bloqueado às unidades marcadas.</p></div><div className="flex items-center gap-2"><button type="button" onClick={() => setSelectedUnits(units.map((unit) => unit.id))} className="text-xs text-zinc-300 hover:text-white">Todas ({units.length})</button><span className="text-zinc-600">•</span><button type="button" onClick={() => setSelectedUnits([])} className="text-xs text-zinc-400 hover:text-zinc-200">Limpar</button></div></div><input type="text" placeholder="Filtrar contas / franquias..." value={unitSearch} onChange={(e) => setUnitSearch(e.target.value)} className="mt-2 w-full rounded-lg border border-border bg-background/40 px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-zinc-400" /><div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-border p-2">{filteredUnits.length === 0 ? <p className="p-3 text-center text-xs text-muted-foreground">Nenhuma unidade encontrada.</p> : filteredUnits.map((unit) => <label key={unit.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-white/[0.05]"><input checked={selectedUnits.includes(unit.id)} onChange={() => toggle(unit.id, selectedUnits, setSelectedUnits)} type="checkbox" className="size-4 accent-white" /><span className="truncate">{unit.name}</span></label>)}</div></section><label className="mt-5 block"><span className="mb-1.5 block text-xs font-medium">Validade</span><select value={days} onChange={(event) => setDays(event.target.value)} className="w-full rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"><option value="30">30 dias</option><option value="90">90 dias</option><option value="365">365 dias</option></select></label><div className="mt-7 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-xs font-medium hover:bg-white/[0.05]">Cancelar</button><button disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-zinc-950 disabled:opacity-50"><KeyRound className="size-3.5" />{saving ? "Emitindo..." : "Emitir token"}</button></div></form></div>;
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(value) => { if (!value) onClose(); }}
+      size="lg"
+      title="Novo token"
+      description="Escolha quais dados e quais unidades a ferramenta de IA poderá consultar."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" form="token-form" variant="primary" loading={saving}>Emitir token</Button>
+        </>
+      }
+    >
+      <form id="token-form" onSubmit={submit} noValidate className="space-y-5">
+        <Field label="Nome da integração" htmlFor="token-name" required error={errors.name}>
+          <Input id="token-name" autoFocus maxLength={120} value={name} aria-invalid={Boolean(errors.name) || undefined} onChange={(e) => { setName(e.target.value); setErrors((c) => ({ ...c, name: undefined })); }} placeholder="Ex.: Assistente de performance" />
+        </Field>
+
+        <Field label="Dados liberados" required error={errors.scopes} hint={errors.scopes ? undefined : "Somente dados agregados; nomes, telefones e conversas nunca saem."}>
+          <div className="space-y-2.5 pt-1">
+            {scopes.map((scope) => (
+              <CheckboxField
+                key={scope}
+                id={`scope-${scope}`}
+                label={scopeLabel(scope)}
+                description={SCOPES[scope]?.description}
+                checked={selectedScopes.includes(scope)}
+                onCheckedChange={() => { toggle(scope, selectedScopes, setSelectedScopes); setErrors((c) => ({ ...c, scopes: undefined })); }}
+              />
+            ))}
+          </div>
+        </Field>
+
+        <Field label={`Unidades (${selectedUnits.length} de ${units.length})`} required error={errors.units}>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <Input leading={<Search />} value={unitSearch} onChange={(e) => setUnitSearch(e.target.value)} placeholder="Filtrar unidades" aria-label="Filtrar unidades" />
+              </div>
+              <Button variant="secondary" onClick={() => { setSelectedUnits(allSelected ? [] : units.map((u) => u.id)); setErrors((c) => ({ ...c, units: undefined })); }}>
+                {allSelected ? "Desmarcar todas" : "Marcar todas"}
+              </Button>
+            </div>
+            <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-2">
+              {filteredUnits.length === 0 ? (
+                <p className="p-3 text-center text-sm text-zinc-500">Nenhuma unidade encontrada.</p>
+              ) : (
+                filteredUnits.map((unit) => (
+                  <CheckboxField
+                    key={unit.id}
+                    id={`unit-${unit.id}`}
+                    className="rounded-md px-1.5 py-1 hover:bg-white/[0.03]"
+                    label={unit.name}
+                    checked={selectedUnits.includes(unit.id)}
+                    onCheckedChange={() => { toggle(unit.id, selectedUnits, setSelectedUnits); setErrors((c) => ({ ...c, units: undefined })); }}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </Field>
+
+        <Field label="Validade">
+          <SegmentedControl
+            aria-label="Validade"
+            value={days}
+            onValueChange={setDays}
+            options={[
+              { value: "30", label: "30 dias" },
+              { value: "90", label: "90 dias" },
+              { value: "365", label: "1 ano" },
+            ]}
+          />
+        </Field>
+      </form>
+    </Dialog>
+  );
 }
 
-function SecretModal({ result, onClose }: { result: { token: string; metadata: Token }; onClose: () => void }) {
+function SecretDialog({ result, onClose }: { result: { token: string; metadata: Token } | null; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const copy = async () => { try { await navigator.clipboard.writeText(result.token); setCopied(true); toast.success("Token copiado"); } catch { toast.error("Não foi possível copiar automaticamente"); } };
-  return <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"><div className="glass-card w-full max-w-xl p-6"><div className="flex gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-300"><ShieldCheck className="size-5" /></div><div><h2 className="font-display text-lg font-semibold">Token emitido</h2><p className="mt-1 text-sm text-muted-foreground">Copie o segredo agora. Ele não será exibido novamente.</p></div></div><p className="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs leading-5 text-amber-100"><AlertTriangle className="mr-1 inline size-3.5" />Guarde-o em um gestor de senhas e nunca o envie por e-mail, planilha ou chat.</p><div className="mt-4 flex gap-2 rounded-xl border border-border bg-black/30 p-3"><code className="min-w-0 flex-1 break-all font-mono text-xs text-zinc-100">{result.token}</code><button onClick={copy} className="shrink-0 rounded-lg border border-white/15 p-2 hover:bg-white/10">{copied ? <Check className="size-4" /> : <Copy className="size-4" />}</button></div><div className="mt-6 flex justify-end"><button onClick={onClose} className="rounded-xl bg-white px-4 py-2 text-xs font-semibold text-zinc-950">Entendi, já guardei</button></div></div></div>;
+  useEffect(() => setCopied(false), [result]);
+  const copy = async () => {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(result.token);
+      setCopied(true);
+      toast.success("Token copiado");
+    } catch {
+      toast.error("Não foi possível copiar automaticamente");
+    }
+  };
+  return (
+    <Dialog
+      open={Boolean(result)}
+      onOpenChange={(open) => { if (!open) onClose(); }}
+      size="md"
+      title="Token emitido"
+      description="Copie agora: ele não aparece de novo."
+      footer={<Button variant="primary" onClick={onClose}>Já guardei</Button>}
+    >
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 p-3">
+          <code className="min-w-0 flex-1 select-all break-all font-mono text-xs text-zinc-100">{result?.token}</code>
+          <IconButton label={copied ? "Copiado" : "Copiar token"} icon={copied ? <Check /> : <Copy />} onClick={() => void copy()} />
+        </div>
+        <InlineNotice tone="warning">Guarde em um gestor de senhas. Não envie por e-mail, planilha ou chat.</InlineNotice>
+      </div>
+    </Dialog>
+  );
 }
 
 export default function DashboardExternalAiTokens() {
   useAdminGuard();
+  const { confirm } = useConfirm();
   const [data, setData] = useState<PageData>({ scopes: [], rateLimitPerMinute: 60, units: [], tokens: [] });
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState<{ token: string; metadata: Token } | null>(null);
-  const [revoking, setRevoking] = useState<Token | null>(null);
   const unitNames = useMemo(() => new Map(data.units.map((unit) => [unit.id, unit.name])), [data.units]);
-  const load = useCallback(async () => { setLoading(true); try { const response = await fetch("/api/external-ai/tokens", { headers: headers() }); if (response.status === 401) { window.location.href = "/login"; return; } if (response.status === 403) { window.location.href = "/dashboard"; return; } const body = await response.json().catch(() => ({})); if (!response.ok) { toast.error(body.error ?? "Não foi possível carregar as integrações"); return; } setData(body); } catch { toast.error("Não foi possível conectar ao servidor"); } finally { setLoading(false); } }, []);
-  useEffect(() => { document.title = "Tráfego Pro — Integrações de IA"; void load(); }, [load]);
-  const revoke = async () => { if (!revoking) return; try { const response = await fetch(`/api/external-ai/tokens/${revoking.id}`, { method: "DELETE", headers: headers() }); const body = await response.json().catch(() => ({})); if (!response.ok) { toast.error(body.error ?? "Não foi possível revogar o token"); return; } toast.success("Token revogado imediatamente"); setRevoking(null); void load(); } catch { toast.error("Não foi possível conectar ao servidor"); } };
-  return <AppLayout><main className="mx-auto max-w-[1160px] space-y-6 px-4 py-6 md:px-8"><header className="flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-400"><Link2 className="size-3.5" />Integrações</p><h1 className="font-display text-2xl font-semibold tracking-tight">Dados para IA externa</h1><p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Controle acessos de leitura para ferramentas de IA sem expor Supabase, credenciais ou dados pessoais.</p></div><div className="flex gap-2"><button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-white/[0.05]"><RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />Atualizar</button><button onClick={() => setCreating(true)} className="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-xs font-semibold text-zinc-950"><Plus className="size-3.5" />Novo token</button></div></header><section className="grid gap-3 md:grid-cols-3"><div className="glass-card p-4"><LockKeyhole className="mb-3 size-4 text-zinc-300" /><strong className="text-sm">Somente leitura</strong><p className="mt-1 text-xs leading-5 text-muted-foreground">Sem criação, alteração ou exclusão de dados.</p></div><div className="glass-card p-4"><ShieldCheck className="mb-3 size-4 text-zinc-300" /><strong className="text-sm">Escopo por unidade</strong><p className="mt-1 text-xs leading-5 text-muted-foreground">Cada token consulta apenas as unidades escolhidas.</p></div><div className="glass-card p-4"><KeyRound className="mb-3 size-4 text-zinc-300" /><strong className="text-sm">Revogação imediata</strong><p className="mt-1 text-xs leading-5 text-muted-foreground">A próxima chamada é bloqueada após revogar.</p></div></section><section className="glass-card overflow-hidden"><div className="flex items-center justify-between border-b border-border/70 px-5 py-4"><div><h2 className="font-display text-base font-semibold">Tokens emitidos</h2><p className="mt-1 text-xs text-muted-foreground">{data.rateLimitPerMinute} chamadas por minuto por token.</p></div><span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-muted-foreground">{data.tokens.length}</span></div>{loading ? <p className="p-8 text-center text-sm text-muted-foreground">Carregando integrações...</p> : data.tokens.length === 0 ? <div className="p-12 text-center"><KeyRound className="mx-auto mb-3 size-9 text-muted-foreground/35" /><p className="text-sm font-medium">Nenhum token emitido</p><p className="mt-1 text-xs text-muted-foreground">Crie um token ao conectar uma IA aos indicadores agregados.</p></div> : <div className="divide-y divide-border/60">{data.tokens.map((token) => { const active = !token.revokedAt && new Date(token.expiresAt).getTime() > Date.now(); const names = token.unitIds.map((id) => unitNames.get(id) ?? "Unidade removida"); return <article key={token.id} className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{token.name}</strong><span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${active ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200" : "border-red-500/20 bg-red-500/10 text-red-200"}`}>{token.revokedAt ? "Revogado" : active ? "Ativo" : "Expirado"}</span></div><p className="mt-1 font-mono text-[11px] text-muted-foreground">{token.tokenPrefix}</p><div className="mt-3 flex flex-wrap gap-1.5">{token.scopes.map((scope) => <span key={scope} className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] text-zinc-300">{labels[scope] ?? scope}</span>)}</div></div><div className="grid grid-cols-2 gap-x-5 gap-y-2 text-xs text-muted-foreground sm:grid-cols-4 lg:w-[490px]"><div><span className="block text-[10px] uppercase tracking-wide text-zinc-500">Unidades</span><span title={names.join(", ")} className="block max-w-36 truncate text-zinc-300">{names.join(", ")}</span></div><div><span className="block text-[10px] uppercase tracking-wide text-zinc-500">Expira</span><span className="text-zinc-300">{dateText(token.expiresAt)}</span></div><div><span className="block text-[10px] uppercase tracking-wide text-zinc-500">Último uso</span><span className="text-zinc-300">{dateText(token.lastUsedAt)}</span></div><div className="flex items-end justify-end">{!token.revokedAt && <button onClick={() => setRevoking(token)} className="inline-flex items-center gap-1 text-xs text-red-300 hover:text-red-100"><Trash2 className="size-3" />Revogar</button>}</div></div></article>; })}</div>}</section><section className="rounded-2xl border border-white/10 bg-white/[0.025] p-5"><h2 className="font-display text-base font-semibold">Endpoints disponíveis</h2><p className="mt-1 text-sm text-muted-foreground">Use <code className="rounded bg-black/30 px-1.5 py-0.5 text-xs">Authorization: Bearer …</code> e consulte primeiro as unidades permitidas.</p><div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-3"><code className="rounded-lg border border-white/10 bg-black/20 p-2.5">GET /api/external/v1/metrics</code><code className="rounded-lg border border-white/10 bg-black/20 p-2.5">GET /api/external/v1/leads/summary</code><code className="rounded-lg border border-white/10 bg-black/20 p-2.5">GET /api/external/v1/crm/summary</code></div></section></main>{creating && <NewTokenModal scopes={data.scopes} units={data.units} onClose={() => setCreating(false)} onCreated={(value) => { setCreating(false); setSecret(value); void load(); }} />}{secret && <SecretModal result={secret} onClose={() => setSecret(null)} />}{revoking && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"><div className="glass-card w-full max-w-sm p-6"><h2 className="font-display text-lg font-semibold">Revogar token?</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">O acesso de <strong className="text-foreground">{revoking.name}</strong> será bloqueado imediatamente e não poderá ser reativado.</p><div className="mt-6 flex justify-end gap-2"><button onClick={() => setRevoking(null)} className="rounded-xl border border-border px-3 py-2 text-xs">Cancelar</button><button onClick={() => void revoke()} className="rounded-xl bg-red-500 px-3 py-2 text-xs font-semibold text-white">Revogar agora</button></div></div></div>}</AppLayout>;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/external-ai/tokens", { headers: headers() });
+      if (response.status === 401) { window.location.href = "/login"; return; }
+      if (response.status === 403) { window.location.href = "/dashboard"; return; }
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(body.error ?? "Não foi possível carregar as integrações");
+        return;
+      }
+      setData(body);
+    } catch {
+      toast.error("Não foi possível conectar ao servidor");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.title = "Tráfego Pro — Integrações de IA";
+    void load();
+  }, [load]);
+
+  const revoke = async (token: Token) => {
+    const ok = await confirm({
+      title: `Revogar "${token.name}"?`,
+      description: "O acesso é bloqueado na próxima chamada e o token não pode ser reativado.",
+      confirmLabel: "Revogar token",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      const response = await fetch(`/api/external-ai/tokens/${token.id}`, { method: "DELETE", headers: headers() });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(body.error ?? "Não foi possível revogar o token");
+        return;
+      }
+      toast.success("Token revogado");
+      void load();
+    } catch {
+      toast.error("Não foi possível conectar ao servidor");
+    }
+  };
+
+  return (
+    <AppLayout>
+      <Page width="medium">
+        <PageHeader
+          title="Integrações de IA"
+          subtitle="Tokens somente leitura, limitados às unidades escolhidas e revogáveis a qualquer momento."
+          actions={
+            <>
+              <IconButton label="Atualizar" icon={<RefreshCw className={loading ? "animate-spin" : undefined} />} onClick={() => void load()} disabled={loading} />
+              <Button variant="primary" onClick={() => setCreating(true)}><Plus />Novo token</Button>
+            </>
+          }
+        />
+
+        <Surface className="overflow-hidden">
+          <SurfaceHeader title={`Tokens · ${data.tokens.length}`} description={`Até ${data.rateLimitPerMinute} chamadas por minuto por token.`} />
+          {loading && data.tokens.length === 0 ? (
+            <EmptyState title="Carregando integrações…" />
+          ) : data.tokens.length === 0 ? (
+            <EmptyState title="Nenhum token emitido" description="Crie um token para conectar uma ferramenta de IA aos indicadores agregados." />
+          ) : (
+            <ul className="divide-y divide-white/[0.06]">
+              {data.tokens.map((token) => {
+                const active = !token.revokedAt && new Date(token.expiresAt).getTime() > Date.now();
+                const names = token.unitIds.map((id) => unitNames.get(id) ?? "Unidade removida");
+                return (
+                  <li key={token.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-zinc-100">{token.name}</span>
+                        <StatusBadge tone={active ? "good" : token.revokedAt ? "critical" : "neutral"}>
+                          {token.revokedAt ? "Revogado" : active ? "Ativo" : "Expirado"}
+                        </StatusBadge>
+                      </div>
+                      <p className="mt-0.5 text-sm text-zinc-400">
+                        {token.scopes.map(scopeLabel).join(" · ")} <span className="font-mono text-xs text-zinc-500">· {token.tokenPrefix}</span>
+                      </p>
+                    </div>
+                    <dl className="grid grid-cols-3 gap-4 text-sm lg:w-[440px]">
+                      <div className="min-w-0">
+                        <dt className="text-xs text-zinc-500">Unidades</dt>
+                        <dd>
+                          <Popover
+                            className="w-64"
+                            trigger={
+                              <button type="button" className="rounded-md text-left text-zinc-200 underline decoration-zinc-600 underline-offset-4 outline-none hover:decoration-zinc-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+                                {names.length === 1 ? names[0] : `${names.length} unidades`}
+                              </button>
+                            }
+                          >
+                            <ul className="max-h-64 space-y-1 overflow-y-auto p-3 text-sm text-zinc-200">
+                              {names.map((n, i) => <li key={`${n}-${i}`} className="truncate">{n}</li>)}
+                            </ul>
+                          </Popover>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-zinc-500">Expira</dt>
+                        <dd className="tabular-nums text-zinc-200" title={formatDateTime(token.expiresAt)}>{formatDate(token.expiresAt)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-zinc-500">Último uso</dt>
+                        <dd className="text-zinc-200">{token.lastUsedAt ? formatRelative(token.lastUsedAt) : "Nunca"}</dd>
+                      </div>
+                    </dl>
+                    <div className="lg:w-24 lg:text-right">
+                      {!token.revokedAt && (
+                        <Button variant="danger-ghost" size="sm" onClick={() => void revoke(token)}>Revogar</Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Surface>
+
+        <Surface>
+          <SurfaceHeader title="Endpoints disponíveis" description="Envie Authorization: Bearer <token> e consulte primeiro as unidades permitidas." />
+          <div className="grid gap-2 p-5 text-xs text-zinc-300 md:grid-cols-3">
+            <code className="rounded-lg border border-white/10 bg-black/20 p-2.5">GET /api/external/v1/metrics</code>
+            <code className="rounded-lg border border-white/10 bg-black/20 p-2.5">GET /api/external/v1/leads/summary</code>
+            <code className="rounded-lg border border-white/10 bg-black/20 p-2.5">GET /api/external/v1/crm/summary</code>
+          </div>
+        </Surface>
+      </Page>
+
+      <NewTokenDialog
+        open={creating}
+        scopes={data.scopes}
+        units={data.units}
+        onClose={() => setCreating(false)}
+        onCreated={(value) => {
+          setCreating(false);
+          setSecret(value);
+          void load();
+        }}
+      />
+      <SecretDialog result={secret} onClose={() => setSecret(null)} />
+    </AppLayout>
+  );
 }

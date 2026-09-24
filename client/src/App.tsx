@@ -10,22 +10,39 @@ import { ClientProvider } from "./contexts/ClientContext";
 import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import DashboardConfiguracoes from "./pages/DashboardConfiguracoes";
-import DashboardAnuncios from "./pages/DashboardAnuncios";
-import DashboardFeedbackLeads, { StandaloneFeedbackLeads } from "./pages/DashboardFeedbackLeads";
-import DashboardFeedbackLeadsList from "./pages/DashboardFeedbackLeadsList";
-import DashboardUsuarios from "./pages/DashboardUsuarios";
-import DashboardExternalAiTokens from "./pages/DashboardExternalAiTokens";
-import DashboardFormularios from "./pages/DashboardFormularios";
-import AdminMetricsOverview from "./pages/AdminMetricsOverview";
-import TalentPublicForm from "./pages/TalentPublicForm";
-import TalentBankAdmin from "./pages/TalentBankAdmin";
-import EvolutionAdmin from "./pages/EvolutionAdmin";
-import SocialPublishingAdmin from "./pages/SocialPublishingAdmin";
-
 import { AdminRoute } from "./components/AdminRoute";
-import AdminFinanceiro from "./pages/admin/financeiro";
+
+// Home, login e cadastro vão no pacote inicial (são a porta de entrada).
+// As demais telas carregam sob demanda: quem abre a home não baixa o
+// Financeiro, os gráficos da Dashboard nem o gerador de planilhas.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function page(load: () => Promise<{ default: React.ComponentType<any> }>) {
+  const Lazy = lazy(load);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function LazyPage(props: any) {
+    return (
+      <Suspense fallback={<div className="min-h-dvh bg-[#050505]" aria-busy="true" />}>
+        <Lazy {...props} />
+      </Suspense>
+    );
+  };
+}
+
+const Dashboard = page(() => import("./pages/Dashboard"));
+const DashboardConfiguracoes = page(() => import("./pages/DashboardConfiguracoes"));
+const DashboardAnuncios = page(() => import("./pages/DashboardAnuncios"));
+const DashboardFeedbackLeads = page(() => import("./pages/DashboardFeedbackLeads"));
+const StandaloneFeedbackLeads = page(() => import("./pages/DashboardFeedbackLeads").then((m) => ({ default: m.StandaloneFeedbackLeads })));
+const DashboardFeedbackLeadsList = page(() => import("./pages/DashboardFeedbackLeadsList"));
+const DashboardUsuarios = page(() => import("./pages/DashboardUsuarios"));
+const DashboardExternalAiTokens = page(() => import("./pages/DashboardExternalAiTokens"));
+const DashboardFormularios = page(() => import("./pages/DashboardFormularios"));
+const AdminMetricsOverview = page(() => import("./pages/AdminMetricsOverview"));
+const TalentPublicForm = page(() => import("./pages/TalentPublicForm"));
+const TalentBankAdmin = page(() => import("./pages/TalentBankAdmin"));
+const EvolutionAdmin = page(() => import("./pages/EvolutionAdmin"));
+const SocialPublishingAdmin = page(() => import("./pages/SocialPublishingAdmin"));
+const AdminFinanceiro = page(() => import("./pages/admin/financeiro"));
 
 // Vitrine do design system: só em desenvolvimento, fora do bundle de produção.
 const DesignSystemPreview = import.meta.env.DEV ? lazy(() => import("./pages/DesignSystemPreview")) : null;

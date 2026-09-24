@@ -9,7 +9,7 @@ const only = process.env.ONLY ? new RegExp(process.env.ONLY) : null;
 
 async function runStep(p, s) {
   if (s.click) { const loc = typeof s.click === "string" ? p.getByText(s.click, { exact: s.exact ?? false }).first() : p.locator(s.click.css).nth(s.click.nth || 0); await loc.scrollIntoViewIfNeeded().catch(()=>{}); await loc.click({ timeout: 4000 }); }
-  if (s.role) await p.getByRole(s.role.role, { name: s.role.name, exact: s.role.exact ?? false }).nth(s.role.nth || 0).click({ timeout: 4000 });
+  if (s.role) await p.getByRole(s.role.role, { name: s.role.name.startsWith("^") ? new RegExp(s.role.name) : s.role.name, exact: s.role.name.startsWith("^") ? undefined : s.role.exact ?? false }).nth(s.role.nth || 0).click({ timeout: 4000 });
   if (s.css) await p.locator(s.css).nth(s.nth || 0).click({ timeout: 4000 });
   if (s.fill) await p.locator(s.fill.css).nth(s.fill.nth || 0).fill(s.fill.value);
   if (s.hover) await p.locator(s.hover).first().hover();

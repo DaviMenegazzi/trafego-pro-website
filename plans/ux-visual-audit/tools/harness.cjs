@@ -16,6 +16,7 @@ async function newPage(browser, { width = 1440, height = 900, scheme = "dark", a
   await page.route(/firebaseio\.com/, (r) => {
     const u = r.request().url();
     if (u.includes("trafegopro.json") && r.request().method() === "GET") return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockOpts.emptyFinance ? null : mock.financeDB()) });
+    if (["PUT", "PATCH", "DELETE"].includes(r.request().method())) return r.fulfill({ status: 200, contentType: "application/json", body: "null" });
     return r.abort();
   });
   await page.route(/\/api\//, (r) => {

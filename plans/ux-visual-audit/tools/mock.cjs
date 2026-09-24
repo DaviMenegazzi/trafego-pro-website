@@ -133,12 +133,12 @@ const feedbacks = Array.from({ length: 26 }, (_, i) => {
 });
 
 const aiTokens = {
-  scopes: ["metrics:read", "leads:read", "crm:read"], rateLimitPerMinute: 60,
+  scopes: ["metrics:read", "leads:summary:read", "crm:summary:read"], rateLimitPerMinute: 60,
   units: UNITS.map((u) => ({ id: u.id, name: u.name })),
   tokens: [
-    { id: "t1", name: "GPT análise semanal", tokenPrefix: "tpai_4f9c…", scopes: ["metrics:read", "leads:read"], unitIds: UNITS.slice(0, 4).map((u) => u.id), expiresAt: daysAgo(-60).toISOString(), revokedAt: null, lastUsedAt: daysAgo(1).toISOString(), createdAt: daysAgo(30).toISOString() },
-    { id: "t2", name: "Claude relatórios", tokenPrefix: "tpai_a21e…", scopes: ["metrics:read", "crm:read"], unitIds: UNITS.map((u) => u.id), expiresAt: daysAgo(-10).toISOString(), revokedAt: null, lastUsedAt: daysAgo(0).toISOString(), createdAt: daysAgo(15).toISOString() },
-    { id: "t3", name: "Teste n8n", tokenPrefix: "tpai_77b0…", scopes: ["leads:read"], unitIds: [UNITS[2].id], expiresAt: daysAgo(5).toISOString(), revokedAt: null, lastUsedAt: null, createdAt: daysAgo(40).toISOString() },
+    { id: "t1", name: "GPT análise semanal", tokenPrefix: "tpai_4f9c…", scopes: ["metrics:read", "leads:summary:read"], unitIds: UNITS.slice(0, 4).map((u) => u.id), expiresAt: daysAgo(-60).toISOString(), revokedAt: null, lastUsedAt: daysAgo(1).toISOString(), createdAt: daysAgo(30).toISOString() },
+    { id: "t2", name: "Claude relatórios", tokenPrefix: "tpai_a21e…", scopes: ["metrics:read", "crm:summary:read"], unitIds: UNITS.map((u) => u.id), expiresAt: daysAgo(-10).toISOString(), revokedAt: null, lastUsedAt: daysAgo(0).toISOString(), createdAt: daysAgo(15).toISOString() },
+    { id: "t3", name: "Teste n8n", tokenPrefix: "tpai_77b0…", scopes: ["leads:summary:read"], unitIds: [UNITS[2].id], expiresAt: daysAgo(5).toISOString(), revokedAt: null, lastUsedAt: null, createdAt: daysAgo(40).toISOString() },
     { id: "t4", name: "Integração antiga", tokenPrefix: "tpai_0c3d…", scopes: ["metrics:read"], unitIds: [UNITS[5].id], expiresAt: daysAgo(-100).toISOString(), revokedAt: daysAgo(20).toISOString(), lastUsedAt: daysAgo(22).toISOString(), createdAt: daysAgo(80).toISOString() },
   ],
 };

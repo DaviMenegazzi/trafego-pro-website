@@ -1,0 +1,825 @@
+[
+ {
+  "id": "01-home",
+  "path": "/",
+  "auth": null,
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-light",
+    "width": 1440,
+    "height": 900,
+    "scheme": "light"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "02-login",
+  "path": "/login",
+  "auth": null,
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "02-login-erro",
+  "path": "/login",
+  "auth": null,
+  "state": "envio vazio",
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Entrar",
+     "exact": true
+    },
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "id": "03-cadastro",
+  "path": "/cadastro",
+  "auth": null
+ },
+ {
+  "id": "04-dashboard",
+  "path": "/dashboard",
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-light",
+    "width": 1440,
+    "height": 900,
+    "scheme": "light"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "04-dashboard-periodo",
+  "path": "/dashboard",
+  "state": "popover de período aberto",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Período personalizado"
+    },
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "id": "04-dashboard-unidade",
+  "path": "/dashboard",
+  "state": "popover de unidade aberto",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Vida Card Ijuí",
+     "nth": 0
+    },
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "id": "04-dashboard-analise",
+  "path": "/dashboard",
+  "state": "análise profunda expandida",
+  "steps": [
+   {
+    "role": {
+     "role": "radio",
+     "name": "Análise"
+    },
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "id": "04-dashboard-print",
+  "path": "/dashboard",
+  "state": "modal Gerar Print",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Exportar"
+    },
+    "wait": 500
+   },
+   {
+    "role": {
+     "role": "menuitem",
+     "name": "Imagem"
+    },
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "id": "04-dashboard-vazio",
+  "path": "/dashboard",
+  "state": "sem dados no período",
+  "mock": {
+   "empty": true
+  },
+  "fullPage": false
+ },
+ {
+  "id": "04-dashboard-erro",
+  "path": "/dashboard",
+  "state": "erro do Supabase",
+  "mock": {
+   "fail": true
+  },
+  "fullPage": false,
+  "wait": 3500
+ },
+ {
+  "id": "04-dashboard-banco",
+  "path": "/dashboard",
+  "state": "modo banco + rate limit",
+  "mock": {
+   "source": "supabase",
+   "rateLimited": true
+  },
+  "fullPage": false
+ },
+ {
+  "id": "05-sidebar-recolhida",
+  "path": "/dashboard",
+  "state": "sidebar recolhida",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Recolher menu"
+    },
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "id": "05-sidebar-mobile",
+  "path": "/dashboard",
+  "state": "menu lateral no celular",
+  "fullPage": false,
+  "variants": [
+   {
+    "suffix": "",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ],
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Abrir menu"
+    }
+   }
+  ]
+ },
+ {
+  "id": "06-anuncios",
+  "path": "/dashboard/anuncios",
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "06-anuncios-galeria",
+  "path": "/dashboard/anuncios",
+  "state": "galeria de criativos",
+  "steps": [
+   {
+    "role": {
+     "role": "radio",
+     "name": "Galeria"
+    },
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "id": "06-anuncios-status",
+  "path": "/dashboard/anuncios",
+  "state": "popover de status",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "radio",
+     "name": "Ativos"
+    },
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "id": "06-anuncios-legenda",
+  "path": "/dashboard/anuncios",
+  "state": "legenda aberta",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Como ler a classificação"
+    },
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "id": "06-anuncios-export",
+  "path": "/dashboard/anuncios",
+  "state": "modal Card WhatsApp",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Exportar"
+    },
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "id": "07-feedback",
+  "path": "/dashboard/feedback-leads",
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "08-talentos",
+  "path": "/dashboard/banco-talentos",
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "08-talentos-editor",
+  "path": "/dashboard/banco-talentos",
+  "state": "editor de formulário",
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "^Trabalhe na"
+    },
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "id": "08-talentos-candidatos",
+  "path": "/dashboard/banco-talentos",
+  "state": "lista de candidatos",
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "^Trabalhe na"
+    },
+    "wait": 1000
+   },
+   {
+    "role": {
+     "role": "radio",
+     "name": "Candidatos"
+    },
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "id": "08-talentos-candidato",
+  "path": "/dashboard/banco-talentos",
+  "state": "detalhe do candidato",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "^Trabalhe na"
+    },
+    "wait": 1000
+   },
+   {
+    "role": {
+     "role": "radio",
+     "name": "Candidatos"
+    },
+    "wait": 1200
+   },
+   {
+    "role": {
+     "role": "button",
+     "name": "Bruno Kessler"
+    },
+    "wait": 1000
+   }
+  ]
+ },
+ {
+  "id": "09-trabalhe-conosco",
+  "path": "/trabalhe-conosco/vida-card-ijui",
+  "auth": null,
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "10-configuracoes",
+  "path": "/dashboard/configuracoes"
+ },
+ {
+  "id": "10-configuracoes-seguranca",
+  "path": "/dashboard/configuracoes",
+  "state": "aba Segurança",
+  "steps": [
+   {
+    "role": {
+     "role": "tab",
+     "name": "Segurança"
+    },
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "id": "11-metricas",
+  "path": "/admin/metricas",
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "11-metricas-guia",
+  "path": "/admin/metricas",
+  "state": "guia do algoritmo",
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Como ler esta tela"
+    },
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "id": "11-metricas-analise",
+  "path": "/admin/metricas",
+  "state": "unidade expandida",
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Vida Card Cruz Alta"
+    },
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "id": "12-financeiro",
+  "path": "/admin/financeiro",
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "12-financeiro-despesas",
+  "path": "/admin/financeiro",
+  "state": "aba Despesas",
+  "steps": [
+   {
+    "role": {
+     "role": "tab",
+     "name": "Despesas"
+    },
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "id": "12-financeiro-dashboard",
+  "path": "/admin/financeiro",
+  "state": "aba Dashboard",
+  "steps": [
+   {
+    "role": {
+     "role": "tab",
+     "name": "Resumo"
+    },
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "id": "12-financeiro-atas",
+  "path": "/admin/financeiro",
+  "state": "aba Atas",
+  "steps": [
+   {
+    "role": {
+     "role": "tab",
+     "name": "Atas"
+    },
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "id": "12-financeiro-unidade",
+  "path": "/admin/financeiro",
+  "state": "detalhe da unidade",
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "^Vida Card Ijuí",
+     "nth": 1
+    },
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "id": "12-financeiro-nova",
+  "path": "/admin/financeiro",
+  "state": "modal Cadastrar unidade",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Nova unidade"
+    },
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "id": "12-financeiro-seletor",
+  "path": "/admin/financeiro",
+  "state": "seletor de unidade pagante",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "combobox",
+     "name": "Abrir unidade"
+    },
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "id": "13-feedbacks-lista",
+  "path": "/dashboard/feedback-leads/list"
+ },
+ {
+  "id": "13-feedbacks-lista-aberto",
+  "path": "/dashboard/feedback-leads/list",
+  "state": "feedback expandido",
+  "steps": [
+   {
+    "eval": "(()=>{const b=[...document.querySelectorAll('main button')].find(x=>x.innerText.includes('18/09/2026'));b&&b.click()})()",
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "id": "14-usuarios",
+  "path": "/dashboard/usuarios",
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "14-usuarios-novo",
+  "path": "/dashboard/usuarios",
+  "state": "modal Cadastrar usuário",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Novo usuário"
+    },
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "id": "14-usuarios-unidades",
+  "path": "/dashboard/usuarios",
+  "state": "acesso a unidades",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "^2 unidades"
+    },
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "id": "14-usuarios-senha",
+  "path": "/dashboard/usuarios",
+  "state": "redefinir senha",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Mais ações para",
+     "nth": 0
+    },
+    "wait": 400
+   },
+   {
+    "role": {
+     "role": "menuitem",
+     "name": "Redefinir senha"
+    },
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "id": "14-usuarios-excluir",
+  "path": "/dashboard/usuarios",
+  "state": "desativar/excluir",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Mais ações para",
+     "nth": 0
+    },
+    "wait": 400
+   },
+   {
+    "role": {
+     "role": "menuitem",
+     "name": "Desativar ou excluir"
+    },
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "id": "15-integracoes-ia",
+  "path": "/dashboard/integracoes-ia"
+ },
+ {
+  "id": "15-integracoes-ia-novo",
+  "path": "/dashboard/integracoes-ia",
+  "state": "modal Novo token",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Novo token"
+    },
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "id": "15-integracoes-ia-revogar",
+  "path": "/dashboard/integracoes-ia",
+  "state": "confirmar revogação",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Revogar",
+     "exact": true,
+     "nth": 0
+    },
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "id": "16-formularios",
+  "path": "/dashboard/formularios",
+  "variants": [
+   {
+    "suffix": "",
+    "width": 1440,
+    "height": 900,
+    "scheme": "dark"
+   },
+   {
+    "suffix": "-mobile",
+    "width": 390,
+    "height": 844,
+    "scheme": "dark"
+   }
+  ]
+ },
+ {
+  "id": "16-formularios-endpoints",
+  "path": "/dashboard/formularios",
+  "state": "aba Endpoints",
+  "steps": [
+   {
+    "role": {
+     "role": "radio",
+     "name": "Endpoints"
+    },
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "id": "16-formularios-detalhe",
+  "path": "/dashboard/formularios",
+  "state": "detalhe da submissão",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Ana Paula Ribeiro",
+     "nth": 0
+    },
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "id": "16-formularios-novo",
+  "path": "/dashboard/formularios",
+  "state": "modal Novo endpoint",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "radio",
+     "name": "Endpoints"
+    },
+    "wait": 600
+   },
+   {
+    "role": {
+     "role": "button",
+     "name": "Novo endpoint"
+    },
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "id": "17-404",
+  "path": "/pagina-inexistente",
+  "auth": null
+ },
+ {
+  "id": "08-talentos-unidade",
+  "path": "/dashboard/banco-talentos",
+  "state": "seletor de unidade",
+  "fullPage": false,
+  "steps": [
+   {
+    "role": {
+     "role": "button",
+     "name": "Formulários",
+     "exact": true
+    },
+    "wait": 800
+   }
+  ]
+ }
+]

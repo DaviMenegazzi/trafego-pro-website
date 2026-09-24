@@ -33,6 +33,7 @@ O site também roda na VPS da Evolution, em `/opt/trafego-pro`, no container `tr
 - As mídias das publicações vão para o bucket público `social-media` e os currículos para o bucket `talent-resumes`.
 - As rotas `/api/scheduled/*` aceitam o header `X-Cron-Secret` (`CRON_SECRET`); o cron fica em `/etc/cron.d/trafego-pro`.
 - Deploy: `pnpm build` local → enviar `dist`, `package.json`, `pnpm-lock.yaml`, `patches` e `deploy/vps/*` para `/opt/trafego-pro` → `docker compose build && docker compose up -d`. Nunca rode o `vite build` na VPS.
+- Financeiro: sem conta de serviço do Firebase (não temos acesso de dono ao projeto `trafegopro-5206e`), o servidor usa a API REST do Realtime Database. O site só libera `/api/finance` para admin ativo no Supabase, mas o banco do Firebase continua aberto na internet até o dono publicar `firebase.database.rules.json`. Se `FIREBASE_SERVICE_ACCOUNT_JSON` for configurada, o servidor volta a usar o Admin SDK automaticamente.
 - Dados antigos do MySQL do Manus: `scripts/migrate-manus-mysql-to-supabase.mjs`.
 
 ## Verificação

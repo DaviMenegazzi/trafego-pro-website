@@ -129,5 +129,4 @@ vidacard_*.csv
 vidacard_*.json
 
 # Ferramentas locais
-graphify-out/
 .claude/settings.local.json

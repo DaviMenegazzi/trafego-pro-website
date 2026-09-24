@@ -1,0 +1,258 @@
+{
+  "generated_at": "2026-09-21T20:52:34.392985+00:00",
+  "nodes": {
+    "client_src_app": {
+      "code_fingerprint": "01e02e258c6f5939a5964d57bb43207b21014c1a7cb6b9fcc82991cfcaaf1977",
+      "label": "App.tsx",
+      "last": "2026-09-21T19:50:33.059400+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T19:50:33.059400+00:00",
+          "outcome": "useful",
+          "q": "É possível criar uma aba Pixel na dashboard, conectar instâncias da Evolution API por unidade via QR Code e mostrar somente mensagens de leads?"
+        }
+      ],
+      "score": 0.999005344,
+      "source_file": "client/src/App.tsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_components_applayout": {
+      "code_fingerprint": "a561c9deb221a615d85ee3604195a3b9818c38bd1580d3f88ff4c62686f05270",
+      "label": "AppLayout.tsx",
+      "last": "2026-09-21T19:50:33.059400+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T19:50:33.059400+00:00",
+          "outcome": "useful",
+          "q": "É possível criar uma aba Pixel na dashboard, conectar instâncias da Evolution API por unidade via QR Code e mostrar somente mensagens de leads?"
+        }
+      ],
+      "score": 0.999005344,
+      "source_file": "client/src/components/AppLayout.tsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_pages_evolutionadmin": {
+      "code_fingerprint": "4e8bc0f9d19767fa779b0b9033444b09a59c1afa7d929cb9b7fbf9a0f0e86fa3",
+      "label": "EvolutionAdmin.tsx",
+      "last": "2026-09-21T19:50:33.059400+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T19:50:33.059400+00:00",
+          "outcome": "useful",
+          "q": "É possível criar uma aba Pixel na dashboard, conectar instâncias da Evolution API por unidade via QR Code e mostrar somente mensagens de leads?"
+        }
+      ],
+      "score": 0.999005344,
+      "source_file": "client/src/pages/EvolutionAdmin.tsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "server_auth": {
+      "code_fingerprint": "17ab8c7449bfd65ec4cffd45fb9c992d53e745525b079afde33fef76e165aa70",
+      "label": "auth.ts",
+      "last": "2026-09-21T20:26:43.811456+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:26:43.811456+00:00",
+          "outcome": "useful",
+          "q": "acessei a aba do pixel e retornou voce nao tem acesso a essa unidade sendo que eu to entrando como administrador"
+        }
+      ],
+      "score": 0.999585433,
+      "source_file": "server/auth.ts",
+      "status": "tentative",
+      "uses": 1
+    },
+    "server_evolutionaiautomation": {
+      "code_fingerprint": "e87025c54cf0ab6b3b4e1ea71881d1e8e285d466014d3a8cea73d52a342ad535",
+      "label": "evolutionAiAutomation.ts",
+      "last": "2026-09-21T20:40:48.782252+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:40:48.782252+00:00",
+          "outcome": "useful",
+          "q": "mas eu nao quero implementar nenhuma IA por enquanto. é pra ser totalmente determinístico"
+        }
+      ],
+      "score": 0.999811325,
+      "source_file": "server/evolutionAiAutomation.ts",
+      "status": "tentative",
+      "uses": 1
+    },
+    "server_evolutionorigin": {
+      "code_fingerprint": "dcef1f3456942226e250467d158ce0054d45b8dfe8ba456830fdf5cedf099f85",
+      "label": "evolutionOrigin.ts",
+      "last": "2026-09-21T20:50:31.178522+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:50:31.178522+00:00",
+          "outcome": "useful",
+          "q": "essas que não são leads não precisa armazenar no supabase"
+        },
+        {
+          "date": "2026-09-21T20:40:48.782252+00:00",
+          "outcome": "useful",
+          "q": "mas eu nao quero implementar nenhuma IA por enquanto. é pra ser totalmente determinístico"
+        },
+        {
+          "date": "2026-09-21T20:36:53.995622+00:00",
+          "outcome": "useful",
+          "q": "quais são os critérios pra ele ser um lead identificado nesse pixel pelo evolution?"
+        }
+      ],
+      "score": 2.999526928,
+      "source_file": "server/evolutionOrigin.ts",
+      "status": "preferred",
+      "uses": 3
+    },
+    "server_evolutionsupabasestore": {
+      "code_fingerprint": "1c0e32848bc9b858e731710cdb55bf93ee691ca0b1a121c25ddea56efd0162f8",
+      "label": "evolutionSupabaseStore.ts",
+      "last": "2026-09-21T20:50:31.178522+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:50:31.178522+00:00",
+          "outcome": "useful",
+          "q": "essas que não são leads não precisa armazenar no supabase"
+        },
+        {
+          "date": "2026-09-21T20:40:48.782252+00:00",
+          "outcome": "useful",
+          "q": "mas eu nao quero implementar nenhuma IA por enquanto. é pra ser totalmente determinístico"
+        },
+        {
+          "date": "2026-09-21T20:36:53.995622+00:00",
+          "outcome": "useful",
+          "q": "quais são os critérios pra ele ser um lead identificado nesse pixel pelo evolution?"
+        },
+        {
+          "date": "2026-09-21T20:15:27.882066+00:00",
+          "outcome": "useful",
+          "q": "acessa a VPS pega as informações do ENV e aplica aqui localmente pra podermos testar aqui antes de colocar no site efetivamente por favor; pode fazer as migrações no supabase"
+        },
+        {
+          "date": "2026-09-21T19:50:33.059400+00:00",
+          "outcome": "useful",
+          "q": "É possível criar uma aba Pixel na dashboard, conectar instâncias da Evolution API por unidade via QR Code e mostrar somente mensagens de leads?"
+        }
+      ],
+      "score": 4.99793704,
+      "source_file": "server/evolutionSupabaseStore.ts",
+      "status": "preferred",
+      "uses": 5
+    },
+    "server_evolutionwebhook": {
+      "code_fingerprint": "09baa8851c68ee8a5447957b0c47803d456e022e6371886c5aa6904897e79bce",
+      "label": "evolutionWebhook.ts",
+      "last": "2026-09-21T20:50:31.178522+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:50:31.178522+00:00",
+          "outcome": "useful",
+          "q": "essas que não são leads não precisa armazenar no supabase"
+        },
+        {
+          "date": "2026-09-21T20:40:48.782252+00:00",
+          "outcome": "useful",
+          "q": "mas eu nao quero implementar nenhuma IA por enquanto. é pra ser totalmente determinístico"
+        },
+        {
+          "date": "2026-09-21T20:36:53.995622+00:00",
+          "outcome": "useful",
+          "q": "quais são os critérios pra ele ser um lead identificado nesse pixel pelo evolution?"
+        }
+      ],
+      "score": 2.999526928,
+      "source_file": "server/evolutionWebhook.ts",
+      "status": "preferred",
+      "uses": 3
+    },
+    "server_metadirectservice": {
+      "code_fingerprint": "3c33e3135d1d54b6745fa5c86ba33ce6aa61171330ed64580cb89b88f24d1e89",
+      "label": "metaDirectService.ts",
+      "last": "2026-09-21T20:26:43.811456+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:26:43.811456+00:00",
+          "outcome": "useful",
+          "q": "acessei a aba do pixel e retornou voce nao tem acesso a essa unidade sendo que eu to entrando como administrador"
+        }
+      ],
+      "score": 0.999585433,
+      "source_file": "server/metaDirectService.ts",
+      "status": "tentative",
+      "uses": 1
+    },
+    "server_routes_evolutionroutes": {
+      "code_fingerprint": "3e9880a174f072281be4fcd406757e68462e2e59be36ad2b1f850e0416db3738",
+      "label": "evolutionRoutes.ts",
+      "last": "2026-09-21T20:50:31.178522+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:50:31.178522+00:00",
+          "outcome": "useful",
+          "q": "essas que não são leads não precisa armazenar no supabase"
+        },
+        {
+          "date": "2026-09-21T20:40:48.782252+00:00",
+          "outcome": "useful",
+          "q": "mas eu nao quero implementar nenhuma IA por enquanto. é pra ser totalmente determinístico"
+        },
+        {
+          "date": "2026-09-21T20:36:53.995622+00:00",
+          "outcome": "useful",
+          "q": "quais são os critérios pra ele ser um lead identificado nesse pixel pelo evolution?"
+        },
+        {
+          "date": "2026-09-21T20:29:51.637997+00:00",
+          "outcome": "useful",
+          "q": "pq o povisionamento ainda está sem credenciais?"
+        },
+        {
+          "date": "2026-09-21T20:26:43.811456+00:00",
+          "outcome": "useful",
+          "q": "acessei a aba do pixel e retornou voce nao tem acesso a essa unidade sendo que eu to entrando como administrador"
+        }
+      ],
+      "score": 6.997158114,
+      "source_file": "server/routes/evolutionRoutes.ts",
+      "status": "preferred",
+      "uses": 7
+    },
+    "server_routes_metricsroutes": {
+      "code_fingerprint": "3fc376530718de1c31a4a0d23bc886af90cc4b5435934d21ab17b774574df329",
+      "label": "metricsRoutes.ts",
+      "last": "2026-09-21T20:26:43.811456+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:26:43.811456+00:00",
+          "outcome": "useful",
+          "q": "acessei a aba do pixel e retornou voce nao tem acesso a essa unidade sendo que eu to entrando como administrador"
+        }
+      ],
+      "score": 0.999585433,
+      "source_file": "server/routes/metricsRoutes.ts",
+      "status": "tentative",
+      "uses": 1
+    },
+    "server_server_supabase": {
+      "code_fingerprint": "cc07f70e64bef324e4bc8ff39ec995aa7c4ab093e53bde3ec564d7406c76c99c",
+      "label": "server-supabase.ts",
+      "last": "2026-09-21T20:15:27.882066+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-21T20:15:27.882066+00:00",
+          "outcome": "useful",
+          "q": "acessa a VPS pega as informações do ENV e aplica aqui localmente pra podermos testar aqui antes de colocar no site efetivamente por favor; pode fazer as migrações no supabase"
+        }
+      ],
+      "score": 0.999404768,
+      "source_file": "server/server-supabase.ts",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
+  "version": 1
+}

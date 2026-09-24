@@ -1,13 +1,8 @@
-import { Tooltip } from "@/components/ds";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Button, DatePicker, dateToIso, Field, IconButton, Input, isoToDate, Page, SegmentedControl, Select, Surface, Textarea } from "@/components/ds";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { useClientContext } from "@/contexts/ClientContext";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { ArrowLeft, LogOut, Send, ShieldCheck } from "lucide-react";
 import { useAdminAuth, getToken } from "@/hooks/useAdminAuth";
@@ -18,6 +13,7 @@ import {
   LOSS_REASONS,
   RATING_OPTIONS,
   getAuthorizedUnitNames,
+  validateFeedbackCounts,
 } from "./feedbackLeadsConfig";
 import { submitFeedbackLead } from "./feedbackLeadsApi";
 
@@ -47,11 +43,6 @@ const emptyForm: FormData = {
   leadsResponded: "", leadsConverted: "", leadsLost: "", leadsInNegotiation: "", lossReason: "",
   leadQuality: "", observations: "", agencySatisfaction: "", communicationClarity: "", agencyAdjustment: "",
 };
-
-const fieldClassName =
-  "mt-1 h-11 w-full rounded-xl border border-white/15 bg-[#0b0e11] px-3 text-sm text-white shadow-inner shadow-black/10 outline-none transition placeholder:text-white/35 focus:border-emerald-300/70 focus:ring-2 focus:ring-emerald-300/15";
-const labelClassName = "text-sm font-medium leading-5 text-white/80";
-const cardClassName = "rounded-2xl border border-white/10 bg-[#111519] p-5 shadow-[0_18px_45px_rgba(0,0,0,0.16)] sm:p-6";
 
 function StandaloneFeedbackShell({ children, userName, onLogout }: { children: React.ReactNode; userName?: string; onLogout: () => void }) {
   return (
@@ -83,22 +74,58 @@ function FeedbackLoading() {
   return <div className="flex min-h-screen items-center justify-center bg-[#080808] text-sm text-white/70">Verificando autenticação…</div>;
 }
 
-function FormSectionHeading({ step, title, description }: { step: string; title: string; description: string }) {
+function FormSection({ step, title, description, children }: { step: string; title: string; description: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 border-b border-white/10 pb-4">
-      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-300/15 text-xs font-semibold text-emerald-200 ring-1 ring-inset ring-emerald-300/30">{step}</span>
-      <div><h2 className="text-base font-semibold tracking-tight text-white sm:text-lg">{title}</h2><p className="mt-1 text-sm leading-5 text-white/50">{description}</p></div>
-    </div>
+    <Surface className="p-5 sm:p-6">
+      <div className="flex items-start gap-3 border-b border-white/[0.06] pb-4">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-xs font-semibold text-zinc-200">{step}</span>
+        <div>
+          <h2 className="text-base font-semibold text-white">{title}</h2>
+          <p className="mt-0.5 text-sm text-zinc-400">{description}</p>
+        </div>
+      </div>
+      <div className="pt-5">{children}</div>
+    </Surface>
   );
 }
 
-function NumberField({ name, label, value, onChange }: { name: keyof FormData; label: string; value: string; onChange: (event: React.ChangeEvent<HTMLInputElement>) => void }) {
+const COUNT_FIELDS: { name: keyof FormData & ("totalLeads" | "leadsContacted" | "leadsResponded" | "leadsConverted" | "leadsLost" | "leadsInNegotiation"); label: string }[] = [
+  { name: "totalLeads", label: "Leads recebidos" },
+  { name: "leadsContacted", label: "Contatados" },
+  { name: "leadsResponded", label: "Responderam" },
+  { name: "leadsConverted", label: "Fecharam" },
+  { name: "leadsLost", label: "Perdidos ou descartados" },
+  { name: "leadsInNegotiation", label: "Ainda em negociação" },
+];
+
+function RatingField({ label, value, onChange, low, high, error }: { label: string; value: string; onChange: (v: string) => void; low: string; high: string; error?: string }) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor={name} className={labelClassName}>{label} *</Label>
-      <Input id={name} name={name} type="number" min="0" step="1" value={value} onChange={onChange} placeholder="0" required />
-    </div>
+    <Field label={label} required error={error}>
+      <SegmentedControl
+        aria-label={label}
+        value={value as "1" | "2" | "3" | "4" | "5"}
+        onValueChange={onChange}
+        fullWidth
+        options={RATING_OPTIONS.map((r) => ({ value: String(r) as "1" | "2" | "3" | "4" | "5", label: String(r) }))}
+      />
+      <div className="mt-1 flex justify-between text-xs text-zinc-500"><span>1 · {low}</span><span>5 · {high}</span></div>
+    </Field>
   );
+}
+
+function formatWeek(start: string, end: string) {
+  const a = isoToDate(start);
+  const b = isoToDate(end);
+  if (!a || !b) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(a.getDate())}/${pad(a.getMonth() + 1)} a ${pad(b.getDate())}/${pad(b.getMonth() + 1)}`;
+}
+
+function addDays(iso: string, days: number) {
+  const date = isoToDate(iso);
+  if (!date) return "";
+  date.setDate(date.getDate() + days);
+  return dateToIso(date);
 }
 
 export function StandaloneFeedbackLeads() {
@@ -115,19 +142,36 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>(emptyForm);
+  const [submitted, setSubmitted] = useState(false);
+
+  // Preenche o responsável com o nome da conta e a unidade, quando só há uma.
+  useEffect(() => {
+    if (!user) return;
+    setFormData((previous) => (previous.responsible ? previous : { ...previous, responsible: user.name ?? "" }));
+  }, [user]);
+  const authorizedUnits = useMemo(
+    () => (user ? getAuthorizedUnitNames(clients, FALLBACK_UNITS, user.allowedClientIds ?? [], user.role) : []),
+    [clients, user],
+  );
+  useEffect(() => {
+    if (authorizedUnits.length === 1) setFormData((previous) => (previous.unit ? previous : { ...previous, unit: authorizedUnits[0] }));
+  }, [authorizedUnits]);
 
   if (authLoading || !user) return <FeedbackLoading />;
 
   const units = getAuthorizedUnitNames(clients, FALLBACK_UNITS, user.allowedClientIds ?? [], user.role);
   const unitSelectDisabled = clientsLoading || units.length === 0;
+  const countErrors = validateFeedbackCounts(formData);
+  const hasCountErrors = Object.keys(countErrors).length > 0;
+  const set = (name: keyof FormData, value: string) => setFormData((previous) => ({ ...previous, [name]: value }));
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = event.target;
-    setFormData((previous) => ({ ...previous, [name]: value }));
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    set(event.target.name as keyof FormData, event.target.value);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setSubmitted(true);
     if (!formData.unit || !formData.responsible || !formData.weekStart || !formData.weekEnd) {
       toast.error("Preencha a identificação e o período de referência.");
       return;
@@ -136,73 +180,132 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
       toast.error("A data inicial não pode ser posterior à data final.");
       return;
     }
+    if (COUNT_FIELDS.some((f) => formData[f.name] === "") || !formData.lossReason || !formData.leadQuality || !formData.agencySatisfaction || !formData.communicationClarity) {
+      toast.error("Preencha os campos obrigatórios destacados.");
+      return;
+    }
+    if (hasCountErrors) {
+      toast.error("Revise os números: eles não fecham entre si.");
+      return;
+    }
     const token = getToken();
     if (!token) { toast.error("Sessão expirada. Faça login novamente."); setLocation("/login"); return; }
     setLoading(true);
     try {
       await submitFeedbackLead(formData, token);
-      toast.success("Feedback semanal salvo com sucesso!");
-      setFormData(emptyForm);
+      toast.success(`Feedback da semana ${formatWeek(formData.weekStart, formData.weekEnd)} enviado.`);
+      setSubmitted(false);
+      setFormData({ ...emptyForm, unit: formData.unit, responsible: formData.responsible });
     } catch (error) {
       if (error instanceof Error && error.message === "SESSION_EXPIRED") { toast.error("Sessão expirada. Faça login novamente."); setLocation("/login"); }
       else toast.error(error instanceof Error ? error.message : "Erro ao salvar feedback. Tente novamente.");
     } finally { setLoading(false); }
   };
 
+  const required = (name: keyof FormData) => (submitted && !formData[name] ? "Obrigatório." : undefined);
+
   const content = (
-    <div className="feedback-form-shell flex-1 overflow-auto">
-      <div className={FEEDBACK_LAYOUT.page}>
-        <div className="flex items-start gap-3 sm:gap-4">
-          <Tooltip content={"Voltar"}>
-            <button onClick={() => setLocation(standalone ? "/" : "/dashboard")} className="mt-0.5 rounded-xl border border-white/10 p-2.5 text-white/60 transition-colors hover:border-white/25 hover:bg-white/5 hover:text-white" aria-label={"Voltar"}><ArrowLeft className="size-5" /></button>
-          </Tooltip>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Feedback Semanal de Leads{formData.unit ? ` — ${formData.unit}` : ""}</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55 sm:text-base">Registre o panorama dos leads e a percepção da unidade sobre a entrega da Tráfego Pro.</p>
-          </div>
+    <Page width="medium">
+      <div className="flex items-start gap-3">
+        <IconButton label="Voltar" icon={<ArrowLeft />} variant="secondary" onClick={() => setLocation(standalone ? "/" : "/dashboard")} className="mt-0.5" />
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] text-white sm:text-[28px]">Feedback semanal de leads</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-400">Registre o que aconteceu com os leads da semana e como foi a entrega da Tráfego Pro. Leva cerca de 2 minutos.</p>
         </div>
-
-        <form onSubmit={handleSubmit} className={FEEDBACK_LAYOUT.form}>
-          <Card className={cardClassName}>
-            <FormSectionHeading step="1" title="Identificação" description="Informe quem preencheu, a unidade e o período semanal analisado." />
-            <div className={FEEDBACK_LAYOUT.identityGrid}>
-              <div className="space-y-2"><Label htmlFor="responsible" className={labelClassName}>Nome do gerente/vendedor responsável *</Label><Input id="responsible" name="responsible" value={formData.responsible} onChange={handleChange} placeholder="Nome do responsável" required /></div>
-              <div className="space-y-2"><Label htmlFor="unit" className={labelClassName}>Unidade *</Label><select id="unit" name="unit" value={formData.unit} onChange={handleChange} required disabled={unitSelectDisabled} className={fieldClassName}><option value="">{clientsLoading ? "Carregando unidades..." : units.length ? "Selecione a unidade" : "Nenhuma unidade disponível para este usuário"}</option>{units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></div>
-              <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="weekStart" className={labelClassName}>Início *</Label><Input id="weekStart" name="weekStart" type="date" value={formData.weekStart} onChange={handleChange} required /></div><div className="space-y-2"><Label htmlFor="weekEnd" className={labelClassName}>Fim *</Label><Input id="weekEnd" name="weekEnd" type="date" min={formData.weekStart || undefined} value={formData.weekEnd} onChange={handleChange} required /></div></div>
-            </div>
-          </Card>
-
-          <Card className={cardClassName}>
-            <FormSectionHeading step="2" title="Panorama geral de leads da semana" description="Acompanhe volume, evolução do atendimento, conversão e percepção sobre a qualidade." />
-            <div className={FEEDBACK_LAYOUT.metricsGrid}>
-              <NumberField name="totalLeads" label="Quantos leads foram recebidos essa semana?" value={formData.totalLeads} onChange={handleChange} />
-              <NumberField name="leadsContacted" label="Quantos foram contatados?" value={formData.leadsContacted} onChange={handleChange} />
-              <NumberField name="leadsResponded" label="Quantos retornaram/responderam?" value={formData.leadsResponded} onChange={handleChange} />
-              <NumberField name="leadsConverted" label="Quantos fecharam (converteram)?" value={formData.leadsConverted} onChange={handleChange} />
-              <NumberField name="leadsLost" label="Quantos foram perdidos/descartados?" value={formData.leadsLost} onChange={handleChange} />
-              <NumberField name="leadsInNegotiation" label="Quantos ainda estão em negociação?" value={formData.leadsInNegotiation} onChange={handleChange} />
-              <div className="space-y-2"><Label htmlFor="lossReason" className={labelClassName}>Principal motivo de perda *</Label><select id="lossReason" name="lossReason" value={formData.lossReason} onChange={handleChange} required className={fieldClassName}><option value="">Selecione o motivo</option>{LOSS_REASONS.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select></div>
-              <div className="space-y-2"><Label htmlFor="leadQuality" className={labelClassName}>Qualidade geral dos leads (1 a 5) *</Label><select id="leadQuality" name="leadQuality" value={formData.leadQuality} onChange={handleChange} required className={fieldClassName}><option value="">Selecione uma nota</option>{RATING_OPTIONS.map((rating) => <option key={rating} value={rating}>{rating} — {rating === 1 ? "Muito baixa" : rating === 5 ? "Muito alta" : ""}</option>)}</select></div>
-            </div>
-            <div className="mt-4 space-y-2"><Label htmlFor="observations" className={labelClassName}>Observações livres <span className="font-normal text-white/40">(opcional)</span></Label><Textarea id="observations" name="observations" value={formData.observations} onChange={handleChange} placeholder="Registre um contexto importante sobre os leads da semana..." rows={3} /></div>
-          </Card>
-
-          <Card className={cardClassName}>
-            <FormSectionHeading step="3" title="Satisfação de entrega da agência" description="Compartilhe a percepção da unidade para orientar a próxima semana da Tráfego Pro." />
-            <div className={FEEDBACK_LAYOUT.metricsGrid}>
-              <div className="space-y-2"><Label htmlFor="agencySatisfaction" className={labelClassName}>Satisfação com a Tráfego Pro (1 a 5) *</Label><select id="agencySatisfaction" name="agencySatisfaction" value={formData.agencySatisfaction} onChange={handleChange} required className={fieldClassName}><option value="">Selecione uma nota</option>{RATING_OPTIONS.map((rating) => <option key={rating} value={rating}>{rating} — {rating === 1 ? "Muito insatisfeito" : rating === 5 ? "Muito satisfeito" : ""}</option>)}</select></div>
-              <div className="space-y-2"><Label htmlFor="communicationClarity" className={labelClassName}>A comunicação com a agência foi clara? *</Label><select id="communicationClarity" name="communicationClarity" value={formData.communicationClarity} onChange={handleChange} required className={fieldClassName}><option value="">Selecione uma opção</option>{COMMUNICATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></div>
-            </div>
-            <div className="mt-4 space-y-2"><Label htmlFor="agencyAdjustment" className={labelClassName}>Algo que a agência deveria ajustar na próxima semana? <span className="font-normal text-white/40">(opcional)</span></Label><Textarea id="agencyAdjustment" name="agencyAdjustment" value={formData.agencyAdjustment} onChange={handleChange} placeholder="Descreva qualquer ajuste, prioridade ou ponto de atenção..." rows={3} /></div>
-          </Card>
-
-          <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setLocation(standalone ? "/" : "/dashboard")} className="h-11 rounded-xl border-white/15 bg-transparent px-5 text-white/70 hover:bg-white/5 hover:text-white">Cancelar</Button>
-            <Button type="submit" disabled={loading || unitSelectDisabled} className="h-11 gap-2 rounded-xl bg-emerald-300 px-5 font-semibold text-[#06120b] shadow-[0_8px_24px_rgba(110,231,183,0.16)] hover:bg-emerald-200"><Send className="size-4" />{loading ? "Salvando..." : "Enviar feedback semanal"}</Button>
-          </div>
-        </form>
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <FormSection step="1" title="Identificação" description="Quem preenche, a unidade e a semana analisada.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Responsável pelo preenchimento" htmlFor="responsible" required error={required("responsible")}>
+              <Input id="responsible" name="responsible" size="lg" value={formData.responsible} onChange={handleChange} placeholder="Nome do gerente ou vendedor" aria-invalid={Boolean(required("responsible"))} />
+            </Field>
+            <Field label="Unidade" htmlFor="unit" required error={required("unit")} hint={!clientsLoading && units.length === 0 ? "Nenhuma unidade disponível para este usuário." : undefined}>
+              <Select
+                id="unit"
+                size="lg"
+                value={formData.unit}
+                onValueChange={(v) => set("unit", v)}
+                disabled={unitSelectDisabled}
+                invalid={Boolean(required("unit"))}
+                placeholder={clientsLoading ? "Carregando unidades…" : "Selecione a unidade"}
+                options={units.map((u) => ({ value: u, label: u }))}
+              />
+            </Field>
+            <Field label="Início da semana" htmlFor="weekStart" required error={required("weekStart")}>
+              <DatePicker
+                id="weekStart"
+                size="lg"
+                value={formData.weekStart}
+                invalid={Boolean(required("weekStart"))}
+                onChange={(iso) => setFormData((previous) => ({ ...previous, weekStart: iso, weekEnd: previous.weekEnd && previous.weekEnd >= iso ? previous.weekEnd : addDays(iso, 6) }))}
+              />
+            </Field>
+            <Field label="Fim da semana" htmlFor="weekEnd" required error={required("weekEnd") ?? (formData.weekStart && formData.weekEnd && formData.weekEnd < formData.weekStart ? "O fim não pode vir antes do início." : undefined)} hint="Sugerido automaticamente: 7 dias.">
+              <DatePicker id="weekEnd" size="lg" value={formData.weekEnd} min={formData.weekStart || undefined} invalid={Boolean(required("weekEnd"))} onChange={(iso) => set("weekEnd", iso)} />
+            </Field>
+          </div>
+        </FormSection>
+
+        <FormSection step="2" title="Leads da semana" description="Do recebimento ao desfecho. Os números precisam fechar entre si.">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+            {COUNT_FIELDS.map((f) => (
+              <Field key={f.name} label={f.label} htmlFor={f.name} required error={countErrors[f.name] ?? required(f.name)}>
+                <Input
+                  id={f.name}
+                  name={f.name}
+                  size="lg"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={formData[f.name]}
+                  onChange={handleChange}
+                  placeholder="0"
+                  aria-invalid={Boolean(countErrors[f.name] ?? required(f.name))}
+                  className="tabular-nums"
+                />
+              </Field>
+            ))}
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Principal motivo de perda" htmlFor="lossReason" required error={required("lossReason")}>
+              <Select id="lossReason" size="lg" value={formData.lossReason} onValueChange={(v) => set("lossReason", v)} invalid={Boolean(required("lossReason"))} placeholder="Selecione o motivo" options={LOSS_REASONS.map((r) => ({ value: r, label: r }))} />
+            </Field>
+            <RatingField label="Qualidade geral dos leads" value={formData.leadQuality} onChange={(v) => set("leadQuality", v)} low="muito baixa" high="muito alta" error={required("leadQuality")} />
+          </div>
+          <Field label="Observações" htmlFor="observations" optional className="mt-5">
+            <Textarea id="observations" name="observations" value={formData.observations} onChange={handleChange} placeholder="Algum contexto importante sobre os leads da semana?" rows={3} />
+          </Field>
+        </FormSection>
+
+        <FormSection step="3" title="Entrega da agência" description="Sua percepção orienta a próxima semana da Tráfego Pro.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <RatingField label="Satisfação com a Tráfego Pro" value={formData.agencySatisfaction} onChange={(v) => set("agencySatisfaction", v)} low="muito insatisfeito" high="muito satisfeito" error={required("agencySatisfaction")} />
+            <Field label="A comunicação com a agência foi clara?" required error={required("communicationClarity")}>
+              <SegmentedControl
+                aria-label="A comunicação com a agência foi clara?"
+                value={formData.communicationClarity as (typeof COMMUNICATION_OPTIONS)[number]}
+                onValueChange={(v) => set("communicationClarity", v)}
+                fullWidth
+                options={COMMUNICATION_OPTIONS.map((o) => ({ value: o, label: o }))}
+              />
+            </Field>
+          </div>
+          <Field label="Algo que a agência deveria ajustar na próxima semana?" htmlFor="agencyAdjustment" optional className="mt-5">
+            <Textarea id="agencyAdjustment" name="agencyAdjustment" value={formData.agencyAdjustment} onChange={handleChange} placeholder="Ajustes, prioridades ou pontos de atenção" rows={3} />
+          </Field>
+        </FormSection>
+
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" size="lg" onClick={() => setLocation(standalone ? "/" : "/dashboard")}>Cancelar</Button>
+          <Button type="submit" variant="primary" size="lg" loading={loading} disabled={unitSelectDisabled}>
+            <Send />
+            {loading ? "Enviando…" : "Enviar feedback"}
+          </Button>
+        </div>
+      </form>
+    </Page>
   );
 
   return standalone ? <StandaloneFeedbackShell userName={user.name} onLogout={logout}>{content}</StandaloneFeedbackShell> : <AppLayout>{content}</AppLayout>;

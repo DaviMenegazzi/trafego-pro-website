@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "wouter";
-import { CalendarDays, ChevronDown, ChevronUp, Download, Inbox, RefreshCw, ShieldCheck } from "lucide-react";
+import { useLocation } from "wouter";
+import { Download, FileSpreadsheet, Inbox, Plus, RefreshCw } from "lucide-react";
+import { Button, DateRangePicker, EmptyState, IconButton, MenuButton, Page, PageHeader, Select, Sheet, Surface } from "@/components/ds";
+import { formatDate, formatDateRange, formatDateTime, formatNumber, formatRatio } from "@/lib/format";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 
@@ -44,19 +46,6 @@ function useAdminGuard() {
   }, [setLocation]);
 }
 
-function formatDate(value: string): string {
-  const parsed = new Date(`${value}T12:00:00`);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("pt-BR");
-}
-
-function NumberMetric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl border border-border/60 bg-background/40 px-3 py-2"><div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</div><div className="mt-1 text-lg font-semibold text-foreground">{value}</div></div>;
-}
-
-function DetailBox({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div className="rounded-xl border border-border/60 bg-background/30 p-4"><h3 className="text-xs font-semibold text-foreground">{title}</h3><div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{children}</div></div>;
-}
-
 export default function DashboardFeedbackLeadsList() {
   useAdminGuard();
   const [, setLocation] = useLocation();
@@ -64,7 +53,7 @@ export default function DashboardFeedbackLeadsList() {
   const [unit, setUnit] = useState("");
   const [weekStart, setWeekStart] = useState("");
   const [weekEnd, setWeekEnd] = useState("");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
@@ -112,50 +101,150 @@ export default function DashboardFeedbackLeadsList() {
     finally { setExporting(false); }
   };
 
+  const open = feedbacks.find((f) => f.id === openId) ?? null;
+
   return (
     <AppLayout>
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 md:px-8">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-primary"><ShieldCheck className="size-4" /> Área administrativa</div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Feedbacks semanais de leads</h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Consulte os retornos enviados pelas unidades. Os registros ficam armazenados na base SQL interna do projeto.</p>
+      <Page>
+        <PageHeader
+          title="Feedbacks enviados"
+          subtitle="Retornos semanais das unidades sobre leads e sobre a entrega da agência."
+          actions={
+            <>
+              <IconButton label="Atualizar" icon={<RefreshCw className={loading ? "animate-spin" : undefined} />} onClick={() => void fetchFeedbacks()} disabled={loading} />
+              <MenuButton
+                label="Exportar"
+                icon={<Download />}
+                disabled={exporting}
+                items={[{ label: exporting ? "Preparando planilha…" : "Planilha com todos os feedbacks", hint: "Todas as unidades e semanas", icon: <FileSpreadsheet />, onSelect: () => void exportAll() }]}
+              />
+              <Button variant="primary" onClick={() => setLocation("/dashboard/feedback-leads")}>
+                <Plus />
+                Novo feedback
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              aria-label="Unidade"
+              value={unit}
+              onValueChange={setUnit}
+              className="w-60"
+              options={[{ value: "", label: "Todas as unidades" }, ...units.map((item) => ({ value: item, label: item }))]}
+              placeholder="Todas as unidades"
+            />
+            <DateRangePicker
+              aria-label="Semanas"
+              value={{ start: weekStart, end: weekEnd }}
+              onChange={(range) => { setWeekStart(range.start); setWeekEnd(range.end); }}
+              placeholder="Todas as semanas"
+              className="w-auto"
+            />
+            {(unit || weekStart || weekEnd) && (
+              <Button variant="ghost" size="sm" onClick={() => { setUnit(""); setWeekStart(""); setWeekEnd(""); }}>Limpar filtros</Button>
+            )}
+            <span className="ml-auto text-sm text-zinc-400" aria-live="polite">{loading ? "Carregando…" : `${formatNumber(feedbacks.length)} ${feedbacks.length === 1 ? "registro" : "registros"}`}</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/dashboard/feedback-leads" className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">Novo feedback</Link>
-            <button onClick={exportAll} disabled={exporting} className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-opacity hover:bg-primary/15 disabled:opacity-60" type="button"><Download className="size-3.5" />{exporting ? "Preparando..." : "Baixar banco completo"}</button>
-            <button onClick={fetchFeedbacks} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90" type="button"><RefreshCw className="size-3.5" /> Atualizar</button>
-          </div>
-        </header>
+        </PageHeader>
 
-        <section className="grid gap-3 rounded-2xl border border-border/70 bg-card/60 p-4 shadow-sm md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-end">
-          <label className="space-y-2 text-xs font-medium text-foreground"><span>Unidade</span><select value={unit} onChange={(event) => setUnit(event.target.value)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"><option value="">Todas as unidades</option>{units.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-          <label className="space-y-2 text-xs font-medium text-foreground"><span>Semana inicial</span><input type="date" value={weekStart} onChange={(event) => setWeekStart(event.target.value)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40" /></label>
-          <label className="space-y-2 text-xs font-medium text-foreground"><span>Semana final</span><input type="date" value={weekEnd} onChange={(event) => setWeekEnd(event.target.value)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40" /></label>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground md:pb-3"><CalendarDays className="size-4 text-primary" /> {feedbacks.length} registro{feedbacks.length === 1 ? "" : "s"}</div>
-        </section>
+        <Surface className="overflow-hidden">
+          {loading && feedbacks.length === 0 ? (
+            <EmptyState title="Carregando feedbacks…" />
+          ) : feedbacks.length === 0 ? (
+            <EmptyState icon={<Inbox />} title="Nenhum feedback encontrado" description="Quando uma unidade enviar o formulário semanal, ele aparece aqui." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[880px] text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.06] text-left text-xs text-zinc-500">
+                    <th scope="col" className="py-2.5 pl-5 pr-3 font-medium">Unidade</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Semana</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Responsável</th>
+                    <th scope="col" className="px-3 py-2.5 text-right font-medium">Recebidos</th>
+                    <th scope="col" className="px-3 py-2.5 text-right font-medium">Fecharam</th>
+                    <th scope="col" className="px-3 py-2.5 text-right font-medium">Conversão</th>
+                    <th scope="col" className="px-3 py-2.5 text-right font-medium">Qualidade</th>
+                    <th scope="col" className="py-2.5 pl-3 pr-5 text-right font-medium">Satisfação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.05]">
+                  {feedbacks.map((feedback) => (
+                    <tr key={feedback.id} className="whitespace-nowrap tabular-nums text-zinc-300 transition-colors hover:bg-white/[0.02]">
+                      <td className="py-3 pl-5 pr-3">
+                        <button type="button" onClick={() => setOpenId(feedback.id)} className="rounded-md text-left font-medium text-zinc-100 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+                          {feedback.unit}
+                        </button>
+                      </td>
+                      <td className="px-3 py-3">{formatDateRange(feedback.weekStart, feedback.weekEnd)}</td>
+                      <td className="max-w-[180px] truncate px-3 py-3 text-zinc-400">{feedback.responsible}</td>
+                      <td className="px-3 py-3 text-right">{formatNumber(feedback.totalLeads)}</td>
+                      <td className="px-3 py-3 text-right font-medium text-white">{formatNumber(feedback.leadsConverted)}</td>
+                      <td className="px-3 py-3 text-right">{feedback.totalLeads > 0 ? formatRatio(feedback.leadsConverted / feedback.totalLeads) : "—"}</td>
+                      <td className="px-3 py-3 text-right">{feedback.leadQuality ? `${feedback.leadQuality}/5` : "—"}</td>
+                      <td className="py-3 pl-3 pr-5 text-right">{feedback.agencySatisfaction ? `${feedback.agencySatisfaction}/5` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Surface>
+      </Page>
 
-        {loading && <div className="rounded-2xl border border-border/70 bg-card/60 p-10 text-center text-sm text-muted-foreground">Carregando feedbacks...</div>}
-        {!loading && feedbacks.length === 0 && <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-card/40 px-6 py-16 text-center"><Inbox className="mb-3 size-10 text-muted-foreground/50" /><h2 className="text-base font-semibold text-foreground">Nenhum feedback encontrado</h2><p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">Quando uma unidade enviar o formulário semanal, o registro aparecerá aqui.</p></div>}
-
-        {!loading && feedbacks.length > 0 && <div className="space-y-3">
-          {feedbacks.map((feedback) => {
-            const expanded = expandedId === feedback.id;
-            return <article key={feedback.id} className="overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm">
-              <button type="button" onClick={() => setExpandedId(expanded ? null : feedback.id)} className="flex w-full items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-muted/20 md:px-5">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-sm font-semibold text-primary">{feedback.unit.slice(0, 2).toUpperCase()}</div>
-                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h2 className="truncate text-sm font-semibold text-foreground">{feedback.unit}</h2><span className="text-xs text-muted-foreground">{formatDate(feedback.weekStart)} a {formatDate(feedback.weekEnd)}</span></div><p className="mt-1 text-xs text-muted-foreground">{feedback.responsible} · {feedback.submittedByEmail || "utilizador autenticado"}</p></div>
-                <div className="hidden items-center gap-2 sm:flex"><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{feedback.totalLeads} leads</span><span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-500">{feedback.leadsConverted} convertidos</span></div>
-                {expanded ? <ChevronUp className="size-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="size-4 shrink-0 text-muted-foreground" />}
-              </button>
-              {expanded && <div className="space-y-5 border-t border-border/60 px-4 py-5 md:px-5">
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3"><NumberMetric label="Recebidos" value={feedback.totalLeads} /><NumberMetric label="Contatados" value={feedback.leadsContacted} /><NumberMetric label="Responderam" value={feedback.leadsResponded} /><NumberMetric label="Convertidos" value={feedback.leadsConverted} /><NumberMetric label="Perdidos" value={feedback.leadsLost} /><NumberMetric label="Em negociação" value={feedback.leadsInNegotiation} /></div>
-                <div className="grid gap-4 md:grid-cols-3"><DetailBox title="Motivo principal de perda">{feedback.lossReason || "Não informado"}</DetailBox><DetailBox title="Qualidade geral dos leads">{feedback.leadQuality ? `${feedback.leadQuality}/5` : "Não informado"}</DetailBox><DetailBox title="Satisfação com a agência">{feedback.agencySatisfaction ? `${feedback.agencySatisfaction}/5` : "Não informado"}</DetailBox><DetailBox title="Comunicação com a agência">{feedback.communicationClarity || "Não informado"}</DetailBox><DetailBox title="Observações livres">{feedback.observations || "Não informado"}</DetailBox><DetailBox title="Ajustes para próxima semana">{feedback.agencyAdjustment || "Não informado"}</DetailBox></div>
-              </div>}
-            </article>;
-          })}
-        </div>}
-      </div>
+      <Sheet
+        open={Boolean(open)}
+        onOpenChange={(value) => { if (!value) setOpenId(null); }}
+        title={open ? `${open.unit} · ${formatDateRange(open.weekStart, open.weekEnd)}` : "Feedback"}
+        description={open ? `Enviado por ${open.responsible}${open.submittedByEmail ? ` (${open.submittedByEmail})` : ""} em ${formatDateTime(open.submittedAt)}` : undefined}
+      >
+        {open && <FeedbackDetail feedback={open} />}
+      </Sheet>
     </AppLayout>
+  );
+}
+
+function FeedbackDetail({ feedback }: { feedback: Feedback }) {
+  const funnel = [
+    { label: "Recebidos", value: feedback.totalLeads },
+    { label: "Contatados", value: feedback.leadsContacted },
+    { label: "Responderam", value: feedback.leadsResponded },
+    { label: "Fecharam", value: feedback.leadsConverted },
+  ];
+  const max = Math.max(1, feedback.totalLeads);
+  const texts: [string, string][] = [
+    ["Motivo principal de perda", feedback.lossReason || "Não informado"],
+    ["Qualidade dos leads", feedback.leadQuality ? `${feedback.leadQuality}/5` : "Não informado"],
+    ["Satisfação com a agência", feedback.agencySatisfaction ? `${feedback.agencySatisfaction}/5` : "Não informado"],
+    ["Comunicação clara", feedback.communicationClarity || "Não informado"],
+    ["Observações", feedback.observations || "—"],
+    ["Ajustes para a próxima semana", feedback.agencyAdjustment || "—"],
+  ];
+  return (
+    <div className="space-y-6">
+      <section aria-label="Funil da semana" className="space-y-2.5">
+        {funnel.map((step) => (
+          <div key={step.label} className="grid grid-cols-[7rem_1fr_3rem] items-center gap-3 text-sm">
+            <span className="text-zinc-400">{step.label}</span>
+            <span className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+              <span className="block h-full rounded-full bg-zinc-300" style={{ width: `${(step.value / max) * 100}%` }} />
+            </span>
+            <span className="text-right font-medium tabular-nums text-white">{formatNumber(step.value)}</span>
+          </div>
+        ))}
+        <p className="pt-1 text-xs text-zinc-500">
+          Perdidos: {formatNumber(feedback.leadsLost)} · Em negociação: {formatNumber(feedback.leadsInNegotiation)}
+        </p>
+      </section>
+      <dl className="space-y-4 border-t border-white/[0.06] pt-5">
+        {texts.map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-xs text-zinc-500">{label}</dt>
+            <dd className="mt-0.5 whitespace-pre-wrap text-sm leading-6 text-zinc-200">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-xs text-zinc-600">Semana de {formatDate(feedback.weekStart)} a {formatDate(feedback.weekEnd)}</p>
+    </div>
   );
 }

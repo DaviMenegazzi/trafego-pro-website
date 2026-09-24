@@ -57,3 +57,50 @@ export function getAuthorizedUnitNames(
     .map((client) => client.name)
     .filter((name, index, names) => Boolean(name) && names.indexOf(name) === index);
 }
+
+export type FeedbackCounts = {
+  totalLeads: string;
+  leadsContacted: string;
+  leadsResponded: string;
+  leadsConverted: string;
+  leadsLost: string;
+  leadsInNegotiation: string;
+};
+
+/**
+ * Coerência do funil semanal: ninguém é contatado sem ter chegado, ninguém
+ * responde sem ter sido contatado, e o desfecho (fechou, perdeu, negociando)
+ * não passa de quem respondeu. Campos vazios não geram erro aqui (o
+ * obrigatório é tratado à parte).
+ */
+export function validateFeedbackCounts(counts: FeedbackCounts): Partial<Record<keyof FeedbackCounts, string>> {
+  const value = (key: keyof FeedbackCounts) => (counts[key] === "" ? null : Number(counts[key]));
+  const errors: Partial<Record<keyof FeedbackCounts, string>> = {};
+  const total = value("totalLeads");
+  const contacted = value("leadsContacted");
+  const responded = value("leadsResponded");
+  const converted = value("leadsConverted");
+  const lost = value("leadsLost");
+  const negotiating = value("leadsInNegotiation");
+
+  (Object.keys(counts) as (keyof FeedbackCounts)[]).forEach((key) => {
+    const v = value(key);
+    if (v !== null && (!Number.isInteger(v) || v < 0)) errors[key] = "Use um número inteiro, zero ou maior.";
+  });
+
+  if (total !== null && contacted !== null && contacted > total && !errors.leadsContacted) {
+    errors.leadsContacted = `Não pode passar dos ${total} recebidos.`;
+  }
+  if (contacted !== null && responded !== null && responded > contacted && !errors.leadsResponded) {
+    errors.leadsResponded = `Não pode passar dos ${contacted} contatados.`;
+  }
+  if (responded !== null && converted !== null && lost !== null && negotiating !== null) {
+    const outcome = converted + lost + negotiating;
+    if (outcome > responded && !errors.leadsConverted && !errors.leadsLost && !errors.leadsInNegotiation) {
+      errors.leadsInNegotiation = `Fecharam + perdidos + em negociação somam ${outcome}, mais que os ${responded} que responderam.`;
+    }
+  } else if (responded !== null && converted !== null && converted > responded && !errors.leadsConverted) {
+    errors.leadsConverted = `Não pode passar dos ${responded} que responderam.`;
+  }
+  return errors;
+}

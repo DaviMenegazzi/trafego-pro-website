@@ -716,38 +716,35 @@ export async function getMetaDirectCampaigns(
   });
 }
 
+// Capas de vídeo vêm como www.facebook.com/ads/image/?d=…, que só redireciona para a CDN.
+// Navegadores com proteção contra rastreamento (Edge, Brave, bloqueadores) barram o
+// facebook.com dentro do site e a miniatura some; a CDN (fbcdn.net) passa.
+function isFacebookRedirectImage(url: string): boolean {
+  try {
+    return /(^|\.)facebook\.com$/i.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function extractBestCreativeImageUrl(creative?: any): string | null {
   if (!creative) return null;
 
-  // 1. Imagem direta de alta resolução (1080x1080 / 1600x1600 da CDN Meta)
-  if (creative.image_url) {
-    return creative.image_url;
-  }
-
-  // 2. Thumbnail de vídeo em alta resolução do object_story_spec.video_data
-  if (creative.object_story_spec?.video_data?.image_url) {
-    return creative.object_story_spec.video_data.image_url;
-  }
-
-  // 3. Imagem do link do object_story_spec
-  if (creative.object_story_spec?.link_data?.picture) {
-    return creative.object_story_spec.link_data.picture;
-  }
-  if (creative.object_story_spec?.link_data?.image_url) {
-    return creative.object_story_spec.link_data.image_url;
-  }
-
-  // 4. Imagem de criativo dinâmico (asset_feed_spec)
-  if (Array.isArray(creative.asset_feed_spec?.images) && creative.asset_feed_spec.images[0]?.url) {
-    return creative.asset_feed_spec.images[0].url;
-  }
-
-  // 5. Fallback final para thumbnail
-  if (creative.thumbnail_url) {
-    return creative.thumbnail_url;
-  }
-
-  return null;
+  const candidates: Array<string | undefined> = [
+    // 1. Imagem direta de alta resolução (1080x1080 / 1600x1600 da CDN Meta)
+    creative.image_url,
+    // 2. Capa do vídeo no object_story_spec.video_data
+    creative.object_story_spec?.video_data?.image_url,
+    // 3. Imagem do link do object_story_spec
+    creative.object_story_spec?.link_data?.picture,
+    creative.object_story_spec?.link_data?.image_url,
+    // 4. Imagem de criativo dinâmico (asset_feed_spec)
+    Array.isArray(creative.asset_feed_spec?.images) ? creative.asset_feed_spec.images[0]?.url : undefined,
+    // 5. Miniatura (pedida em 1080px na consulta dos anúncios)
+    creative.thumbnail_url,
+  ];
+  const urls = candidates.filter((u): u is string => typeof u === "string" && u.length > 0);
+  return urls.find((u) => !isFacebookRedirectImage(u)) ?? urls[0] ?? null;
 }
 
 /**
@@ -781,7 +778,7 @@ export async function getMetaDirectOffers(
       insightsSubquery = `insights.date_preset(last_30d){spend,impressions,clicks,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type,date_start,date_stop}`;
     }
 
-    const url = `${GRAPH_API_BASE}/${actId}/ads?fields=id,name,status,effective_status,campaign{id,name},adset{id,name},creative{id,name,image_url,thumbnail_url,object_story_spec,asset_feed_spec},${insightsSubquery}&limit=100&access_token=${encodeURIComponent(token)}`;
+    const url = `${GRAPH_API_BASE}/${actId}/ads?fields=id,name,status,effective_status,campaign{id,name},adset{id,name},creative.thumbnail_width(1080).thumbnail_height(1080){id,name,image_url,thumbnail_url,object_story_spec,asset_feed_spec},${insightsSubquery}&limit=100&access_token=${encodeURIComponent(token)}`;
 
     try {
       const res: Response = await resilientFetch(url);

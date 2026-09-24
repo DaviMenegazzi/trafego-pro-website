@@ -228,6 +228,21 @@ describe("metaDirectService", () => {
       expect(extractBestCreativeImageUrl(creative)).toBe("https://scontent.fbcdn.net/video_cover_hd.jpg");
     });
 
+    it("prefere a miniatura da CDN à capa de vídeo servida por www.facebook.com", () => {
+      const creative = {
+        object_story_spec: {
+          video_data: { image_url: "https://www.facebook.com/ads/image/?d=abc" },
+        },
+        thumbnail_url: "https://scontent.fbcdn.net/p1080x1080_thumb.jpg",
+      };
+      expect(extractBestCreativeImageUrl(creative)).toBe("https://scontent.fbcdn.net/p1080x1080_thumb.jpg");
+    });
+
+    it("usa a URL do facebook.com quando não há alternativa", () => {
+      const creative = { object_story_spec: { video_data: { image_url: "https://www.facebook.com/ads/image/?d=abc" } } };
+      expect(extractBestCreativeImageUrl(creative)).toBe("https://www.facebook.com/ads/image/?d=abc");
+    });
+
     it("retorna null de forma segura para creative ausente", () => {
       expect(extractBestCreativeImageUrl(undefined)).toBeNull();
     });

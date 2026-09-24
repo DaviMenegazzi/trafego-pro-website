@@ -102,7 +102,7 @@ function Thumb({ row, className, fit = "cover" }: { row: AdRow; className?: stri
   if (!row.ad_image_url || failed) {
     const initial = (row.offer_name || cleanDisplayName(row) || "?").trim().charAt(0).toUpperCase();
     return (
-      <div className={cn("flex items-center justify-center rounded-lg bg-white/[0.05] font-display font-semibold text-zinc-500", className)} aria-hidden>
+      <div className={cn("flex items-center justify-center rounded-lg bg-white/[0.05] font-display font-semibold text-zinc-500", className, fit === "contain" && "h-48 text-4xl")} aria-hidden>
         {initial}
       </div>
     );

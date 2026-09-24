@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ds";
-import { GRADE_STYLE, PredictiveAnalysis, STATUS_META, STATUS_STRIPE, STRIPE_BASE, goalLabel, type PredictiveUnitProfile } from "@/components/DeepAnalyticsAccordion";
+import { GRADE_STYLE, PredictiveAnalysis, STATUS_META, goalLabel, type PredictiveUnitProfile } from "@/components/DeepAnalyticsAccordion";
 import { formatCurrency, formatNumber, formatRatio } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -322,7 +322,7 @@ export default function AdminMetricsOverviewPage() {
               const gp = p.goalProbability;
               const pct = gp.totalTarget > 0 ? gp.currentLeads / gp.totalTarget : 0;
               return (
-                <div key={p.unitId} className={cn(STRIPE_BASE, STATUS_STRIPE[p.statusFlag])}>
+                <div key={p.unitId}>
                   <button
                     type="button"
                     aria-expanded={isOpen}

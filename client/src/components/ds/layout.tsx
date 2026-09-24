@@ -188,8 +188,6 @@ export function StatTile({
         className,
       )}
     >
-      {/* Filete no topo com a cor do assunto: guia o olhar sem pintar o número. */}
-      <span aria-hidden className={cn("pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r to-transparent opacity-80", ACCENTS[accent].glow)} />
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 truncate pt-0.5 text-sm text-zinc-400">{label}</p>
         {icon && <IconChip icon={icon} accent={accent} size="sm" />}

@@ -140,12 +140,12 @@ export function TabDashboard({ dbState }: TabDashboardProps) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={<Landmark />} accent="aqua" trend={chartData.map((m) => m.receita)} label="Receita" value={formatCurrency(d.receita)} hint={`${d.paidUnitsCount} unidades pagaram · ticket ${formatCurrency(d.ticketMedio)}`} />
-        <StatTile icon={<Receipt />} accent="orange" trend={chartData.map((m) => m.despesas)} label="Despesas pagas" value={formatCurrency(d.despesas)} hint={`${d.paidDespesasCount} lançamentos`} />
+        <StatTile icon={<Landmark />} accent="aqua" label="Receita" value={formatCurrency(d.receita)} hint={`${d.paidUnitsCount} unidades pagaram · ticket ${formatCurrency(d.ticketMedio)}`} />
+        <StatTile icon={<Receipt />} accent="orange" label="Despesas pagas" value={formatCurrency(d.despesas)} hint={`${d.paidDespesasCount} lançamentos`} />
         <StatTile
           icon={<Coins />}
           accent="blue"
-          trend={chartData.map((m) => m.lucro)}
+         
           label="Lucro"
           value={formatCurrency(d.lucro)}
           hint={d.receita > 0 ? `Margem ${formatPercent(d.margem)}` : undefined}

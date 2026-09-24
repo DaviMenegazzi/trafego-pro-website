@@ -131,7 +131,6 @@ export function TalentFormsList({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredForms.map((f) => (
             <Surface key={f.id} as="article" className="group relative flex flex-col overflow-hidden p-5 transition-all duration-200 hover:-translate-y-px hover:border-emerald-400/25">
-              <span aria-hidden className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r to-transparent ${f.isPublished ? "from-emerald-400/70" : "from-amber-400/60"}`} />
               <div className="flex items-start justify-between gap-3">
                 <StatusBadge tone={f.isPublished ? "good" : "warning"}>{f.isPublished ? "Publicado" : "Rascunho"}</StatusBadge>
                 <div className="relative z-10 -mr-2 -mt-1.5">

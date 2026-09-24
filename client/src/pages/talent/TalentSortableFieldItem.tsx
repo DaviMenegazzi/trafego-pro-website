@@ -91,9 +91,9 @@ export function TalentSortableFieldItem({
         isDragging ? "z-30 border-emerald-500/60 bg-zinc-900 shadow-2xl" : "border-white/[0.08] bg-zinc-900/60 hover:border-white/15"
       }`}
     >
-      <div className="flex items-start gap-2 p-3 sm:p-4">
-        {/* Alça e setas: aparecem no hover/foco; as setas são o caminho de teclado para reordenar. */}
-        <div className="flex flex-col items-center gap-0.5 opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+      <div className="flex items-center gap-2 px-3 py-2.5 sm:px-4">
+        {/* Alça à esquerda; as setas (caminho de teclado para reordenar) ficam à direita, no hover/foco. */}
+        <div className="opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <Tooltip content="Arraste para reordenar">
             <button
               type="button"
@@ -105,17 +105,15 @@ export function TalentSortableFieldItem({
               <GripVertical className="size-4" />
             </button>
           </Tooltip>
-          <IconButton size="sm" label="Mover para cima" icon={<ChevronUp />} onClick={() => onMoveUp(index)} disabled={index === 0} />
-          <IconButton size="sm" label="Mover para baixo" icon={<ChevronDown />} onClick={() => onMoveDown(index)} disabled={index === totalFields - 1} />
         </div>
 
-        <div className="min-w-0 flex-1 pt-1">
+        <div className="min-w-0 flex-1">
           <button type="button" onClick={() => onEdit(field)} className="w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
             <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className="text-xs tabular-nums text-zinc-500">{index + 1}.</span>
-              <span className="break-words text-base font-medium text-zinc-100">{field.label}</span>
+              <span className="break-words text-sm font-medium text-zinc-100">{field.label}</span>
             </span>
-            <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
               <span className="inline-flex items-center gap-1.5"><IconComponent className="size-3.5" />{typeConfig?.label ?? field.fieldType}</span>
               {choices && <span>{field.options.length} {field.options.length === 1 ? "opção" : "opções"}{field.options.length > 0 ? `: ${field.options.slice(0, 3).map((o) => o.label).join(", ")}${field.options.length > 3 ? "…" : ""}` : ""}</span>}
               {field.helpText && <span className="truncate">{field.helpText}</span>}
@@ -123,7 +121,11 @@ export function TalentSortableFieldItem({
           </button>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 pt-1">
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="flex items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-sm:hidden">
+            <IconButton size="sm" label="Mover para cima" icon={<ChevronUp />} onClick={() => onMoveUp(index)} disabled={index === 0} />
+            <IconButton size="sm" label="Mover para baixo" icon={<ChevronDown />} onClick={() => onMoveDown(index)} disabled={index === totalFields - 1} />
+          </div>
           <label htmlFor={requiredId} className="hidden cursor-pointer text-xs text-zinc-400 sm:inline">Obrigatória</label>
           <Switch id={requiredId} aria-label="Pergunta obrigatória" checked={field.isRequired} onCheckedChange={() => onToggleRequired(field)} />
           <ActionsMenu

@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { Despesa } from "../types";
@@ -42,17 +43,17 @@ export function ModalEditarDespesa({
 
   const handleSave = async () => {
     if (!nome.trim()) {
-      alert("Informe o nome da despesa.");
+      toast.error("Informe o nome da despesa.");
       return;
     }
     const numVal = parseFloat(String(val));
     if (!numVal || numVal <= 0) {
-      alert("Informe um valor válido.");
+      toast.error("Informe um valor válido.");
       return;
     }
     const numDia = parseInt(String(dia));
     if (!numDia || numDia < 1 || numDia > 31) {
-      alert("Informe um dia de pagamento válido (1-31).");
+      toast.error("Informe um dia de pagamento válido (1-31).");
       return;
     }
 
@@ -69,7 +70,7 @@ export function ModalEditarDespesa({
       });
       onClose();
     } catch (err: any) {
-      alert("Erro ao salvar despesa: " + err.message);
+      toast.error("Erro ao salvar despesa: " + err.message);
     } finally {
       setSaving(false);
     }

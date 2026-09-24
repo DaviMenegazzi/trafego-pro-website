@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ds";
 import { useState } from "react";
 import {
   Building2,
@@ -125,15 +126,16 @@ export function FormSubmissionDetailModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
+            <Tooltip content={"Copiar resumo textual"}>
+              <button
               type="button"
               onClick={copyDataAsText}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/10 hover:text-white transition"
-              title="Copiar resumo textual"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/10 hover:text-white transition" aria-label={"Copiar resumo textual"}
             >
               {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
               {copied ? "Copiado" : "Copiar"}
             </button>
+            </Tooltip>
 
             <button
               type="button"

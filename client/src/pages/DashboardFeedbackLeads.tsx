@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ds";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
@@ -152,7 +153,9 @@ function DashboardFeedbackLeadsContent({ standalone = false }: { standalone?: bo
     <div className="feedback-form-shell flex-1 overflow-auto">
       <div className={FEEDBACK_LAYOUT.page}>
         <div className="flex items-start gap-3 sm:gap-4">
-          <button onClick={() => setLocation(standalone ? "/" : "/dashboard")} className="mt-0.5 rounded-xl border border-white/10 p-2.5 text-white/60 transition-colors hover:border-white/25 hover:bg-white/5 hover:text-white" title="Voltar"><ArrowLeft className="size-5" /></button>
+          <Tooltip content={"Voltar"}>
+            <button onClick={() => setLocation(standalone ? "/" : "/dashboard")} className="mt-0.5 rounded-xl border border-white/10 p-2.5 text-white/60 transition-colors hover:border-white/25 hover:bg-white/5 hover:text-white" aria-label={"Voltar"}><ArrowLeft className="size-5" /></button>
+          </Tooltip>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Feedback Semanal de Leads{formData.unit ? ` — ${formData.unit}` : ""}</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55 sm:text-base">Registre o panorama dos leads e a percepção da unidade sobre a entrega da Tráfego Pro.</p>

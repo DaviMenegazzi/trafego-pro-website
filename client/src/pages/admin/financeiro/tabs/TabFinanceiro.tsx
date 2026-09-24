@@ -1,3 +1,4 @@
+import { toastWithUndo, Tooltip, useConfirm } from "@/components/ds";
 import { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -66,6 +67,7 @@ export function TabFinanceiro({
   onSelectClient,
   onCobrancaUpdated,
 }: TabFinanceiroProps) {
+  const { confirm } = useConfirm();
   const { clients: metaAccounts } = useClientContext();
 
   // Form states for new unit
@@ -142,29 +144,29 @@ export function TabFinanceiro({
 
   const handleCadastrarUnidade = async () => {
     if (!nome.trim()) {
-      alert("Informe o nome da unidade.");
+      toast.error("Informe o nome da unidade.");
       return;
     }
     const cleanCnpj = cnpj.replace(/\D/g, "");
     if (!cnpj || cleanCnpj.length !== 14) {
-      alert("Informe um CNPJ completo no formato 00.000.000/0000-00.");
+      toast.error("Informe um CNPJ completo no formato 00.000.000/0000-00.");
       return;
     }
     if (!validarCNPJ(cnpj)) {
-      alert("O CNPJ informado é inválido. Verifique os dígitos.");
+      toast.error("O CNPJ informado é inválido. Verifique os dígitos.");
       return;
     }
     if (!vencDia) {
-      alert("Selecione o dia de vencimento.");
+      toast.error("Selecione o dia de vencimento.");
       return;
     }
     const numVal = parseFloat(String(mensalidade));
     if (!numVal || numVal <= 0) {
-      alert("Informe o valor da mensalidade.");
+      toast.error("Informe o valor da mensalidade.");
       return;
     }
     if (!mesInicial) {
-      alert("Selecione o primeiro mês de cobrança.");
+      toast.error("Selecione o primeiro mês de cobrança.");
       return;
     }
 
@@ -172,7 +174,7 @@ export function TabFinanceiro({
       (c) => c.cnpj.replace(/\D/g, "") === cleanCnpj
     );
     if (dup) {
-      alert(`CNPJ já cadastrado para a unidade: ${dup.nome}`);
+      toast.error(`CNPJ já cadastrado para a unidade: ${dup.nome}`);
       return;
     }
 
@@ -234,7 +236,7 @@ export function TabFinanceiro({
 
       if (onClientRegistered) onClientRegistered(id);
     } catch (err: any) {
-      alert("Erro ao cadastrar unidade: " + err.message);
+      toast.error("Erro ao cadastrar unidade: " + err.message);
     }
   };
 
@@ -277,18 +279,18 @@ export function TabFinanceiro({
       setMsgCx("Salvo com sucesso!");
       setTimeout(() => setMsgCx(""), 3000);
     } catch (err: any) {
-      alert("Erro ao salvar caixa: " + err.message);
+      toast.error("Erro ao salvar caixa: " + err.message);
     }
   };
 
   const handleAddDespFixa = async () => {
     if (!dfNome.trim()) {
-      alert("Informe o nome da despesa fixa.");
+      toast.error("Informe o nome da despesa fixa.");
       return;
     }
     const val = parseFloat(String(dfVal));
     if (!val || val <= 0) {
-      alert("Informe um valor válido.");
+      toast.error("Informe um valor válido.");
       return;
     }
     const id = "df_" + Date.now();
@@ -304,9 +306,9 @@ export function TabFinanceiro({
   };
 
   const handleDeleteDespFixa = async (id: string) => {
-    if (confirm("Remover esta despesa fixa?")) {
-      await deleteDespesaFixa(id);
-    }
+    const ok = await confirm({ title: "Remover esta despesa fixa?", description: "Ela deixa de entrar na projeção de caixa.", tone: "danger", confirmLabel: "Remover" });
+    if (!ok) return;
+    await deleteDespesaFixa(id);
   };
 
   const persistCobranca = async (
@@ -327,7 +329,7 @@ export function TabFinanceiro({
     setSavingCobrancas((current) => ({ ...current, [operationKey]: true }));
     try {
       await saveCobranca(cid, mesKey, updated);
-      toast.success(successMessage);
+      if (successMessage) toast.success(successMessage);
       return true;
     } catch (error) {
       console.error("Firebase financial write error:", error);
@@ -423,25 +425,26 @@ export function TabFinanceiro({
     mesKey: string,
     clienteNome: string
   ) => {
-    if (
-      confirm(
-        `Desconfirmar o recebimento de "${clienteNome}" no mês selecionado?\n\nO status voltará para Pendente e o valor será removido da divisão societária.`
-      )
-    ) {
-      const existing = dbState.cobrancas?.[cid]?.[mesKey] || {
-        mes: MESES.find((m) => m.k === mesKey)?.l || mesKey,
-        boletoGerado: false,
-        nfGerada: false,
-      };
+    // Reversível: volta para pendente na hora e oferece "Desfazer" em vez de pedir confirmação.
+    const previous = dbState.cobrancas?.[cid]?.[mesKey];
+    const existing = previous || {
+      mes: MESES.find((m) => m.k === mesKey)?.l || mesKey,
+      boletoGerado: false,
+      nfGerada: false,
+    };
 
-      const updated: Cobranca = {
-        ...existing,
-        recebido: false,
-        valorRecebido: null,
-        divisao: null,
-      };
+    const updated: Cobranca = {
+      ...existing,
+      recebido: false,
+      valorRecebido: null,
+      divisao: null,
+    };
 
-      await persistCobranca(cid, mesKey, updated, "Recebimento voltou para pendente.");
+    const saved = await persistCobranca(cid, mesKey, updated, "");
+    if (saved && previous) {
+      toastWithUndo(`Recebimento de ${clienteNome} voltou para pendente.`, async () => {
+        await persistCobranca(cid, mesKey, previous, "Recebimento restaurado.");
+      });
     }
   };
 
@@ -1168,7 +1171,8 @@ export function TabFinanceiro({
                         </div>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
+                        <Tooltip content={cb.boletoGerado ? "Clique para desmarcar boleto" : "Clique para marcar boleto como gerado"}>
+                          <button
                           type="button"
                           disabled={Boolean(savingCobrancas[`${c.id}:${mesCobKey}`])}
                           onClick={() =>
@@ -1178,8 +1182,7 @@ export function TabFinanceiro({
                             cb.boletoGerado
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
                               : "bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white hover:border-white/20"
-                          }`}
-                          title={cb.boletoGerado ? "Clique para desmarcar boleto" : "Clique para marcar boleto como gerado"}
+                          }`} aria-label={cb.boletoGerado ? "Clique para desmarcar boleto" : "Clique para marcar boleto como gerado"}
                         >
                           <span
                             className={`size-3.5 rounded flex items-center justify-center text-[9px] font-bold ${
@@ -1190,9 +1193,11 @@ export function TabFinanceiro({
                           </span>
                           <span>{cb.boletoGerado ? "Gerado" : "Pendente"}</span>
                         </button>
+                        </Tooltip>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
+                        <Tooltip content={cb.nfGerada ? "Clique para desmarcar nota fiscal" : "Clique para marcar nota fiscal como gerada"}>
+                          <button
                           type="button"
                           disabled={Boolean(savingCobrancas[`${c.id}:${mesCobKey}`])}
                           onClick={() =>
@@ -1202,8 +1207,7 @@ export function TabFinanceiro({
                             cb.nfGerada
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
                               : "bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white hover:border-white/20"
-                          }`}
-                          title={cb.nfGerada ? "Clique para desmarcar nota fiscal" : "Clique para marcar nota fiscal como gerada"}
+                          }`} aria-label={cb.nfGerada ? "Clique para desmarcar nota fiscal" : "Clique para marcar nota fiscal como gerada"}
                         >
                           <span
                             className={`size-3.5 rounded flex items-center justify-center text-[9px] font-bold ${
@@ -1214,6 +1218,7 @@ export function TabFinanceiro({
                           </span>
                           <span>{cb.nfGerada ? "Gerada" : "Pendente"}</span>
                         </button>
+                        </Tooltip>
                       </td>
                       <td className="py-3 px-4">
                         {cb.recebido ? (
@@ -1222,7 +1227,8 @@ export function TabFinanceiro({
                               <Check className="size-3" />
                               <span>{fmtBRL(cb.valorRecebido)}</span>
                             </span>
-                            <button
+                            <Tooltip content={"Editar valor recebido"}>
+                              <button
                               type="button"
                               onClick={() => {
                                 setEditRecModal({
@@ -1232,22 +1238,23 @@ export function TabFinanceiro({
                                 });
                                 setEditRecInput(String(cb.valorRecebido || val));
                               }}
-                              className="text-zinc-500 hover:text-amber-400 p-1 transition-colors cursor-pointer"
-                              title="Editar valor recebido"
+                              className="text-zinc-500 hover:text-amber-400 p-1 transition-colors cursor-pointer" aria-label={"Editar valor recebido"}
                             >
                               <Pencil className="size-3.5" />
                             </button>
-                            <button
+                            </Tooltip>
+                            <Tooltip content={"Desconfirmar recebimento (voltar para pendente)"}>
+                              <button
                               type="button"
                               disabled={Boolean(savingCobrancas[`${c.id}:${mesCobKey}`])}
                               onClick={() =>
                                 handleDesconfirmarRecebimento(c.id, mesCobKey, c.nome)
                               }
-                              className="text-zinc-500 hover:text-red-400 p-1 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Desconfirmar recebimento (voltar para pendente)"
+                              className="text-zinc-500 hover:text-red-400 p-1 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" aria-label={"Desconfirmar recebimento (voltar para pendente)"}
                             >
                               <RotateCcw className="size-3.5" />
                             </button>
+                            </Tooltip>
                             <span className="text-[10px] text-zinc-500 font-mono">
                               div. em {cb.divisao?.em || "—"}
                             </span>

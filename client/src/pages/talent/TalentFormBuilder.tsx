@@ -1,3 +1,4 @@
+import { Tooltip, useConfirm } from "@/components/ds";
 import { useState, useRef } from "react";
 import {
   DndContext,
@@ -54,6 +55,7 @@ export function TalentFormBuilder({
   onFormChange,
   onDeleteForm,
 }: TalentFormBuilderProps) {
+  const { prompt } = useConfirm();
   const [editingField, setEditingField] = useState<TalentField | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -184,14 +186,18 @@ export function TalentFormBuilder({
   };
 
   const handleEditSlug = async () => {
-    const next = window.prompt("Defina o final do link público", form.publicSlug);
-    if (next === null || next.trim() === form.publicSlug) return;
-    const publicSlug = next.trim().toLowerCase();
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(publicSlug)) {
-      toast.error("Use apenas letras minúsculas, números e hífens no slug.");
-      return;
-    }
-    await onSave({ ...form, publicSlug });
+    const next = await prompt({
+      title: "Editar link público",
+      description: "Quem já tem o link antigo deixa de conseguir abrir a vaga.",
+      label: "Final do link",
+      prefix: "/trabalhe-conosco/",
+      defaultValue: form.publicSlug,
+      confirmLabel: "Salvar link",
+      validate: (value) =>
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? null : "Use letras minúsculas, números e hífens (ex.: vida-card-ijui).",
+    });
+    if (next === null || next === form.publicSlug) return;
+    await onSave({ ...form, publicSlug: next });
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -411,11 +417,11 @@ export function TalentFormBuilder({
               <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-300">
                 {publicUrl}
               </span>
-              <button
+              <Tooltip content={"Copiar link"}>
+                <button
                 type="button"
                 onClick={handleCopyLink}
-                className="rounded p-1 text-zinc-400 hover:text-white transition"
-                title="Copiar link"
+                className="rounded p-1 text-zinc-400 hover:text-white transition" aria-label={"Copiar link"}
               >
                 {copiedLink ? (
                   <Check className="size-3.5 text-emerald-400" />
@@ -423,14 +429,16 @@ export function TalentFormBuilder({
                   <Copy className="size-3.5" />
                 )}
               </button>
-              <button
+              </Tooltip>
+              <Tooltip content={"Editar link público"}>
+                <button
                 type="button"
                 onClick={() => void handleEditSlug()}
-                className="rounded p-1 text-zinc-400 hover:text-white transition"
-                title="Editar link público"
+                className="rounded p-1 text-zinc-400 hover:text-white transition" aria-label={"Editar link público"}
               >
                 <Pencil className="size-3.5" />
               </button>
+              </Tooltip>
             </div>
             <a
               href={publicUrl}

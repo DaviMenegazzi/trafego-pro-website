@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ds";
 import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -254,14 +255,15 @@ export function TalentCandidatesList({
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <button
+          <Tooltip content={"Atualizar lista"}>
+            <button
             type="button"
             onClick={onRefresh}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
-            title="Atualizar lista"
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition" aria-label={"Atualizar lista"}
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
           </button>
+          </Tooltip>
 
           <button
             type="button"

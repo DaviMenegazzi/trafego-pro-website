@@ -1,3 +1,5 @@
+import { Tooltip, useConfirm } from "@/components/ds";
+import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import type { Ata, DatabaseState } from "../types";
 import { PARTICIPANTES, now } from "../constants";
@@ -10,6 +12,7 @@ interface TabAtasProps {
 }
 
 export function TabAtas({ dbState, currentUser = "admin" }: TabAtasProps) {
+  const { confirm } = useConfirm();
   const [titulo, setTitulo] = useState("");
   const [demandante, setDemandante] = useState("");
   const [data, setData] = useState(() => new Date().toISOString().split("T")[0]);
@@ -28,23 +31,23 @@ export function TabAtas({ dbState, currentUser = "admin" }: TabAtasProps) {
 
   const handleSalvarAta = async () => {
     if (!titulo.trim()) {
-      alert("Informe o título da reunião.");
+      toast.error("Informe o título da reunião.");
       return;
     }
     if (!demandante) {
-      alert("Selecione quem abriu a demanda.");
+      toast.error("Selecione quem abriu a demanda.");
       return;
     }
     if (!data) {
-      alert("Informe a data da reunião.");
+      toast.error("Informe a data da reunião.");
       return;
     }
     if (!pauta.trim()) {
-      alert("Descreva o que foi tratado na reunião.");
+      toast.error("Descreva o que foi tratado na reunião.");
       return;
     }
     if (participantes.length === 0) {
-      alert("Selecione ao menos um participante.");
+      toast.error("Selecione ao menos um participante.");
       return;
     }
 
@@ -71,14 +74,15 @@ export function TabAtas({ dbState, currentUser = "admin" }: TabAtasProps) {
       setParticipantes([]);
       setShowNewAtaForm(false);
     } catch (err: any) {
-      alert("Erro ao registrar ata: " + err.message);
+      toast.error("Erro ao registrar ata: " + err.message);
     }
   };
 
   const handleDeleteAta = async (a: Ata) => {
-    if (confirm(`Excluir a ata "${a.titulo}"?`)) {
-      await deleteAta(a.id);
-    }
+    const ok = await confirm({ title: `Excluir a ata "${a.titulo}"?`, description: "A ata some para toda a equipe. Não dá para desfazer.", tone: "danger", confirmLabel: "Excluir ata" });
+    if (!ok) return;
+    await deleteAta(a.id);
+    toast.success("Ata excluída.");
   };
 
   const atasOrdenadas = useMemo(() => {
@@ -265,14 +269,15 @@ export function TabAtas({ dbState, currentUser = "admin" }: TabAtasProps) {
                     </div>
                   </div>
 
-                  <button
+                  <Tooltip content={"Excluir ata"}>
+                    <button
                     onClick={() => handleDeleteAta(a)}
-                    className="text-zinc-500 hover:text-red-400 p-1 transition-colors flex items-center gap-1 text-xs"
-                    title="Excluir ata"
+                    className="text-zinc-500 hover:text-red-400 p-1 transition-colors flex items-center gap-1 text-xs" aria-label={"Excluir ata"}
                   >
                     <Trash2 className="size-3.5" />
                     <span>Excluir</span>
                   </button>
+                  </Tooltip>
                 </div>
 
                 <div className="bg-zinc-900/70 border border-white/5 rounded-xl p-4 text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">

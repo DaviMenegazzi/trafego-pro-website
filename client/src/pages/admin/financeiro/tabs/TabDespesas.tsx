@@ -1,3 +1,5 @@
+import { Tooltip, useConfirm } from "@/components/ds";
+import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import type { Despesa, DatabaseState } from "../types";
 import { MESES, CATEGORIAS_DESP, fmtBRL, now } from "../constants";
@@ -20,6 +22,7 @@ interface TabDespesasProps {
 }
 
 export function TabDespesas({ dbState }: TabDespesasProps) {
+  const { confirm } = useConfirm();
   const [nome, setNome] = useState("");
   const [cat, setCat] = useState("");
   const [val, setVal] = useState<string | number>("");
@@ -35,25 +38,25 @@ export function TabDespesas({ dbState }: TabDespesasProps) {
 
   const handleSalvarDespesa = async () => {
     if (!nome.trim()) {
-      alert("Informe o nome da despesa.");
+      toast.error("Informe o nome da despesa.");
       return;
     }
     if (!cat) {
-      alert("Selecione a categoria.");
+      toast.error("Selecione a categoria.");
       return;
     }
     const numVal = parseFloat(String(val));
     if (!numVal || numVal <= 0) {
-      alert("Informe um valor válido.");
+      toast.error("Informe um valor válido.");
       return;
     }
     const numDia = parseInt(String(dia));
     if (!numDia || numDia < 1 || numDia > 31) {
-      alert("Informe o dia do pagamento (1-31).");
+      toast.error("Informe o dia do pagamento (1-31).");
       return;
     }
     if (!mes) {
-      alert("Selecione o mês de competência.");
+      toast.error("Selecione o mês de competência.");
       return;
     }
 
@@ -83,7 +86,7 @@ export function TabDespesas({ dbState }: TabDespesasProps) {
       setStatus("pendente");
       setShowNewExpenseForm(false);
     } catch (err: any) {
-      alert("Erro ao lançar despesa: " + err.message);
+      toast.error("Erro ao lançar despesa: " + err.message);
     }
   };
 
@@ -97,9 +100,10 @@ export function TabDespesas({ dbState }: TabDespesasProps) {
   };
 
   const handleDeleteDespesa = async (d: Despesa) => {
-    if (confirm(`Excluir despesa "${d.nome}" (${fmtBRL(d.val)})?`)) {
-      await deleteDespesa(d.id);
-    }
+    const ok = await confirm({ title: `Excluir a despesa "${d.nome}"?`, description: `${fmtBRL(d.val)} deixa de contar no mês. Não dá para desfazer.`, tone: "danger", confirmLabel: "Excluir despesa" });
+    if (!ok) return;
+    await deleteDespesa(d.id);
+    toast.success("Despesa excluída.");
   };
 
   const handleUpdateDespesa = async (id: string, updated: Partial<Despesa>) => {
@@ -393,20 +397,22 @@ export function TabDespesas({ dbState }: TabDespesasProps) {
                       </button>
                     </td>
                     <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
-                      <button
+                      <Tooltip content={"Editar despesa"}>
+                        <button
                         onClick={() => setEditingDespesa(d)}
-                        className="text-zinc-500 hover:text-white p-1 transition-colors"
-                        title="Editar despesa"
+                        className="text-zinc-500 hover:text-white p-1 transition-colors" aria-label={"Editar despesa"}
                       >
                         <Pencil className="size-3.5" />
                       </button>
-                      <button
+                      </Tooltip>
+                      <Tooltip content={"Excluir despesa"}>
+                        <button
                         onClick={() => handleDeleteDespesa(d)}
-                        className="text-zinc-500 hover:text-red-400 p-1 transition-colors"
-                        title="Excluir despesa"
+                        className="text-zinc-500 hover:text-red-400 p-1 transition-colors" aria-label={"Excluir despesa"}
                       >
                         <Trash2 className="size-3.5" />
                       </button>
+                      </Tooltip>
                     </td>
                   </tr>
                 ))}

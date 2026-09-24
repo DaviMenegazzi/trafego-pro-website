@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { Cliente } from "../types";
@@ -62,21 +63,21 @@ export function ModalEditarCliente({
 
   const handleSave = async () => {
     if (!nome.trim()) {
-      alert("Informe o nome da unidade.");
+      toast.error("Informe o nome da unidade.");
       return;
     }
     const cleanCnpj = cnpj.replace(/\D/g, "");
     if (!cnpj || cleanCnpj.length !== 14 || !validarCNPJ(cnpj)) {
-      alert("Informe um CNPJ válido no formato 00.000.000/0000-00.");
+      toast.error("Informe um CNPJ válido no formato 00.000.000/0000-00.");
       return;
     }
     if (!vencDia) {
-      alert("Selecione o dia de vencimento.");
+      toast.error("Selecione o dia de vencimento.");
       return;
     }
     const numVal = parseFloat(String(mensalidade));
     if (!numVal || numVal <= 0) {
-      alert("Informe o valor da mensalidade.");
+      toast.error("Informe o valor da mensalidade.");
       return;
     }
 
@@ -100,7 +101,7 @@ export function ModalEditarCliente({
         onClose();
       }, 700);
     } catch (err: any) {
-      alert("Erro ao salvar: " + err.message);
+      toast.error("Erro ao salvar: " + err.message);
     } finally {
       setSaving(false);
     }

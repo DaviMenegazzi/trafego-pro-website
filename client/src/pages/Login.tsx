@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ds";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -243,19 +244,17 @@ export default function Login() {
                       disabled={loading}
                       className="w-full rounded-2xl border border-zinc-800 bg-zinc-950/80 pl-10 pr-11 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/60 focus:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      tabIndex={-1}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-zinc-500 hover:text-zinc-300 transition-colors"
-                      title={showPassword ? "Ocultar senha" : "Ver senha"}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="size-4" />
-                      ) : (
-                        <Eye className="size-4" />
-                      )}
-                    </button>
+                    <Tooltip content={showPassword ? "Ocultar senha" : "Mostrar senha"}>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                        aria-pressed={showPassword}
+                        className="absolute inset-y-0 right-1 my-auto flex size-9 items-center justify-center rounded-lg text-zinc-500 outline-none transition-colors hover:text-zinc-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
 

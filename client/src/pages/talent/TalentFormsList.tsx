@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ds";
 import { useState, useMemo } from "react";
 import {
   Plus,
@@ -268,17 +269,18 @@ export function TalentFormsList({
                         <Users className="size-3" />
                         {f.candidateCount ?? 0}
                       </span>
-                      <button
+                      <Tooltip content={"Excluir formulário"}>
+                        <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setFormToDelete(f);
                         }}
-                        className="rounded-lg p-1 text-zinc-500 hover:bg-red-500/10 hover:text-red-400 transition"
-                        title="Excluir formulário"
+                        className="rounded-lg p-1 text-zinc-500 hover:bg-red-500/10 hover:text-red-400 transition" aria-label={"Excluir formulário"}
                       >
                         <Trash2 className="size-3.5" />
                       </button>
+                      </Tooltip>
                     </div>
                   </div>
 
@@ -308,11 +310,11 @@ export function TalentFormsList({
                     <span className="truncate font-mono text-[10px] text-zinc-500">
                       /trabalhe-conosco/{f.publicSlug}
                     </span>
-                    <button
+                    <Tooltip content={"Copiar link"}>
+                      <button
                       type="button"
                       onClick={(e) => handleCopyLink(f.publicSlug, e)}
-                      className="rounded p-1 text-zinc-400 hover:text-white transition shrink-0"
-                      title="Copiar link"
+                      className="rounded p-1 text-zinc-400 hover:text-white transition shrink-0" aria-label={"Copiar link"}
                     >
                       {copiedSlug === f.publicSlug ? (
                         <Check className="size-3.5 text-emerald-400" />
@@ -320,6 +322,7 @@ export function TalentFormsList({
                         <Copy className="size-3.5" />
                       )}
                     </button>
+                    </Tooltip>
                   </div>
 
                   {/* Primary Buttons */}

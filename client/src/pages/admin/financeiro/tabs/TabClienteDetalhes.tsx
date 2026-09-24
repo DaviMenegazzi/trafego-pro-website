@@ -1,3 +1,5 @@
+import { Tooltip, useConfirm } from "@/components/ds";
+import { toast } from "sonner";
 import { useState } from "react";
 import type { Cliente, ChecklistItemState, DatabaseState } from "../types";
 import {
@@ -41,6 +43,7 @@ export function TabClienteDetalhes({
   currentUser = "admin",
   onClientDeleted,
 }: TabClienteDetalhesProps) {
+  const { confirm } = useConfirm();
   const cliente = dbState.clientes?.[clientId];
 
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -65,13 +68,13 @@ export function TabClienteDetalhes({
   };
 
   const handleExcluirCliente = async () => {
-    if (
-      !confirm(
-        `Excluir a unidade "${cliente.nome}"?\n\nO histórico financeiro ficará arquivado na aba Financeiro.\nChecklists e dados cadastrais serão removidos.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Encerrar a unidade "${cliente.nome}"?`,
+      description: "O histórico financeiro fica arquivado. Checklists e dados cadastrais são removidos e não voltam.",
+      tone: "danger",
+      confirmLabel: "Encerrar unidade",
+    });
+    if (!ok) return;
 
     const archiveData = {
       nome: cliente.nome,
@@ -86,7 +89,7 @@ export function TabClienteDetalhes({
       await deleteClienteAndArchive(clientId, archiveData);
       if (onClientDeleted) onClientDeleted();
     } catch (err: any) {
-      alert("Erro ao excluir unidade: " + err.message);
+      toast.error("Erro ao excluir unidade: " + err.message);
     }
   };
 
@@ -108,7 +111,7 @@ export function TabClienteDetalhes({
   const handleSalvarExtra = async (tipo: "fin" | "traf" | "soc") => {
     const texto = (extraTexto[tipo] || "").trim();
     if (!texto) {
-      alert("Descreva a demanda antes de salvar.");
+      toast.error("Descreva a demanda antes de salvar.");
       return;
     }
 
@@ -136,9 +139,9 @@ export function TabClienteDetalhes({
   };
 
   const handleRemoverExtra = async (checkId: string) => {
-    if (confirm("Remover esta demanda?")) {
-      await deleteChecklistItem(clientId, checkId);
-    }
+    const ok = await confirm({ title: "Remover esta demanda?", description: "O item sai do checklist da unidade.", tone: "danger", confirmLabel: "Remover" });
+    if (!ok) return;
+    await deleteChecklistItem(clientId, checkId);
   };
 
   const renderChecklistCard = (
@@ -247,13 +250,14 @@ export function TabClienteDetalhes({
                         </button>
 
                         {i.extra && (
-                          <button
+                          <Tooltip content={"Remover demanda adicional"}>
+                            <button
                             onClick={() => handleRemoverExtra(i.id)}
-                            className="text-zinc-600 hover:text-red-400 p-0.5 rounded transition-colors"
-                            title="Remover demanda adicional"
+                            className="text-zinc-600 hover:text-red-400 p-0.5 rounded transition-colors" aria-label={"Remover demanda adicional"}
                           >
                             <X className="size-3.5" />
                           </button>
+                          </Tooltip>
                         )}
                       </div>
 

@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ds";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -91,15 +92,16 @@ export function TalentSortableFieldItem({
       {/* Top bar with drag handle */}
       <div className="flex items-center justify-between border-b border-white/5 px-4 py-2.5 bg-white/[0.02]">
         <div className="flex items-center gap-2">
-          <button
+          <Tooltip content={"Arraste para reordenar"}>
+            <button
             type="button"
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing rounded-lg p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200 transition touch-none"
-            title="Arraste para reordenar"
+            className="cursor-grab active:cursor-grabbing rounded-lg p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200 transition touch-none" aria-label={"Arraste para reordenar"}
           >
             <GripVertical className="size-4" />
           </button>
+          </Tooltip>
           <span className="text-[11px] font-mono font-medium text-zinc-500">
             #{index + 1}
           </span>
@@ -114,24 +116,26 @@ export function TalentSortableFieldItem({
 
         {/* Quick move buttons */}
         <div className="flex items-center gap-1">
-          <button
+          <Tooltip content={"Mover para cima"}>
+            <button
             type="button"
             onClick={() => onMoveUp(index)}
             disabled={index === 0}
-            className="rounded-lg p-1 text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent transition"
-            title="Mover para cima"
+            className="rounded-lg p-1 text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent transition" aria-label={"Mover para cima"}
           >
             <ChevronUp className="size-3.5" />
           </button>
-          <button
+          </Tooltip>
+          <Tooltip content={"Mover para baixo"}>
+            <button
             type="button"
             onClick={() => onMoveDown(index)}
             disabled={index === totalFields - 1}
-            className="rounded-lg p-1 text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent transition"
-            title="Mover para baixo"
+            className="rounded-lg p-1 text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent transition" aria-label={"Mover para baixo"}
           >
             <ChevronDown className="size-3.5" />
           </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -228,32 +232,35 @@ export function TalentSortableFieldItem({
 
           {/* Edit, duplicate, delete */}
           <div className="flex items-center gap-1.5">
-            <button
+            <Tooltip content={"Duplicar pergunta"}>
+              <button
               type="button"
               onClick={() => onDuplicate(field)}
-              className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-white/10 hover:text-white transition"
-              title="Duplicar pergunta"
+              className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-white/10 hover:text-white transition" aria-label={"Duplicar pergunta"}
             >
               <Copy className="size-3.5" />
               <span className="hidden sm:inline">Duplicar</span>
             </button>
-            <button
+            </Tooltip>
+            <Tooltip content={"Editar pergunta"}>
+              <button
               type="button"
               onClick={() => onEdit(field)}
-              className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/15 hover:text-white transition"
-              title="Editar pergunta"
+              className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/15 hover:text-white transition" aria-label={"Editar pergunta"}
             >
               <Edit2 className="size-3.5" />
               <span>Editar</span>
             </button>
-            <button
+            </Tooltip>
+            <Tooltip content={"Excluir pergunta"}>
+              <button
               type="button"
               onClick={() => onDelete(field)}
-              className="rounded-xl p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-400 transition"
-              title="Excluir pergunta"
+              className="rounded-xl p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-400 transition" aria-label={"Excluir pergunta"}
             >
               <Trash2 className="size-4" />
             </button>
+            </Tooltip>
           </div>
         </div>
       </div>

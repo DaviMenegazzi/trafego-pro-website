@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ds";
 import { useState, useRef, useMemo } from "react";
 import { toBlob, toPng } from "html-to-image";
 import { 
@@ -334,19 +335,20 @@ _Os materiais acima estão ativos nas campanhas da sua unidade. Qualquer dúvida
               {periodLabel}
             </span>
             <span className="text-zinc-500">·</span>
-            <button
+            <Tooltip content={"Alternar entre Criativos Únicos agrupados ou Todos os Anúncios Ativos"}>
+              <button
               type="button"
               onClick={() => setViewAllAds((v) => !v)}
               className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all flex items-center gap-1.5 ${
                 !viewAllAds
                   ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
                   : "bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10"
-              }`}
-              title="Alternar entre Criativos Únicos agrupados ou Todos os Anúncios Ativos"
+              }`} aria-label={"Alternar entre Criativos Únicos agrupados ou Todos os Anúncios Ativos"}
             >
               <Layers className="size-3 text-emerald-400" />
               <span>{!viewAllAds ? "Criativos Únicos" : "Todos os Anúncios Ativos"}</span>
             </button>
+            </Tooltip>
           </div>
 
 

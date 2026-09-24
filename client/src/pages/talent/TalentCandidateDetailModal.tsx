@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ds";
 import { useState } from "react";
 import {
   X,
@@ -232,14 +233,15 @@ export function TalentCandidateDetailModal({
                 <span>WhatsApp</span>
               </a>
             )}
-            <button
+            <Tooltip content={"Fechar visualizador"}>
+              <button
               type="button"
               onClick={onClose}
-              className="rounded-xl p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
-              title="Fechar visualizador"
+              className="rounded-xl p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition" aria-label={"Fechar visualizador"}
             >
               <X className="size-5" />
             </button>
+            </Tooltip>
           </div>
         </div>
 

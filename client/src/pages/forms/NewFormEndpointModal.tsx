@@ -1,16 +1,8 @@
 import { useState, useMemo } from "react";
-import {
-  Building2,
-  Check,
-  Globe,
-  KeyRound,
-  Plus,
-  Search,
-  ShieldCheck,
-  X,
-} from "lucide-react";
+import { Search } from "lucide-react";
+import { Button, Checkbox, Dialog, Field, Input, SegmentedControl, Textarea } from "@/components/ds";
 import { toast } from "sonner";
-import type { FormApiKey, NewKeyResponse } from "./formTypes";
+import type { NewKeyResponse } from "./formTypes";
 
 interface ClientOption {
   id: string;
@@ -34,6 +26,7 @@ export function NewFormEndpointModal({
   const [allowedOriginsText, setAllowedOriginsText] = useState("");
   const [expiryDays, setExpiryDays] = useState<string>("never");
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; units?: string }>({});
 
   const toggleUnit = (unitId: string) => {
     setSelectedUnits((prev) =>
@@ -51,14 +44,12 @@ export function NewFormEndpointModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      toast.error("Informe o nome do formulário");
-      return;
-    }
-    if (selectedUnits.length === 0) {
-      toast.error("Selecione ao menos uma unidade associada");
-      return;
-    }
+    const nextErrors = {
+      name: name.trim() ? undefined : "Informe o nome do formulário",
+      units: selectedUnits.length ? undefined : "Selecione ao menos uma unidade",
+    };
+    setErrors(nextErrors);
+    if (nextErrors.name || nextErrors.units) return;
 
     // Processar origens CORS
     let allowedOrigins: string[] | null = null;
@@ -100,203 +91,118 @@ export function NewFormEndpointModal({
         return;
       }
 
-      toast.success("Endpoint criado com sucesso!");
+      toast.success("Endpoint criado");
       onCreated(body as NewKeyResponse);
     } catch {
-      toast.error("Falha de conexão com o servidor");
+      toast.error("Não foi possível conectar ao servidor");
     } finally {
       setSaving(false);
     }
   };
 
+  const allSelected = clients.length > 0 && selectedUnits.length === clients.length;
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <form
-        onSubmit={handleSubmit}
-        className="glass-card flex flex-col max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 p-0 shadow-2xl"
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-white/10 p-6 bg-zinc-900/50">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 shrink-0">
-              <Plus className="size-5" />
-            </div>
-            <div>
-              <h3 className="font-display text-lg font-semibold text-zinc-100">
-                Adicionar Formulário ao Endpoint
-              </h3>
-              <p className="mt-0.5 text-xs text-zinc-400">
-                Gere uma chave de API para receber submissões de uma landing page ou site externo.
-              </p>
-            </div>
-          </div>
+    <Dialog
+      open
+      onOpenChange={(open) => { if (!open) onClose(); }}
+      size="lg"
+      title="Novo endpoint"
+      description="Gera uma chave para a landing page enviar respostas ao Tráfego Pro."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" form="new-endpoint-form" variant="primary" loading={saving}>
+            Gerar chave
+          </Button>
+        </>
+      }
+    >
+      <form id="new-endpoint-form" onSubmit={handleSubmit} noValidate className="space-y-5">
+        <Field label="Nome do formulário" htmlFor="endpoint-name" required error={errors.name}>
+          <Input
+            id="endpoint-name"
+            autoFocus
+            value={name}
+            aria-invalid={Boolean(errors.name) || undefined}
+            onChange={(e) => { setName(e.target.value); setErrors((c) => ({ ...c, name: undefined })); }}
+            placeholder="Ex.: Landing page Caxias – contato"
+          />
+        </Field>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
-          >
-            <X className="size-5" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* Nome */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Nome do Formulário / Origem <span className="text-emerald-400">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: Landing Page Caxias - Contato Principal"
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none transition"
-            />
-          </div>
-
-          {/* Unidades Associadas */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                Unidades Permitidas <span className="text-emerald-400">*</span> ({selectedUnits.length}/{clients.length})
-              </label>
-              <div className="flex items-center gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setSelectedUnits(clients.map((c) => c.id))}
-                  className="text-emerald-400 hover:underline"
-                >
-                  Marcar todas
-                </button>
-                <span className="text-zinc-600">•</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedUnits([])}
-                  className="text-zinc-500 hover:text-zinc-300"
-                >
-                  Desmarcar
-                </button>
+        <Field
+          label={`Unidades (${selectedUnits.length} de ${clients.length})`}
+          required
+          error={errors.units}
+          hint="Só as unidades marcadas podem receber respostas por esta chave. A chave grava o ID da conta de anúncios, mostrado abaixo de cada nome."
+        >
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <Input leading={<Search />} value={unitSearch} onChange={(e) => setUnitSearch(e.target.value)} placeholder="Filtrar unidades" aria-label="Filtrar unidades" />
               </div>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectedUnits(allSelected ? [] : clients.map((c) => c.id));
+                  setErrors((c) => ({ ...c, units: undefined }));
+                }}
+              >
+                {allSelected ? "Desmarcar todas" : "Marcar todas"}
+              </Button>
             </div>
-
-            <p className="mb-2 flex items-start gap-1.5 text-[11px] text-zinc-500">
-              <ShieldCheck className="mt-0.5 size-3 shrink-0 text-zinc-600" />
-              O nome aqui é só um rótulo. O que a chave realmente grava e usa para filtrar é o{" "}
-              <span className="font-mono text-zinc-400">ID da conta de anúncios (Meta)</span> mostrado
-              abaixo de cada unidade — não o nome da franquia.
-            </p>
-
-            <div className="relative mb-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-500" />
-              <input
-                type="text"
-                value={unitSearch}
-                onChange={(e) => setUnitSearch(e.target.value)}
-                placeholder="Filtrar franquias..."
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-
-            <div className="max-h-44 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-2 space-y-1">
+            <div className="max-h-52 overflow-y-auto rounded-lg border border-white/10 p-1">
               {filteredUnits.length === 0 ? (
-                <p className="p-3 text-center text-xs text-zinc-600">Nenhuma franquia encontrada.</p>
+                <p className="p-3 text-center text-sm text-zinc-500">Nenhuma unidade encontrada.</p>
               ) : (
-                filteredUnits.map((u) => {
-                  const isChecked = selectedUnits.includes(u.id);
-                  return (
-                    <label
-                      key={u.id}
-                      onClick={() => toggleUnit(u.id)}
-                      className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs cursor-pointer transition ${
-                        isChecked
-                          ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                          : "text-zinc-300 hover:bg-white/5 border border-transparent"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Building2 className={`size-3.5 shrink-0 ${isChecked ? "text-emerald-400" : "text-zinc-500"}`} />
-                        <div className="min-w-0">
-                          <span className="block truncate font-medium">{u.name}</span>
-                          <span className="block truncate font-mono text-[10px] text-zinc-500">{u.id}</span>
-                        </div>
-                      </div>
-                      <div
-                        className={`flex size-4 items-center justify-center rounded border transition shrink-0 ${
-                          isChecked
-                            ? "bg-emerald-500 border-emerald-500 text-zinc-950"
-                            : "border-zinc-700 bg-zinc-800"
-                        }`}
-                      >
-                        {isChecked && <Check className="size-3 stroke-[3]" />}
-                      </div>
-                    </label>
-                  );
-                })
+                filteredUnits.map((u) => (
+                  <label key={u.id} htmlFor={`unit-${u.id}`} className="flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2 hover:bg-white/[0.04]">
+                    <Checkbox
+                      id={`unit-${u.id}`}
+                      checked={selectedUnits.includes(u.id)}
+                      onCheckedChange={() => { toggleUnit(u.id); setErrors((c) => ({ ...c, units: undefined })); }}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm text-zinc-100">{u.name}</span>
+                      <span className="block truncate font-mono text-xs text-zinc-500">{u.id}</span>
+                    </span>
+                  </label>
+                ))
               )}
             </div>
-            <p className="mt-1 text-[11px] text-zinc-500">
-              O formulário só aceitará submissões direcionadas para as unidades marcadas acima.
-            </p>
           </div>
+        </Field>
 
-          {/* Origens Permitidas (CORS) */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-              Domínios Permitidos (CORS - Opcional)
-            </label>
-            <p className="text-[11px] text-zinc-500 mb-1.5">
-              Informe as URLs que podem disparar envios (ex.: <code className="text-zinc-400">https://vidacardcaxias.com.br</code>). Deixe vazio para aceitar qualquer origem.
-            </p>
-            <textarea
-              rows={2}
-              value={allowedOriginsText}
-              onChange={(e) => setAllowedOriginsText(e.target.value)}
-              placeholder="https://vidacardcaxias.com.br&#10;https://www.vidacardcaxias.com.br"
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-3.5 py-2 text-xs font-mono text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none transition"
-            />
-          </div>
+        <Field
+          label="Domínios permitidos"
+          htmlFor="endpoint-origins"
+          optional
+          hint="Um por linha. Vazio aceita envios de qualquer site."
+        >
+          <Textarea
+            id="endpoint-origins"
+            rows={2}
+            value={allowedOriginsText}
+            onChange={(e) => setAllowedOriginsText(e.target.value)}
+            placeholder={"https://vidacardcaxias.com.br\nhttps://www.vidacardcaxias.com.br"}
+            className="font-mono text-xs"
+          />
+        </Field>
 
-          {/* Validade */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Validade da Chave
-            </label>
-            <select
-              value={expiryDays}
-              onChange={(e) => setExpiryDays(e.target.value)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2.5 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none transition"
-            >
-              <option value="never">Sem expiração (Recomendado para Landing Pages)</option>
-              <option value="90">90 dias</option>
-              <option value="180">180 dias</option>
-              <option value="365">1 ano (365 dias)</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-white/10 p-5 bg-zinc-900/50">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 text-xs font-semibold text-zinc-950 disabled:opacity-50 transition shadow-sm active:scale-95"
-          >
-            <KeyRound className="size-3.5" />
-            {saving ? "Gerando chave..." : "Gerar Endpoint e Chave"}
-          </button>
-        </div>
+        <Field label="Validade da chave" hint={expiryDays === "never" ? "Recomendado para landing pages, que ficam no ar sem data para sair." : undefined}>
+          <SegmentedControl
+            aria-label="Validade da chave"
+            value={expiryDays}
+            onValueChange={setExpiryDays}
+            options={[
+              { value: "never", label: "Sem validade" },
+              { value: "90", label: "90 dias" },
+              { value: "180", label: "180 dias" },
+              { value: "365", label: "1 ano" },
+            ]}
+          />
+        </Field>
       </form>
-    </div>
+    </Dialog>
   );
 }

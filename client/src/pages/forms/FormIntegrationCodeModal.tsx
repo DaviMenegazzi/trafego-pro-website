@@ -1,14 +1,6 @@
 import { useState } from "react";
-import {
-  AlertTriangle,
-  Check,
-  Code2,
-  Copy,
-  ExternalLink,
-  KeyRound,
-  ShieldCheck,
-  X,
-} from "lucide-react";
+import { Check, Copy } from "lucide-react";
+import { Button, Dialog, InlineNotice, SegmentedControl, useConfirm } from "@/components/ds";
 import { toast } from "sonner";
 import type { FormApiKey } from "./formTypes";
 
@@ -26,11 +18,12 @@ export function FormIntegrationCodeModal({
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [activeTab, setActiveTab] = useState<"js" | "html" | "curl">("js");
+  const [keyWasCopied, setKeyWasCopied] = useState(false);
+  const { confirm } = useConfirm();
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://app.trafego.pro";
   const endpointUrl = `${origin}/api/forms/submit`;
   const sampleClientId = formKey.clientIds[0] || "SUA_UNIDADE_ID";
-  const displayKey = apiKey || `${formKey.keyPrefix}... (chave oculta)`;
 
   const jsSnippet = `// Exemplo de envio via JavaScript na Landing Page
 async function enviarFormulario(dadosDoForm) {
@@ -117,7 +110,8 @@ document.getElementById("contato-form").addEventListener("submit", async functio
     try {
       await navigator.clipboard.writeText(apiKey);
       setCopiedKey(true);
-      toast.success("Chave de API copiada!");
+      setKeyWasCopied(true);
+      toast.success("Chave copiada");
       setTimeout(() => setCopiedKey(false), 2000);
     } catch {
       toast.error("Não foi possível copiar a chave");
@@ -129,169 +123,87 @@ document.getElementById("contato-form").addEventListener("submit", async functio
     try {
       await navigator.clipboard.writeText(textToCopy);
       setCopiedSnippet(true);
-      toast.success("Código copiado!");
+      toast.success("Código copiado");
       setTimeout(() => setCopiedSnippet(false), 2000);
     } catch {
       toast.error("Não foi possível copiar o código");
     }
   };
 
+  // A chave completa só aparece aqui, uma vez: fechar sem copiar pede confirmação.
+  const requestClose = async () => {
+    if (apiKey && !keyWasCopied) {
+      const ok = await confirm({
+        title: "Fechar sem copiar a chave?",
+        description: "A chave completa não será exibida de novo. Sem ela, será preciso gerar um novo endpoint.",
+        confirmLabel: "Fechar mesmo assim",
+        cancelLabel: "Voltar",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="glass-card flex flex-col max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 p-0 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-white/10 p-6 bg-zinc-900/50">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 shrink-0">
-              <Code2 className="size-5" />
-            </div>
-            <div>
-              <h3 className="font-display text-lg font-semibold text-zinc-100">
-                Instruções de Integração do Endpoint
-              </h3>
-              <p className="mt-0.5 text-xs text-zinc-400">
-                {formKey.name} • Endpoint público seguro
-              </p>
-            </div>
+    <Dialog
+      open
+      onOpenChange={(open) => { if (!open) void requestClose(); }}
+      size="lg"
+      title="Código de integração"
+      description={formKey.name}
+      bodyClassName="space-y-5"
+      footer={<Button variant="primary" onClick={() => void requestClose()}>Concluir</Button>}
+    >
+      {apiKey && (
+        <InlineNotice tone="warning">
+          <p><strong className="font-medium">Copie a chave agora.</strong> Ela é exibida apenas uma vez.</p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="min-w-0 flex-1 select-all break-all rounded-md bg-black/40 px-2.5 py-2 font-mono text-xs text-zinc-100">{apiKey}</code>
+            <Button size="sm" variant="secondary" onClick={copyKey}>
+              {copiedKey ? <Check /> : <Copy />}
+              {copiedKey ? "Copiada" : "Copiar"}
+            </Button>
           </div>
+        </InlineNotice>
+      )}
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
-          >
-            <X className="size-5" />
-          </button>
+      <section className="space-y-1.5">
+        <h3 className="text-sm font-medium text-zinc-200">Endereço (POST)</h3>
+        <code className="block select-all truncate rounded-lg border border-white/10 bg-zinc-950/70 px-3 py-2 font-mono text-xs text-zinc-200">{endpointUrl}</code>
+      </section>
+
+      <section className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <SegmentedControl
+            aria-label="Linguagem do exemplo"
+            size="sm"
+            value={activeTab}
+            onValueChange={setActiveTab}
+            options={[
+              { value: "js", label: "JavaScript" },
+              { value: "html", label: "HTML + JS" },
+              { value: "curl", label: "cURL" },
+            ]}
+          />
+          <Button size="sm" variant="ghost" onClick={copySnippet}>
+            {copiedSnippet ? <Check /> : <Copy />}
+            {copiedSnippet ? "Copiado" : "Copiar código"}
+          </Button>
         </div>
+        <pre className="max-h-64 overflow-auto rounded-lg border border-white/10 bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-300">
+          {activeTab === "js" ? jsSnippet : activeTab === "html" ? htmlSnippet : curlSnippet}
+        </pre>
+      </section>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* Key Banner (se recém criada) */}
-          {apiKey && (
-            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2 text-emerald-300 font-semibold text-xs uppercase tracking-wider">
-                  <ShieldCheck className="size-4" />
-                  Chave de API Gerada (Copie agora!)
-                </div>
-                <button
-                  type="button"
-                  onClick={copyKey}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 text-zinc-950 px-2.5 py-1 text-xs font-bold transition hover:bg-emerald-400"
-                >
-                  {copiedKey ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                  {copiedKey ? "Copiado!" : "Copiar Chave"}
-                </button>
-              </div>
-
-              <div className="rounded-xl border border-emerald-500/20 bg-black/40 p-2.5 font-mono text-xs text-emerald-200 break-all select-all">
-                {apiKey}
-              </div>
-
-              <p className="text-[11px] text-amber-200/80 flex items-center gap-1">
-                <AlertTriangle className="size-3 text-amber-400 shrink-0" />
-                Esta chave completa é exibida apenas uma vez. Guarde-a com segurança!
-              </p>
-            </div>
-          )}
-
-          {/* Endpoint Info */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              URL do Endpoint (POST)
-            </label>
-            <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5 font-mono text-xs text-zinc-200 select-all">
-              <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">
-                POST
-              </span>
-              <span className="truncate flex-1">{endpointUrl}</span>
-            </div>
-          </div>
-
-          {/* Code Snippets with Tabs */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1 border-b border-white/5 pb-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("js")}
-                  className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
-                    activeTab === "js"
-                      ? "bg-white/10 text-white font-semibold"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  JavaScript (Fetch)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("html")}
-                  className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
-                    activeTab === "html"
-                      ? "bg-white/10 text-white font-semibold"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  HTML + JS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("curl")}
-                  className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
-                    activeTab === "curl"
-                      ? "bg-white/10 text-white font-semibold"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  cURL
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={copySnippet}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/10 transition"
-              >
-                {copiedSnippet ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-                {copiedSnippet ? "Copiado!" : "Copiar Código"}
-              </button>
-            </div>
-
-            <div className="relative rounded-2xl border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs text-zinc-300 overflow-x-auto max-h-64 select-all leading-relaxed">
-              <pre>
-                {activeTab === "js" ? jsSnippet : activeTab === "html" ? htmlSnippet : curlSnippet}
-              </pre>
-            </div>
-          </div>
-
-          {/* Details list */}
-          <div className="rounded-2xl border border-white/5 bg-zinc-900/30 p-4 space-y-2 text-xs text-zinc-400">
-            <div className="font-semibold text-zinc-200 text-xs uppercase tracking-wider mb-1">
-              Parâmetros do Payload:
-            </div>
-            <p>
-              • <strong className="text-zinc-200">clientId</strong>: ID da unidade (ex.: <code className="text-emerald-400">{sampleClientId}</code>). Deve coincidir com as unidades liberadas na chave.
-            </p>
-            <p>
-              • <strong className="text-zinc-200">fields</strong>: Objeto com qualquer dado do formulário (ex.: nome, telefone, cidade, interesse). O backend sanitiza tudo automaticamente.
-            </p>
-            <p>
-              • <strong className="text-zinc-200">metadata</strong> (opcional): Rastreamento de UTMs e URL de origem para atribuição de tráfego.
-            </p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end border-t border-white/10 p-4 bg-zinc-900/50">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl bg-white hover:bg-zinc-200 px-5 py-2 text-xs font-semibold text-zinc-950 transition"
-          >
-            Concluir
-          </button>
-        </div>
-      </div>
-    </div>
+      <section className="space-y-1.5 text-sm text-zinc-400">
+        <h3 className="font-medium text-zinc-200">Campos do envio</h3>
+        <ul className="list-disc space-y-1 pl-5">
+          <li><code className="text-zinc-200">clientId</code>: ID da unidade (ex.: <code className="text-zinc-200">{sampleClientId}</code>); precisa estar entre as unidades da chave.</li>
+          <li><code className="text-zinc-200">fields</code>: os dados do formulário (nome, telefone, cidade…). O servidor limpa tudo antes de gravar.</li>
+          <li><code className="text-zinc-200">metadata</code> (opcional): UTMs e página de origem, para saber de qual campanha veio o lead.</li>
+        </ul>
+      </section>
+    </Dialog>
   );
 }

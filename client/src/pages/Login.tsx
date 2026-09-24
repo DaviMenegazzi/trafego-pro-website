@@ -1,4 +1,4 @@
-import { Tooltip } from "@/components/ds";
+import { Button, CheckboxField, Field, IconButton, InlineNotice, Input } from "@/components/ds";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -7,12 +7,9 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  ShieldCheck,
   TrendingUp,
   UsersRound,
   BarChart3,
-  Loader2,
-  AlertCircle,
 } from "lucide-react";
 import { markDashboardPostLoginRefresh } from "@/lib/dashboardAuthSignal";
 
@@ -38,7 +35,7 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!identifier.trim() || !password.trim()) {
-      setError("Por favor, preencha todos os campos.");
+      setError("Preencha o usuário e a senha.");
       return;
     }
 
@@ -120,7 +117,7 @@ export default function Login() {
               <h1 className="font-display text-4xl xl:text-5xl font-bold tracking-tight text-white leading-[1.18]">
                 Gestão inteligente.<br />
                 <span className="bg-gradient-to-r from-emerald-400 via-teal-200 to-zinc-400 bg-clip-text text-transparent">
-                  Performance em tempo real.
+                  A rede inteira num só lugar.
                 </span>
               </h1>
 
@@ -136,7 +133,7 @@ export default function Login() {
                   <TrendingUp className="size-4" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-zinc-200">Painéis de Indicadores & Métricas</h4>
+                  <h4 className="text-xs font-semibold text-zinc-200">Indicadores e métricas</h4>
                   <p className="text-[11px] text-zinc-400">Acompanhamento consolidado de dados e performance.</p>
                 </div>
               </div>
@@ -146,7 +143,7 @@ export default function Login() {
                   <UsersRound className="size-4" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-zinc-200">Banco de Talentos & Recrutamento</h4>
+                  <h4 className="text-xs font-semibold text-zinc-200">Banco de talentos e recrutamento</h4>
                   <p className="text-[11px] text-zinc-400">Formulários sob medida e funil de seleção de candidatos.</p>
                 </div>
               </div>
@@ -156,171 +153,87 @@ export default function Login() {
                   <BarChart3 className="size-4" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-zinc-200">Retorno Comercial & Qualificação</h4>
+                  <h4 className="text-xs font-semibold text-zinc-200">Retorno comercial dos leads</h4>
                   <p className="text-[11px] text-zinc-400">Feedbacks estruturados e acompanhamento de leads.</p>
                 </div>
               </div>
             </div>
 
-            {/* Bottom Proof Note */}
-            <div className="flex items-center gap-2.5 pt-2 text-xs text-zinc-500 border-t border-white/5">
-              <ShieldCheck className="size-4 text-emerald-400 shrink-0" />
-              <span>Acesso seguro com permissões personalizadas para o seu perfil.</span>
-            </div>
           </div>
 
           {/* Right Column: Modern Glass Card */}
           <div className="lg:col-span-6 flex justify-center">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900/60 p-8 sm:p-10 backdrop-blur-2xl shadow-2xl shadow-black/80 relative">
               
-              {/* Card Header */}
               <div className="mb-7">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="size-2 rounded-full bg-emerald-400" />
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-emerald-400 font-mono">
-                    Acesso Seguro
-                  </span>
-                </div>
-                <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                  Entrar na conta
-                </h2>
-                <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
-                  Informe suas credenciais para acessar o painel.
-                </p>
+                <h2 className="font-display text-2xl font-semibold tracking-tight text-white sm:text-3xl">Entrar</h2>
+                <p className="mt-1.5 text-sm text-zinc-400">Use o usuário ou o e-mail cadastrado.</p>
               </div>
 
-              {/* Error Alert Card */}
               {error && (
-                <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-300 animate-in fade-in duration-200">
-                  <AlertCircle className="size-4 shrink-0 text-red-400 mt-0.5" />
-                  <div className="leading-relaxed flex-1">{error}</div>
-                </div>
+                <InlineNotice tone="critical" className="mb-5">
+                  <span role="alert">{error}</span>
+                </InlineNotice>
               )}
 
-              {/* Login Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                
-                {/* Identifier Input */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300">
-                    Usuário ou E-mail
-                  </label>
-                  <div className="relative group">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-emerald-400 transition-colors">
-                      <User className="size-4" />
-                    </div>
-                    <input
-                      type="text"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="seu.usuario ou seu@email.com"
-                      required
-                      autoFocus={!identifier}
-                      autoComplete="username"
-                      disabled={loading}
-                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-950/80 pl-10 pr-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/60 focus:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
-                    />
-                  </div>
-                </div>
-
-                {/* Password Input */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300">
-                      Senha
-                    </label>
-                  </div>
-                  <div className="relative group">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500 group-focus-within:text-emerald-400 transition-colors">
-                      <Lock className="size-4" />
-                    </div>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      required
-                      autoComplete="current-password"
-                      disabled={loading}
-                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-950/80 pl-10 pr-11 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/60 focus:bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
-                    />
-                    <Tooltip content={showPassword ? "Ocultar senha" : "Mostrar senha"}>
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                        aria-pressed={showPassword}
-                        className="absolute inset-y-0 right-1 my-auto flex size-9 items-center justify-center rounded-lg text-zinc-500 outline-none transition-colors hover:text-zinc-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60"
-                      >
-                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </button>
-                    </Tooltip>
-                  </div>
-                </div>
-
-                {/* Options: Remember Me */}
-                <div className="flex items-center justify-between pt-1">
-                  <label className="flex cursor-pointer items-center gap-2 select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="size-4 rounded-md border-zinc-700 bg-zinc-950 text-emerald-500 accent-emerald-500 focus:ring-0 focus:ring-offset-0"
-                    />
-                    <span className="text-xs text-zinc-400 hover:text-zinc-300 transition">
-                      Lembrar meu usuário
-                    </span>
-                  </label>
-
-                  <span className="text-[11px] text-zinc-500">
-                    Acesso protegido
-                  </span>
-                </div>
-
-                {/* Submit Button */}
-                <div className="pt-2">
-                  <button
-                    type="submit"
+              <form onSubmit={handleSubmit} noValidate className="space-y-4">
+                <Field label="Usuário ou e-mail" htmlFor="login-identifier">
+                  <Input
+                    id="login-identifier"
+                    size="lg"
+                    leading={<User />}
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="seu.usuario ou seu@email.com"
+                    autoFocus={!identifier}
+                    autoComplete="username"
                     disabled={loading}
-                    className="group relative flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 p-3.5 text-sm font-bold text-zinc-950 hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-lg shadow-emerald-950/50 hover:shadow-emerald-500/20 transition-all duration-200"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        <span>Autenticando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Acessar Painel</span>
-                        <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-                      </>
-                    )}
-                  </button>
-                </div>
+                  />
+                </Field>
 
-                {/* Cadastro Link */}
-                <div className="pt-2 text-center">
-                  <Link
-                    href="/cadastro"
-                    className="text-xs text-zinc-400 hover:text-emerald-400 transition-colors"
-                  >
-                    Não possui uma conta? <span className="font-medium text-emerald-400 underline underline-offset-4">Solicitar cadastro</span>
+                <Field label="Senha" htmlFor="login-password">
+                  <Input
+                    id="login-password"
+                    size="lg"
+                    leading={<Lock />}
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    disabled={loading}
+                    trailing={
+                      <IconButton
+                        label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                        aria-pressed={showPassword}
+                        size="sm"
+                        icon={showPassword ? <EyeOff /> : <Eye />}
+                        onClick={() => setShowPassword(!showPassword)}
+                      />
+                    }
+                  />
+                </Field>
+
+                <CheckboxField id="login-remember" label="Lembrar meu usuário" checked={rememberMe} onCheckedChange={(v) => setRememberMe(v === true)} />
+
+                <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
+                  {loading ? "Entrando…" : "Entrar"}
+                  {!loading && <ArrowRight />}
+                </Button>
+
+                <p className="pt-1 text-center text-sm text-zinc-400">
+                  Não tem conta?{" "}
+                  <Link href="/cadastro" className="font-medium text-emerald-300 underline-offset-4 hover:underline">
+                    Solicitar cadastro
                   </Link>
-                </div>
+                </p>
               </form>
-
-              {/* Bottom Security Badge */}
-              <div className="mt-7 pt-5 border-t border-white/5 flex items-center justify-center gap-2 text-center text-[11px] text-zinc-500">
-                <ShieldCheck className="size-3.5 text-zinc-500" />
-                <span>Ambiente seguro com criptografia e controle de acesso.</span>
-              </div>
             </div>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-white/5 text-[11px] text-zinc-500">
+      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-white/5 text-xs text-zinc-500">
         <div>
           © {new Date().getFullYear()} Tráfego Pro · Todos os direitos reservados.
         </div>

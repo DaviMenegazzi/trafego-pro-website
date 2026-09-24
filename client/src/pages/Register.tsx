@@ -1,18 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import {
-  User,
-  Mail,
-  Lock,
-  Briefcase,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Button, Field, IconButton, InlineNotice, Input } from "@/components/ds";
 
 export default function Register() {
   const [, navigate] = useLocation();
@@ -33,7 +22,7 @@ export default function Register() {
     setError("");
 
     if (!fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-      setError("Por favor, preencha todos os campos obrigatórios.");
+      setError("Preencha nome, e-mail, senha e confirmação.");
       return;
     }
 
@@ -108,17 +97,11 @@ export default function Register() {
           {/* Left Column: Context & Information */}
           <div className="hidden lg:flex lg:col-span-5 flex-col justify-center space-y-6 pr-2">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium tracking-wide">
-                <ShieldCheck className="size-3.5" /> Acesso Seguro & Aprovado
-              </div>
               <h1 className="font-display text-3xl xl:text-4xl font-bold tracking-tight text-white leading-[1.2]">
-                Solicite seu acesso à plataforma.<br />
-                <span className="bg-gradient-to-r from-emerald-400 via-teal-200 to-zinc-400 bg-clip-text text-transparent">
-                  Central de Performance
-                </span>
+                Solicite seu acesso à plataforma.
               </h1>
               <p className="text-zinc-400 text-sm leading-relaxed">
-                Por motivos de segurança e governança de dados, novos cadastros passam por triagem e validação dos administradores antes da liberação.
+                Cada cadastro é revisado por um administrador, que libera as unidades que você pode ver.
               </p>
             </div>
 
@@ -128,8 +111,8 @@ export default function Register() {
                   <CheckCircle2 className="size-4" />
                 </div>
                 <div>
-                  <h2 className="text-xs font-semibold text-zinc-200">1. Envio dos Dados</h2>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">Preencha suas informações corporativas para solicitar acesso.</p>
+                  <h2 className="text-xs font-semibold text-zinc-200">1. Envie seus dados</h2>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">Nome, e-mail e senha de acesso.</p>
                 </div>
               </div>
 
@@ -138,8 +121,8 @@ export default function Register() {
                   <ShieldCheck className="size-4" />
                 </div>
                 <div>
-                  <h2 className="text-xs font-semibold text-zinc-200">2. Revisão por Administrador</h2>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">Sua conta será analisada e vinculada às franquias autorizadas.</p>
+                  <h2 className="text-xs font-semibold text-zinc-200">2. Um administrador revisa</h2>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">E vincula sua conta às unidades certas.</p>
                 </div>
               </div>
             </div>
@@ -151,33 +134,27 @@ export default function Register() {
               
               {/* Header */}
               <div className="mb-7">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400/90 font-mono">
-                    Tráfego Pro
-                  </span>
-                </div>
                 <h2 className="font-display text-2xl font-bold text-white tracking-tight">
-                  {submitted ? "Solicitação Enviada" : "Novo Cadastro"}
+                  {submitted ? "Solicitação enviada" : "Solicitar cadastro"}
                 </h2>
                 <p className="text-xs text-zinc-400 mt-1">
                   {submitted
                     ? "Seus dados foram registrados com sucesso."
-                    : "Preencha as informações para solicitar liberação da sua conta."}
+                    : "Um administrador aprova o acesso antes do primeiro login."}
                 </p>
               </div>
 
               {submitted ? (
                 /* Success State */
                 <div className="space-y-6 text-center py-4">
-                  <div className="size-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(16,185,129,0.2)]">
+                  <div className="size-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto ">
                     <CheckCircle2 className="size-8" />
                   </div>
 
                   <div className="space-y-2">
-                    <h3 className="text-base font-semibold text-white">Aguardando Aprovação</h3>
+                    <h3 className="text-base font-semibold text-white">Aguardando aprovação</h3>
                     <p className="text-xs text-zinc-300 leading-relaxed max-w-sm mx-auto">
-                      Sua solicitação de cadastro foi registrada com sucesso no sistema. Um administrador revisará seus dados e liberará o seu acesso em breve.
+                      Um administrador vai revisar seus dados e liberar o acesso. Você poderá entrar com o e-mail e a senha que cadastrou.
                     </p>
                   </div>
 
@@ -187,147 +164,65 @@ export default function Register() {
                   </div>
 
                   <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => navigate("/login")}
-                      className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)] flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      Ir para a tela de Login <ArrowRight className="size-4" />
-                    </button>
+                    <Button variant="primary" size="lg" className="w-full" onClick={() => navigate("/login")}>
+                      Ir para o login <ArrowRight />
+                    </Button>
                   </div>
                 </div>
               ) : (
                 /* Form State */
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} noValidate className="space-y-4">
                   {error && (
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs animate-in fade-in duration-200">
-                      <AlertCircle className="size-4 text-rose-400 shrink-0 mt-0.5" />
-                      <span className="leading-snug">{error}</span>
-                    </div>
+                    <InlineNotice tone="critical"><span role="alert">{error}</span></InlineNotice>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Nome Completo */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                        <User className="size-3.5 text-emerald-400/80" /> Nome Completo *
-                      </label>
-                      <input
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Ex: João da Silva"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-white placeholder:text-zinc-600 text-xs focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field label="Nome completo" htmlFor="reg-name" required>
+                      <Input id="reg-name" size="lg" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ex.: João da Silva" />
+                    </Field>
+                    <Field label="E-mail" htmlFor="reg-email" required>
+                      <Input id="reg-email" size="lg" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@empresa.com.br" />
+                    </Field>
+                  </div>
+
+                  <Field label="Cargo ou função" htmlFor="reg-role" optional hint="Ajuda o administrador a liberar as unidades certas.">
+                    <Input id="reg-role" size="lg" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: Gestor da unidade" />
+                  </Field>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field label="Senha" htmlFor="reg-password" required hint="Pelo menos 6 caracteres.">
+                      <Input
+                        id="reg-password"
+                        size="lg"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        trailing={<IconButton label={showPassword ? "Ocultar senha" : "Mostrar senha"} aria-pressed={showPassword} size="sm" icon={showPassword ? <EyeOff /> : <Eye />} onClick={() => setShowPassword(!showPassword)} />}
                       />
-                    </div>
-
-                    {/* E-mail Corporativo */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                        <Mail className="size-3.5 text-emerald-400/80" /> E-mail *
-                      </label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="usuario@empresa.com.br"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-white placeholder:text-zinc-600 text-xs focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                    </Field>
+                    <Field label="Confirmar senha" htmlFor="reg-confirm" required>
+                      <Input
+                        id="reg-confirm"
+                        size="lg"
+                        type={showConfirmPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        trailing={<IconButton label={showConfirmPassword ? "Ocultar confirmação" : "Mostrar confirmação"} aria-pressed={showConfirmPassword} size="sm" icon={showConfirmPassword ? <EyeOff /> : <Eye />} onClick={() => setShowConfirmPassword(!showConfirmPassword)} />}
                       />
-                    </div>
+                    </Field>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                      <Briefcase className="size-3.5 text-emerald-400/80" /> Cargo / Função
-                    </label>
-                    <input
-                      type="text"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Ex: Gestor de Unidade / Sócio"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-white placeholder:text-zinc-600 text-xs focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                    />
-                  </div>
+                  <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
+                    {loading ? "Enviando…" : "Solicitar acesso"}
+                    {!loading && <ArrowRight />}
+                  </Button>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Senha */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                        <Lock className="size-3.5 text-emerald-400/80" /> Senha *
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Mínimo 6 caracteres"
-                          required
-                          className="w-full px-3.5 py-2.5 pr-9 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-white placeholder:text-zinc-600 text-xs focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-                        >
-                          {showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Confirmação de Senha */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                        <Lock className="size-3.5 text-emerald-400/80" /> Confirmar Senha *
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="Repita a senha"
-                          required
-                          className="w-full px-3.5 py-2.5 pr-9 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-white placeholder:text-zinc-600 text-xs focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-                        >
-                          {showConfirmPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" /> Enviando Solicitação...
-                        </>
-                      ) : (
-                        <>
-                          Solicitar Acesso <ArrowRight className="size-4" />
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="text-center pt-2">
-                    <Link
-                      href="/login"
-                      className="text-xs text-zinc-400 hover:text-emerald-400 transition-colors"
-                    >
-                      Já possui uma conta? <span className="font-medium text-emerald-400 underline underline-offset-4">Fazer login</span>
-                    </Link>
-                  </div>
+                  <p className="pt-1 text-center text-sm text-zinc-400">
+                    Já tem conta?{" "}
+                    <Link href="/login" className="font-medium text-emerald-300 underline-offset-4 hover:underline">Entrar</Link>
+                  </p>
                 </form>
               )}
 

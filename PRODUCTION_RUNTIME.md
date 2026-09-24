@@ -27,7 +27,7 @@ A migração `supabase/migrations/20260923210945_restrict_meta_daily_summary.sql
 
 ## VPS (desde 2026-09-24)
 
-O site também roda na VPS da Evolution, em `/opt/trafego-pro`, no container `trafego_pro` (limites: 512 MB de RAM e 0,5 vCPU), atrás do nginx em `https://trafegopro.147.93.10.249.sslip.io`. Os arquivos ficam em `deploy/vps/`.
+O site também roda na VPS da Evolution, em `/opt/trafego-pro`, no container `trafego_pro` (limites: 512 MB de RAM e 0,5 vCPU), atrás do nginx em `https://www.trafego.pro` (e `https://trafegopro.147.93.10.249.sslip.io`). O DNS do domínio fica na Hostinger, com registros A de `@` e `www` para `147.93.10.249`; o certificado Let's Encrypt é renovado pelo certbot. Os arquivos ficam em `deploy/vps/`.
 
 - Dados próprios do site (feedbacks, formulários, publicações sociais, tokens da API externa) ficam no Supabase `trafegopro-analise` (`db/site_tables_supabase.sql`). Não existe mais MySQL em produção.
 - As mídias das publicações vão para o bucket público `social-media` e os currículos para o bucket `talent-resumes`.

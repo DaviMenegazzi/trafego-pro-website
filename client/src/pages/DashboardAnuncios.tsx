@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
 import { WeeklyCreativeExportModal } from "@/components/WeeklyCreativeExportModal";
 import {
-  Button, DateRangePicker, EmptyState, IconButton, IconChip, InlineNotice, Input, MenuButton, Page, PageHeader, Popover, SegmentedControl,
+  Button, DateRangePicker, EmptyState, IconButton, IconChip, InlineNotice, Input, Page, PageHeader, Popover, SegmentedControl,
   Select, Sheet, StatusBadge, Surface, SurfaceHeader, SwitchField, type Accent, type BadgeTone,
 } from "@/components/ds";
 import { useClientContext } from "@/contexts/ClientContext";
@@ -16,7 +16,7 @@ import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, CartesianGrid, LabelList } from "recharts";
 import {
-  ArrowDownWideNarrow, ArrowUpNarrowWide, Database, Download, HelpCircle, Image as ImageIcon, RefreshCw, Search, SlidersHorizontal, AlertTriangle, MessageCircle, Target, Wallet,
+  ArrowDownWideNarrow, ArrowUpNarrowWide, Database, HelpCircle, RefreshCw, Search, SlidersHorizontal, AlertTriangle, Camera, MessageCircle, Target, Wallet,
 } from "lucide-react";
 
 function useAuthGuard() {
@@ -438,12 +438,10 @@ export default function DashboardAnunciosPage() {
               {lastSyncedAt && !loading && <span className="hidden text-xs text-zinc-500 sm:inline">Atualizado às {formatTime(lastSyncedAt)}</span>}
               <IconButton label="Atualizar anúncios" icon={<RefreshCw className={loading ? "animate-spin" : undefined} />} onClick={fetchOffers} disabled={loading || !selectedClientId} />
               {isAdmin && (
-                <MenuButton
-                  label="Exportar"
-                  icon={<Download />}
-                  disabled={loading || rows.length === 0}
-                  items={[{ label: "Imagem de criativos para WhatsApp", hint: "Criativos ativos com conversas", icon: <ImageIcon />, onSelect: () => setExportModalOpen(true) }]}
-                />
+                <Button variant="primary" disabled={loading || rows.length === 0} onClick={() => setExportModalOpen(true)}>
+                  <Camera />
+                  Imagem de criativos para WhatsApp
+                </Button>
               )}
             </>
           }

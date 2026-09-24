@@ -1,6 +1,6 @@
 import * as React from "react";
 import { DayPicker, type DateRange } from "react-day-picker";
-import { ptBR } from "react-day-picker/locale";
+import { ptBR } from "date-fns/locale/pt-BR";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatShortDate } from "@/lib/format";

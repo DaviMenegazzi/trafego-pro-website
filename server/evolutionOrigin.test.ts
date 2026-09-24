@@ -38,4 +38,23 @@ describe("Evolution origin extraction", () => {
       metaSourceType: null, googleClickId: null, payload: null,
     });
   });
+
+  it("reconhece a tag [REF:xyz] colada na landing page como evidência de Google Ads", () => {
+    const origin = extractEvolutionOrigin({ ref_tag: "campanha-outubro" });
+    expect(origin).toMatchObject({ platform: "google_ads", evidence: "observed" });
+    expect(origin.payload).toMatchObject({ ref_tag: "campanha-outubro" });
+  });
+
+  it("reconhece UTM genérico (sem indicar plataforma) como evidência, sem forçar uma plataforma", () => {
+    const origin = extractEvolutionOrigin({ source_url: "https://wa.me/5511999999999?text=Ola&utm_campaign=liquidacao" });
+    expect(origin).toMatchObject({ platform: "unknown", evidence: "observed" });
+    expect(origin.payload).toMatchObject({ utm_campaign: "liquidacao" });
+  });
+
+  it("não deixa um utm_source=facebook em URL derrubar a atribuição verificada por ctwa_clid", () => {
+    const origin = extractEvolutionOrigin({
+      referral: { ctwa_clid: "ctwa-1", source_url: "https://trafego.pro/contato?utm_source=facebook" },
+    });
+    expect(origin).toMatchObject({ platform: "meta", evidence: "verified" });
+  });
 });

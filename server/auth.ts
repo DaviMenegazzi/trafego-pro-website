@@ -22,6 +22,7 @@ export interface JwtClaims {
   role: string;
   id: string;
   allowedClientIds: string[]; // ["*"] = acesso total
+  pixelAccess?: boolean;
   iat?: number;
   exp?: number;
 }
@@ -80,30 +81,47 @@ export async function fetchUserAccess(
 ): Promise<{
   role: string;
   allowedClientIds: string[];
+  pixelAccess: boolean;
   status?: string;
   profileId?: string;
 }> {
   const sb = supabaseClient || getSupabaseForAccessToken(accessToken);
   if (!sb) {
-    return { role: "", allowedClientIds: [], status: "unauthenticated" };
+    return { role: "", allowedClientIds: [], pixelAccess: false, status: "unauthenticated" };
   }
 
   // 1. Busca perfil por ID
   let { data: profile, error: profileErr } = await sb
     .from("user_profiles")
-    .select("id, role, status, email, full_name")
+    .select("id, role, status, email, full_name, pixel_access")
     .eq("id", supabaseUid)
     .maybeSingle();
 
-  // Se não encontrar por UID e tiver e-mail, busca por e-mail
-  if (!profile && userEmail) {
-    const { data: profileByEmail } = await sb
+  if (profileErr?.code === "42703") {
+    ({ data: profile, error: profileErr } = await sb
       .from("user_profiles")
       .select("id, role, status, email, full_name")
+      .eq("id", supabaseUid)
+      .maybeSingle());
+  }
+
+  // Se não encontrar por UID e tiver e-mail, busca por e-mail
+  if (!profile && userEmail) {
+    let { data: profileByEmail, error: profileByEmailError } = await sb
+      .from("user_profiles")
+      .select("id, role, status, email, full_name, pixel_access")
       .ilike("email", userEmail.trim())
       .maybeSingle();
 
-    if (profileByEmail) {
+    if (profileByEmailError?.code === "42703") {
+      ({ data: profileByEmail, error: profileByEmailError } = await sb
+        .from("user_profiles")
+        .select("id, role, status, email, full_name")
+        .ilike("email", userEmail.trim())
+        .maybeSingle());
+    }
+
+    if (!profileByEmailError && profileByEmail) {
       profile = profileByEmail;
       profileErr = null;
     }
@@ -111,19 +129,20 @@ export async function fetchUserAccess(
 
   if (profileErr || !profile) {
     console.warn(`[auth] Nenhum profile encontrado para uid=${supabaseUid} email=${userEmail ?? "n/a"}`);
-    return { role: "", allowedClientIds: [], status: "not_found" };
+    return { role: "", allowedClientIds: [], pixelAccess: false, status: "not_found" };
   }
 
   if (profile.status !== "active") {
     console.warn(`[auth] Profile não ativo para ${profile.email} (status=${profile.status})`);
-    return { role: "", allowedClientIds: [], status: profile.status || "inactive", profileId: profile.id };
+    return { role: "", allowedClientIds: [], pixelAccess: false, status: profile.status || "inactive", profileId: profile.id };
   }
 
   const role = profile.role || "none";
+  const pixelAccess = profile.pixel_access === true;
 
   // 1. Admin vê tudo
   if (isAdminRole(role)) {
-    return { role, allowedClientIds: ["*"], status: profile.status, profileId: profile.id };
+    return { role, allowedClientIds: ["*"], pixelAccess: true, status: profile.status, profileId: profile.id };
   }
 
   // Busca acessos por UID ou pelo ID do perfil
@@ -138,19 +157,19 @@ export async function fetchUserAccess(
   // 2. Roles de equipe (viewer, designer, cs, account_manager, traffic_manager, copywriter)
   if (isTeamRole(role)) {
     if (clientIds.length > 0) {
-      return { role, allowedClientIds: clientIds, status: profile.status, profileId: profile.id };
+      return { role, allowedClientIds: clientIds, pixelAccess, status: profile.status, profileId: profile.id };
     }
     // Equipe interna sem restrição de cliente específico -> acesso padrão às contas da agência
-    return { role, allowedClientIds: ["*"], status: profile.status, profileId: profile.id };
+    return { role, allowedClientIds: ["*"], pixelAccess, status: profile.status, profileId: profile.id };
   }
 
   // 3. client_viewer: só vê o que está expressamente em user_client_access
   if (role === "client_viewer") {
-    return { role, allowedClientIds: clientIds, status: profile.status, profileId: profile.id };
+    return { role, allowedClientIds: clientIds, pixelAccess, status: profile.status, profileId: profile.id };
   }
 
   // 4. Role "none" ou desconhecida = sem acesso
-  return { role: "none", allowedClientIds: [], status: profile.status, profileId: profile.id };
+  return { role: "none", allowedClientIds: [], pixelAccess: false, status: profile.status, profileId: profile.id };
 }
 
 export type SupabaseDashboardClient = { id: string; name: string; client_group: string | null };
@@ -264,6 +283,44 @@ export function requireAuth(req: express.Request, res: express.Response, next: e
 export function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (!req.claims || !isAdminRole(req.claims.role)) {
     res.status(403).json({ error: "Acesso restrito a administradores" });
+    return;
+  }
+  next();
+}
+
+export async function resolvePixelAccessForRequest(req: express.Request): Promise<{ authenticated: boolean; allowed: boolean }> {
+  if (!req.claims) return { authenticated: false, allowed: false };
+  if (isAdminRole(req.claims.role)) return { authenticated: true, allowed: true };
+
+  const sb = getSupabaseForRequest(req);
+  if (!sb) return { authenticated: false, allowed: false };
+
+  let { data, error } = await sb
+    .from("user_profiles")
+    .select("status, pixel_access")
+    .eq("id", req.claims.id)
+    .maybeSingle();
+
+  if (!data && req.claims.email) {
+    ({ data, error } = await sb
+      .from("user_profiles")
+      .select("status, pixel_access")
+      .ilike("email", req.claims.email.trim())
+      .maybeSingle());
+  }
+
+  if (error || !data) return { authenticated: true, allowed: false };
+  return { authenticated: true, allowed: data.status === "active" && data.pixel_access === true };
+}
+
+export async function requirePixelAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const access = await resolvePixelAccessForRequest(req);
+  if (!access.authenticated) {
+    res.status(401).json({ error: "Sessão expirada. Faça login novamente." });
+    return;
+  }
+  if (!access.allowed) {
+    res.status(403).json({ error: "O Pixel não está liberado para este usuário." });
     return;
   }
   next();

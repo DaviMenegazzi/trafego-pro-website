@@ -43,6 +43,7 @@ describe("Evolution webhook secret", () => {
         key: { id: "endpoint-supabase", remoteJid: "5511999999999@s.whatsapp.net", fromMe: false },
         message: { conversation: "Teste de ponta a ponta" },
         messageTimestamp: 1_700_000_002,
+        referral: { ctwa_clid: "ctwa-endpoint", source_id: "ad-endpoint", source_type: "ad" },
       },
     };
     const event = normalizeEvolutionWebhook(body);
@@ -58,6 +59,34 @@ describe("Evolution webhook secret", () => {
     expect(response.status).toBe(202);
     await expect(response.json()).resolves.toEqual({ accepted: true, duplicate: false });
     expect((await listEvolutionEventsSupabase(100)).some((item) => item.instanceName === instanceName)).toBe(true);
+  });
+
+  it("persiste uma conversa orgânica em quarentena (invisível no Pixel) em vez de descartar", async () => {
+    const instanceName = `__evolution_organic_${Date.now()}`;
+    const body = {
+      event: "messages.upsert",
+      instance: instanceName,
+      data: {
+        key: { id: "endpoint-organic", remoteJid: "5511977776666@s.whatsapp.net", fromMe: false },
+        message: { conversation: "Oi" },
+        messageTimestamp: 1_700_000_003,
+      },
+    };
+    const normalized = normalizeEvolutionWebhook(body);
+    if (!normalized) throw new Error("Evento orgânico não foi normalizado");
+    webhookTestRows.push({ instanceName: normalized.instanceName, contactKey: normalized.contactKey, fingerprint: normalized.fingerprint });
+
+    const response = await fetch(`${baseUrl}/api/evolution/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.EVOLUTION_WEBHOOK_SECRET}` },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual({ accepted: true, duplicate: false });
+    expect((await listEvolutionEventsSupabase(100)).some((item) => item.instanceName === instanceName)).toBe(true);
+    const lead = (await listEvolutionLeadsSupabase()).find((item) => item.instanceName === instanceName);
+    expect(lead).toMatchObject({ isQuarantine: true, originEvidence: "none" });
   });
 
   it("rejeita chamadas sem o segredo do webhook", async () => {
@@ -106,6 +135,34 @@ describe("Evolution webhook normalization", () => {
     expect(event?.fingerprint).toHaveLength(64);
   });
 
+  it("extrai a tag [REF:xyz] do texto da mensagem como evidência determinística de origem", () => {
+    const event = normalizeEvolutionWebhook({
+      event: "messages.upsert",
+      instance: "vida-card-ijui",
+      data: {
+        key: { id: "message-ref-tag", remoteJid: "5599999999999@s.whatsapp.net", fromMe: false },
+        message: { conversation: "Olá, vim pelo anúncio [REF:outubro-liquidacao]" },
+        messageTimestamp: 1_700_000_004,
+      },
+    });
+    expect(event?.origin).toMatchObject({ platform: "google_ads", evidence: "observed" });
+    expect(event?.origin.payload).toMatchObject({ ref_tag: "outubro-liquidacao" });
+  });
+
+  it("extrai UTM de um link wa.me enviado como texto da mensagem", () => {
+    const event = normalizeEvolutionWebhook({
+      event: "messages.upsert",
+      instance: "vida-card-ijui",
+      data: {
+        key: { id: "message-wa-utm", remoteJid: "5599999999999@s.whatsapp.net", fromMe: false },
+        message: { conversation: "https://wa.me/555199999999?text=Ola&utm_source=google&utm_campaign=liquidacao" },
+        messageTimestamp: 1_700_000_005,
+      },
+    });
+    expect(event?.origin).toMatchObject({ platform: "google_ads", evidence: "observed" });
+    expect(event?.origin.payload).toMatchObject({ utm_source: "google", utm_campaign: "liquidacao" });
+  });
+
   it("não usa o pushName da própria instância como nome do contato em mensagem enviada", () => {
     const event = normalizeEvolutionWebhook({
       event: "messages.upsert",
@@ -132,18 +189,19 @@ describe("Evolution webhook normalization", () => {
 
   it("persiste uma conversa com mensagens dos dois lados e substitui o nome pelo contato recebido", async () => {
     const instanceName = `__evolution_conversation_${Date.now()}`;
-    const outgoing = normalizeEvolutionWebhook({
-      event: "messages.upsert", instance: instanceName,
-      data: {
-        key: { id: "outgoing-conversation", remoteJid: "5511988887777@s.whatsapp.net", fromMe: true },
-        message: { conversation: "Olá, como posso ajudar?" }, pushName: "Nome da instância", messageTimestamp: 1_700_000_101,
-      },
-    });
     const incoming = normalizeEvolutionWebhook({
       event: "messages.upsert", instance: instanceName,
       data: {
         key: { id: "incoming-conversation", remoteJid: "5511988887777@s.whatsapp.net", fromMe: false },
-        message: { conversation: "Quero conhecer o cartão" }, pushName: "Contato Real", messageTimestamp: 1_700_000_102,
+        message: { conversation: "Quero conhecer o cartão" }, pushName: "Contato Real", messageTimestamp: 1_700_000_101,
+        referral: { ctwa_clid: "ctwa-conversation", source_id: "ad-conversation", source_type: "ad" },
+      },
+    });
+    const outgoing = normalizeEvolutionWebhook({
+      event: "messages.upsert", instance: instanceName,
+      data: {
+        key: { id: "outgoing-conversation", remoteJid: "5511988887777@s.whatsapp.net", fromMe: true },
+        message: { conversation: "Olá, como posso ajudar?" }, pushName: "Nome da instância", messageTimestamp: 1_700_000_102,
       },
     });
     if (!outgoing || !incoming || !outgoing.contactKey) throw new Error("Eventos de conversa inválidos");
@@ -152,15 +210,15 @@ describe("Evolution webhook normalization", () => {
       { instanceName, contactKey: incoming.contactKey, fingerprint: incoming.fingerprint },
     );
 
-    await expect(recordEvolutionEventSupabase(outgoing)).resolves.toMatchObject({ duplicate: false });
     await expect(recordEvolutionEventSupabase(incoming)).resolves.toMatchObject({ duplicate: false });
+    await expect(recordEvolutionEventSupabase(outgoing)).resolves.toMatchObject({ duplicate: false });
 
     const lead = (await listEvolutionLeadsSupabase()).find((item) => item.instanceName === instanceName);
     expect(lead).toMatchObject({ contactName: "Contato Real", messagesReceived: 1, messagesSent: 1 });
     if (!lead) throw new Error("Contato da conversa não encontrado");
     await expect(listEvolutionMessagesSupabase(lead.id)).resolves.toEqual([
-      expect.objectContaining({ direction: "outgoing", bodyText: "Olá, como posso ajudar?" }),
       expect.objectContaining({ direction: "incoming", bodyText: "Quero conhecer o cartão" }),
+      expect.objectContaining({ direction: "outgoing", bodyText: "Olá, como posso ajudar?" }),
     ]);
   });
 
@@ -195,7 +253,12 @@ describe("Evolution webhook normalization", () => {
     const event = normalizeEvolutionWebhook({
       event: "MESSAGES_UPSERT",
       instance: instanceName,
-      data: { key: { id: "dedupe-message", remoteJid: "5599999999999@s.whatsapp.net", fromMe: false }, message: { conversation: "Teste isolado" }, messageTimestamp: 1_700_000_001 },
+      data: {
+        key: { id: "dedupe-message", remoteJid: "5599999999999@s.whatsapp.net", fromMe: false },
+        message: { conversation: "Teste isolado" },
+        messageTimestamp: 1_700_000_001,
+        referral: { ctwa_clid: "ctwa-dedupe", source_id: "ad-dedupe", source_type: "ad" },
+      },
     });
     if (!event) throw new Error("Evento de teste não foi normalizado");
     webhookTestRows.push({ instanceName: event.instanceName, contactKey: event.contactKey, fingerprint: event.fingerprint });

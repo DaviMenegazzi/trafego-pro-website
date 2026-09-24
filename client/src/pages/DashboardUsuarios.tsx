@@ -54,6 +54,7 @@ type ProfileRow = {
   status: string;
   bio: string;
   avatar_url: string | null;
+  pixel_access: boolean;
   created_at: string;
   updated_at: string;
   client_access: Array<{
@@ -159,6 +160,7 @@ export default function DashboardUsuariosPage() {
   const [approveClientIds, setApproveClientIds] = useState<string[]>([]);
   const [approving, setApproving] = useState(false);
 
+  const [updatingPixelUserId, setUpdatingPixelUserId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -466,6 +468,30 @@ export default function DashboardUsuariosPage() {
     }
   }
 
+  async function handlePixelAccessChange(profile: ProfileRow, enabled: boolean) {
+    if (profile.role === "admin") return;
+    setUpdatingPixelUserId(profile.id);
+    try {
+      const res = await fetch(`/api/user-access/${profile.id}`, {
+        method: "PUT",
+        headers: authHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ pixel_access: enabled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Erro ao alterar a permissão do Pixel");
+        return;
+      }
+      setProfiles((current) => current.map((item) => item.id === profile.id ? { ...item, pixel_access: enabled } : item));
+      toast.success(enabled ? "Pixel liberado para o usuário" : "Acesso ao Pixel revogado");
+    } catch {
+      toast.error("Erro de conexão");
+    } finally {
+      setUpdatingPixelUserId(null);
+    }
+  }
+
   async function handleGrantAccess(userId: string, clientId: string) {
     if (!clientId) {
       toast.error("Selecione uma unidade");
@@ -661,6 +687,13 @@ export default function DashboardUsuariosPage() {
                             label={`Mais ações para ${name}`}
                             size="sm"
                             items={[
+                              profile.role === "admin"
+                                ? { label: "Pixel sempre liberado", hint: "Admin", disabled: true, onSelect: () => {} }
+                                : {
+                                    label: updatingPixelUserId === profile.id ? "Salvando…" : profile.pixel_access ? "Revogar acesso ao Pixel" : "Liberar acesso ao Pixel",
+                                    disabled: updatingPixelUserId === profile.id,
+                                    onSelect: () => void handlePixelAccessChange(profile, !profile.pixel_access),
+                                  },
                               { label: "Redefinir senha", onSelect: () => { setResetPasswordProfile(profile); setNewPasswordInput(""); setPasswordError(""); } },
                               { label: "Desativar ou excluir", tone: "danger", onSelect: () => { setConfirmDelete(profile); setDeletePermanent(false); } },
                             ]}

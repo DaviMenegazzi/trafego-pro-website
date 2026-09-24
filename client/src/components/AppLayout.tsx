@@ -21,12 +21,14 @@ import {
   FileSpreadsheet,
   Check,
   Search,
+  ScanLine,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
 import { IconButton, Menu, Popover, PopoverClose, Tooltip } from "@/components/ds";
 import { cn } from "@/lib/utils";
 import { resolveActiveNav } from "@/lib/navigation";
+import { canAccessPixel } from "@/lib/pixelAccessPolicy";
 
 const DURATION = "200ms";
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
@@ -38,6 +40,7 @@ function getStoredUser(): {
   email?: string;
   role?: string;
   allowedClientIds?: string[];
+  pixelAccess?: boolean;
 } {
   try {
     return JSON.parse(localStorage.getItem("tp_user") ?? "{}");
@@ -56,9 +59,8 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 const NAV_BASE: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
-  { to: "/dashboard/feedback-leads", label: "Feedback de Leads", icon: MessageSquare },
+  { to: "/dashboard/pixel", label: "Pixel", icon: ScanLine },
   { to: "/dashboard/banco-talentos", label: "Banco de Talentos", icon: UsersRound },
-  { to: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 const NAV_ADMIN_ONLY: NavItem[] = [
@@ -320,6 +322,30 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [pathname] = useLocation();
 
   const admin = isAdminUser();
+  const [pixelAllowed, setPixelAllowed] = useState(() => canAccessPixel(getStoredUser()));
+
+  useEffect(() => {
+    const token = localStorage.getItem("tp_token");
+    if (!token) {
+      setPixelAllowed(false);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((user) => {
+        if (cancelled || !user) return;
+        localStorage.setItem("tp_user", JSON.stringify(user));
+        setPixelAllowed(canAccessPixel(user));
+      })
+      .catch(() => setPixelAllowed(canAccessPixel(getStoredUser())));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -365,8 +391,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }, [admin]);
 
   const visibleNavBase = useMemo(
-    () => (!admin && clientFormsVisible ? [...NAV_BASE, CLIENT_FORMS_RESULTS_ITEM] : NAV_BASE),
-    [admin, clientFormsVisible],
+    () => {
+      const base = NAV_BASE.filter((item) => item.to !== "/dashboard/pixel" || pixelAllowed);
+      return !admin && clientFormsVisible ? [...base, CLIENT_FORMS_RESULTS_ITEM] : base;
+    },
+    [admin, clientFormsVisible, pixelAllowed],
   );
 
   const activeTo = resolveActiveNav(pathname, admin ? [...visibleNavBase, ...NAV_ADMIN_ONLY] : visibleNavBase);

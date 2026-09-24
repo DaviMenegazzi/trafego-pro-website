@@ -1,6 +1,8 @@
 export type AuthorizedEvolutionUnit = {
   id: string;
   name: string;
+  metaAccountId?: string;
+  aliases?: readonly string[];
 };
 
 /**
@@ -13,5 +15,6 @@ export function resolveAuthorizedEvolutionUnit(
   units: readonly AuthorizedEvolutionUnit[],
 ): AuthorizedEvolutionUnit | null {
   if (typeof unitId !== "string" || !unitId.trim()) return null;
-  return units.find((unit) => unit.id === unitId) ?? null;
+  const requestedId = unitId.trim();
+  return units.find((unit) => unit.id === requestedId || unit.aliases?.includes(requestedId)) ?? null;
 }

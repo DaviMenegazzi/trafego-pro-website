@@ -41,6 +41,7 @@ import { formRouter } from "./routes/formRoutes.js";
 import { userAccessRouter } from "./routes/userAccessRoutes.js";
 import { healthRouter } from "./routes/healthRoutes.js";
 import { startDailyMetricsBackupScheduler } from "./dailyMetricsBackupService.js";
+import { startEvolutionLiveAiFlushLoop } from "./evolutionLeadStageBuffer.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,8 +94,20 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     standardHeaders: "draft-8",
     legacyHeaders: false,
     message: { error: "Muitas requisições. Aguarde alguns instantes." },
+    skip: (req) => req.path === "/api/evolution/webhook",
   });
 
+  // ─── Rate Limiter Dedicado ao Webhook Evolution ─────────────────────────────
+  // Absorve rajadas legítimas da VPS Evolution sem disputar o limite geral.
+  const evolutionWebhookRateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: process.env.NODE_ENV === "test" ? 50_000 : 10_000, // 10.000 req/min
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Muitas requisições ao webhook Evolution." },
+  });
+
+  app.use("/api/evolution/webhook", evolutionWebhookRateLimiter);
   app.use("/api/", apiGeneralRateLimiter);
   app.use(compression());
   app.use(express.json({ limit: "10mb" }));
@@ -125,6 +138,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
     server.listen(port, "0.0.0.0", () => {
       console.log(`Server running on http://0.0.0.0:${port}/`);
       startDailyMetricsBackupScheduler();
+      const flushIntervalMinutes = Number(process.env.EVOLUTION_AI_LIVE_FLUSH_INTERVAL_MINUTES) || 15;
+      startEvolutionLiveAiFlushLoop(flushIntervalMinutes * 60_000);
     });
   }
 

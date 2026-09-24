@@ -61,9 +61,11 @@ O filtro de período tem atalhos e intervalo personalizado. A troca de unidade c
 
 Os feedbacks de leads são gravados na tabela SQL `lead_feedbacks`. O formulário registra semana, volume de leads, atendimento, conversão, motivos de perda, qualidade e satisfação. Usuários só podem enviar registros para as unidades atribuídas; a listagem e a exportação XLSX são administrativas.
 
-## Evolution Monitor
+## Evolution Monitor e Pixel
 
-O Evolution Monitor é isolado em `/evolution` e não altera os fluxos, métricas ou dados da dashboard.
+O monitor administrativo continua isolado em `/evolution`. A dashboard também oferece `/dashboard/pixel`, com instâncias e conversas segregadas pela unidade selecionada. A criação da instância, a configuração do webhook e a geração do QR Code passam sempre pelo backend; a chave global da Evolution nunca é exposta ao browser.
+
+Antes de habilitar o Pixel em um ambiente existente, aplique `db/evolution_pixel_instance_binding.sql` no Supabase exclusivo do Evolution. A migração adiciona os IDs estáveis da unidade e da conta Meta à instância; instâncias antigas devem ser novamente salvas no monitor administrativo para receber esse vínculo.
 
 ### Supabase exclusivo
 
@@ -111,6 +113,16 @@ O módulo preserva `ctwa_clid`, referências Meta, UTMs e `gclid` quando chegam 
 
 Uma mensagem na Evolution comprova a chegada da conversa, mas não comprova por si só a origem em Meta ou Google. A atribuição só é confirmada quando existe metadado rastreável.
 
+### Classificação de estágio do CRM ao vivo (Laya)
+
+Cada mensagem recebida dispara uma classificação síncrona via um serviço [Laya](https://huggingface.co/convaiinnovations/laya)
+auto-hospedado na VPS (`services/laya-classifier/`, sem OpenAI). O resultado fica num buffer em
+memória do processo Node (`server/evolutionLeadStageBuffer.ts`) e só é gravado no Supabase em lote,
+a cada `EVOLUTION_AI_LIVE_FLUSH_INTERVAL_MINUTES` — para não gerar uma requisição de escrita por
+mensagem. A automação diária baseada em OpenAI (`server/evolutionAiAutomation.ts`) continua
+existindo como fallback, desligável independentemente pela flag `daily_lead_stage` em
+`evolution_ai_automation_settings`.
+
 ## Variáveis de ambiente
 
 Nunca registre valores reais no repositório.
@@ -129,6 +141,18 @@ DATABASE_URL=
 EVOLUTION_SUPABASE_URL=
 EVOLUTION_SUPABASE_SERVICE_ROLE_KEY=
 EVOLUTION_WEBHOOK_SECRET=
+
+# Provisionamento de instâncias na VPS Evolution
+EVOLUTION_API_URL=https://evolution.seu-dominio.com
+EVOLUTION_API_KEY=
+# URL pública completa deste backend. Pode ser omitida quando PUBLIC_APP_URL estiver definida.
+EVOLUTION_WEBHOOK_PUBLIC_URL=https://dashboard.seu-dominio.com/api/evolution/webhook
+PUBLIC_APP_URL=https://dashboard.seu-dominio.com
+
+# Classificação ao vivo do CRM (Laya, self-hosted na VPS)
+LAYA_SERVICE_URL=https://laya.147.93.10.249.sslip.io
+LAYA_SERVICE_SECRET=
+EVOLUTION_AI_LIVE_FLUSH_INTERVAL_MINUTES=15
 ```
 
 ## Desenvolvimento
@@ -154,6 +178,7 @@ client/src/
 ├── App.tsx                         # Rotas públicas, dashboard e /evolution
 ├── contexts/ClientContext.tsx      # Unidades autorizadas da dashboard
 ├── pages/EvolutionAdmin.tsx        # Monitor, conversas, origem e multi-instância
+├── pages/DashboardPixel.tsx       # Pixel por unidade, QR Code e conversas de leads
 └── lib/evolutionScope.ts           # Filtros por unidade e instância
 
 server/
@@ -163,6 +188,7 @@ server/
 ├── evolutionWebhook.ts             # Normalização de eventos Evolution
 ├── evolutionOrigin.ts              # Sinais de origem
 ├── evolutionMetaAttribution.ts     # Associação Meta auditável
+├── evolutionApiClient.ts           # Provisionamento seguro e QR Code da Evolution API v2
 └── evolutionSupabaseStore.ts       # Persistência exclusiva Evolution
 ```
 
@@ -170,4 +196,4 @@ server/
 
 A suíte cobre autenticação, RLS de unidades, respostas 401, feedbacks, webhook Bearer, deduplicação, mensagens enviadas e recebidas, atualizações de contatos, atribuição auditável e filtros multi-instância.
 
-Ao adicionar um WhatsApp, conecte a instância na Evolution, encaminhe os eventos ao mesmo webhook Bearer e, em `/evolution`, atribua um nome operacional e uma unidade. Os dados passam a aparecer automaticamente nos filtros e consolidados do painel.
+Ao adicionar um WhatsApp pelo Pixel, o backend cria a instância `WHATSAPP-BAILEYS`, configura o webhook Bearer e devolve somente a imagem do QR Code. A unidade é validada novamente no servidor antes de criar a instância ou ler conversas. O MVP mostra leads confirmados e contatos pendentes com evidência Meta/Google; contatos marcados como `nao_lead` ou sem evidência ficam fora da aba.

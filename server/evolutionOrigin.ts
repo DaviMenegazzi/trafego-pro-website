@@ -78,10 +78,19 @@ export function extractEvolutionOrigin(...sources: unknown[]): EvolutionOrigin {
   const urlTags = queryTags(sourceUrl);
   const googleClickId = take(values, "gclid", "gbraid", "wbraid") ?? urlTags.gclid ?? urlTags.gbraid ?? urlTags.wbraid ?? null;
   const fbClickId = take(values, "fbclid") ?? urlTags.fbclid ?? null;
+  // Tag determinística `[REF:xyz]` colada na landing page/anúncio, ou UTM já capturado via `sourceUrl`
+  // acima (inclusive quando extraído do texto livre da mensagem — ver evolutionWebhook.ts).
+  // Cobre atribuição tardia sem referral nativo do Baileys (ex.: Google Ads, link wa.me com UTM).
+  const refTag = take(values, "ref_tag", "refTag");
+  const utmSourceValue = urlTags.utm_source?.toLowerCase() ?? null;
+  const utmSuggestsGoogle = utmSourceValue ? /google|adwords|gads/.test(utmSourceValue) : false;
   const hasMetaSignal = Boolean(metaCtwaClid || metaSourceId || metaSourceType?.toLowerCase() === "ad" || fbClickId);
-  const hasGoogleSignal = Boolean(googleClickId);
+  const hasGoogleSignal = Boolean(googleClickId || refTag || utmSuggestsGoogle);
+  // Qualquer UTM genérico (sem indicar a plataforma) ainda conta como evidência de campanha —
+  // o suficiente para tirar o lead da quarentena — mesmo sem atribuir uma plataforma específica.
+  const hasGenericUtmSignal = Boolean(urlTags.utm_source || urlTags.utm_campaign || urlTags.utm_medium || urlTags.utm_content || urlTags.utm_term);
   const platform: EvolutionOriginPlatform = hasMetaSignal && hasGoogleSignal ? "mixed" : hasMetaSignal ? "meta" : hasGoogleSignal ? "google_ads" : "unknown";
-  const evidence: EvolutionOriginEvidence = metaCtwaClid ? "verified" : hasMetaSignal || hasGoogleSignal ? "observed" : "none";
+  const evidence: EvolutionOriginEvidence = metaCtwaClid ? "verified" : hasMetaSignal || hasGoogleSignal || hasGenericUtmSignal ? "observed" : "none";
 
   const payload = Object.fromEntries(Object.entries({
     ctwa_clid: metaCtwaClid,
@@ -90,6 +99,7 @@ export function extractEvolutionOrigin(...sources: unknown[]): EvolutionOrigin {
     source_url: safeSourceUrl(sourceUrl),
     gclid: googleClickId,
     fbclid: fbClickId,
+    ref_tag: refTag,
     ...urlTags,
   }).filter((entry): entry is [string, string] => Boolean(entry[1])));
 

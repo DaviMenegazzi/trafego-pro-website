@@ -11,6 +11,7 @@ import TrafegoProHome from "./pages/TrafegoProHome";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { AdminRoute } from "./components/AdminRoute";
+import { PixelRoute } from "./components/PixelRoute";
 
 // Home, login e cadastro vão no pacote inicial (são a porta de entrada).
 // As demais telas carregam sob demanda: quem abre a home não baixa o
@@ -37,6 +38,7 @@ const DashboardFeedbackLeadsList = page(() => import("./pages/DashboardFeedbackL
 const DashboardUsuarios = page(() => import("./pages/DashboardUsuarios"));
 const DashboardExternalAiTokens = page(() => import("./pages/DashboardExternalAiTokens"));
 const DashboardFormularios = page(() => import("./pages/DashboardFormularios"));
+const DashboardPixel = page(() => import("./pages/DashboardPixel"));
 const AdminMetricsOverview = page(() => import("./pages/AdminMetricsOverview"));
 const TalentPublicForm = page(() => import("./pages/TalentPublicForm"));
 const TalentBankAdmin = page(() => import("./pages/TalentBankAdmin"));
@@ -75,6 +77,8 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/banco-talentos/"} component={TalentBankAdmin} />
       <Route path={"/dashboard/formularios"} component={DashboardFormularios} />
       <Route path={"/dashboard/formularios/"} component={DashboardFormularios} />
+      <PixelRoute path={"/dashboard/pixel"} component={DashboardPixel} />
+      <PixelRoute path={"/dashboard/pixel/"} component={DashboardPixel} />
       <AdminRoute path={"/admin/metricas"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/metricas/"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/financeiro"} component={AdminFinanceiro} />

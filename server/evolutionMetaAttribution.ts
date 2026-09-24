@@ -12,6 +12,7 @@ export type MetaOfferRow = {
   ad_name?: string;
   creative_id?: string;
   creative_name?: string;
+  ad_image_url?: string;
 };
 
 function text(value: unknown): string | null {
@@ -51,6 +52,7 @@ export function resolveEvolutionMetaAttribution(
     adName: text(match?.ad_name),
     creativeId: text(match?.creative_id),
     creativeName: text(match?.creative_name),
+    adImageUrl: text(match?.ad_image_url),
     matchedBy: match ? `meta_source_id:${event.origin.metaSourceType ?? "id"}` : "meta_source_id_sem_correspondencia",
     matchStatus: match ? "matched" : "unresolved",
   };

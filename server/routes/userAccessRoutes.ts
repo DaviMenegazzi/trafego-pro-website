@@ -24,7 +24,7 @@ userAccessRouter.get("/user-access", requireAuth, requireAdmin, async (req, res)
   let error: any;
   ({ data: profiles, error } = await sb
     .from("user_profiles")
-    .select("id, full_name, email, role, status, bio, avatar_url, created_at, updated_at")
+    .select("id, full_name, email, role, status, bio, avatar_url, pixel_access, created_at, updated_at")
     .order("email"));
 
   // Instalações anteriores da dashboard não possuem os campos visuais
@@ -101,6 +101,7 @@ userAccessRouter.get("/user-access", requireAuth, requireAdmin, async (req, res)
     status: p.status || "active",
     bio: p.bio,
     avatar_url: p.avatar_url,
+    pixel_access: p.role === "admin" || p.pixel_access === true,
     created_at: p.created_at,
     updated_at: p.updated_at,
     client_access: accessByUser[p.id] || [],
@@ -166,7 +167,17 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
       res.status(503).json({ error: "Serviço de banco de dados indisponível" });
       return;
     }
-    const { role, full_name, status } = req.body as { role?: string; full_name?: string; status?: string };
+    const { role, full_name, status, pixel_access } = req.body as {
+      role?: string;
+      full_name?: string;
+      status?: string;
+      pixel_access?: boolean;
+    };
+
+    if (pixel_access !== undefined && typeof pixel_access !== "boolean") {
+      res.status(400).json({ error: "Permissão do Pixel inválida" });
+      return;
+    }
 
     if (status === "inactive" || status === "disabled" || status === "rejected") {
       const result = await setProfileInactive(sb, req.params.id);
@@ -187,6 +198,7 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
     const updates: Record<string, unknown> = {};
     if (role) updates.role = role;
     if (full_name !== undefined) updates.full_name = full_name;
+    if (pixel_access !== undefined) updates.pixel_access = pixel_access;
     if (status !== undefined) {
       const normalizedStatus = normalizeManagedUserStatus(status);
       if (!normalizedStatus) {
@@ -201,7 +213,7 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
       .from("user_profiles")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", req.params.id)
-      .select("id, full_name, email, role, status")
+      .select("id, full_name, email, role, status, pixel_access")
       .single();
 
     if (error?.code === "42703") {
@@ -209,7 +221,7 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
         .from("user_profiles")
         .update(updates)
         .eq("id", req.params.id)
-        .select("id, full_name, email, role, status")
+        .select("id, full_name, email, role, status, pixel_access")
         .single());
     }
 
@@ -228,6 +240,7 @@ userAccessRouter.put("/user-access/:id", requireAuth, requireAdmin, async (req, 
       full_name: data.full_name,
       role: data.role || "none",
       status: data.status || "active",
+      pixel_access: data.role === "admin" || data.pixel_access === true,
     });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Falha inesperada ao atualizar o status";

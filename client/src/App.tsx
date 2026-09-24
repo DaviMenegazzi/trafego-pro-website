@@ -1,6 +1,8 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ConfirmProvider } from "@/components/ds";
 import NotFound from "@/pages/NotFound";
+import { lazy, Suspense } from "react";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -24,6 +26,9 @@ import SocialPublishingAdmin from "./pages/SocialPublishingAdmin";
 
 import { AdminRoute } from "./components/AdminRoute";
 import AdminFinanceiro from "./pages/admin/financeiro";
+
+// Vitrine do design system: só em desenvolvimento, fora do bundle de produção.
+const DesignSystemPreview = import.meta.env.DEV ? lazy(() => import("./pages/DesignSystemPreview")) : null;
 
 function ExistingSiteRoutes() {
   return (
@@ -59,6 +64,11 @@ function ExistingSiteRoutes() {
       <AdminRoute path={"/dashboard/financeiro/"} component={AdminFinanceiro} />
       <AdminRoute path={"/dashboard/metricas"} component={AdminMetricsOverview} />
       <AdminRoute path={"/dashboard/metricas/"} component={AdminMetricsOverview} />
+      {DesignSystemPreview && (
+        <Route path={"/dev/ds"}>
+          <Suspense fallback={null}><DesignSystemPreview /></Suspense>
+        </Route>
+      )}
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
@@ -73,7 +83,8 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
-        <TooltipProvider>
+        <TooltipProvider delayDuration={400} skipDelayDuration={300}>
+          <ConfirmProvider>
           <Toaster />
           <Switch>
             <Route path={"/"} component={TrafegoProHome} />
@@ -88,6 +99,7 @@ function App() {
             <Route path={"/trabalhe-conosco/:slug"} component={TalentPublicForm} />
             <Route component={ExistingSiteWithClientProvider} />
           </Switch>
+          </ConfirmProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

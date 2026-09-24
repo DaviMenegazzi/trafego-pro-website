@@ -1,20 +1,19 @@
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
+// O produto é escuro; o Toaster não depende de next-themes (sem provedor no app).
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme="dark"
+      position="bottom-right"
       className="toaster group"
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-        } as React.CSSProperties
-      }
+      toastOptions={{
+        classNames: {
+          toast: "!rounded-xl !border-white/10 !bg-zinc-900 !text-zinc-100 !shadow-2xl",
+          description: "!text-zinc-400",
+          actionButton: "!bg-white/10 !text-white",
+        },
+      }}
       {...props}
     />
   );

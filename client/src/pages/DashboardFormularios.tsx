@@ -31,6 +31,7 @@ import { NewFormEndpointModal } from "./forms/NewFormEndpointModal";
 import { FormIntegrationCodeModal } from "./forms/FormIntegrationCodeModal";
 import { checkAdminAuth } from "@/components/AdminRoute";
 import {
+  Avatar,
   Button,
   EmptyState,
   IconButton,
@@ -474,6 +475,7 @@ export default function DashboardFormularios() {
                       return (
                         <li key={sub.id}>
                           <button type="button" onClick={() => setSelectedSubmission(sub)} className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none hover:bg-white/[0.02] focus-visible:bg-white/[0.04]">
+                            <Avatar name={name} size="sm" />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-medium text-zinc-100">{name}</span>
                               <span className="block truncate text-xs text-zinc-500">
@@ -509,16 +511,23 @@ export default function DashboardFormularios() {
                           const whatsAppLink = phone ? getWhatsAppLink(phone, name) : "";
                           return (
                             <tr key={sub.id} className="whitespace-nowrap text-zinc-300 transition-colors hover:bg-white/[0.02]">
-                              <td className="max-w-[260px] py-2.5 pl-5 pr-3">
+                              <td className="max-w-[300px] py-2.5 pl-5 pr-3">
+                                <div className="flex items-center gap-3">
+                                <Avatar name={name} size="sm" />
+                                <div className="min-w-0">
                                 <button type="button" onClick={() => setSelectedSubmission(sub)} className="block max-w-full truncate rounded-md text-left font-medium text-zinc-100 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-emerald-400/60">
                                   {name}
                                 </button>
                                 {email && <span className="block truncate text-xs text-zinc-500">{email}</span>}
+                                </div>
+                                </div>
                               </td>
                               <td className="px-3 py-2.5 tabular-nums">{phone ? formatPhone(phone) : "—"}</td>
                               <td className="max-w-[220px] truncate px-3 py-2.5">{sub.formName}</td>
                               {clients.length > 1 && <td className="max-w-[200px] truncate px-3 py-2.5 text-zinc-400">{clientNameMap.get(sub.clientId) || sub.clientId}</td>}
-                              <td className="px-3 py-2.5 tabular-nums text-zinc-400" title={formatSubmissionDate(sub.submittedAt)}>{formatRelative(sub.submittedAt)}</td>
+                              <td className="px-3 py-2.5 tabular-nums text-zinc-400" title={formatSubmissionDate(sub.submittedAt)}>
+                                {isSameLocalDay(sub.submittedAt) ? <StatusBadge tone="info">Hoje · {formatRelative(sub.submittedAt)}</StatusBadge> : formatRelative(sub.submittedAt)}
+                              </td>
                               <td className="py-2 pl-3 pr-5 text-right">
                                 {whatsAppLink && (
                                   <IconButton asChild label="Conversar no WhatsApp" size="sm" icon={<a href={whatsAppLink} target="_blank" rel="noopener noreferrer"><MessageCircle /></a>} />

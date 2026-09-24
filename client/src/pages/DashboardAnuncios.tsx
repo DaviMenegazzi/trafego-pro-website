@@ -4,8 +4,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
 import { WeeklyCreativeExportModal } from "@/components/WeeklyCreativeExportModal";
 import {
-  Button, DateRangePicker, EmptyState, IconButton, InlineNotice, Input, MenuButton, Page, PageHeader, Popover, SegmentedControl,
-  Select, Sheet, StatusBadge, Surface, SurfaceHeader, SwitchField, type BadgeTone,
+  Button, DateRangePicker, EmptyState, IconButton, IconChip, InlineNotice, Input, MenuButton, Page, PageHeader, Popover, SegmentedControl,
+  Select, Sheet, StatusBadge, Surface, SurfaceHeader, SwitchField, type Accent, type BadgeTone,
 } from "@/components/ds";
 import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
@@ -16,7 +16,7 @@ import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, CartesianGrid, LabelList } from "recharts";
 import {
-  ArrowDownWideNarrow, ArrowUpNarrowWide, Database, Download, HelpCircle, Image as ImageIcon, RefreshCw, Search, SlidersHorizontal, AlertTriangle,
+  ArrowDownWideNarrow, ArrowUpNarrowWide, Database, Download, HelpCircle, Image as ImageIcon, RefreshCw, Search, SlidersHorizontal, AlertTriangle, MessageCircle, Target, Wallet,
 } from "lucide-react";
 
 function useAuthGuard() {
@@ -119,10 +119,13 @@ function Thumb({ row, className, fit = "cover" }: { row: AdRow; className?: stri
 }
 
 function AdDetail({ ad }: { ad: ConsolidatedAdRow }) {
+  // Os três números que decidem o anúncio, com a cor do assunto (igual aos gráficos).
+  const headline: { label: string; value: string; accent: Accent; icon: React.ReactNode }[] = [
+    { label: "Conversas iniciadas", value: n(ad.total_conversas_iniciadas), accent: "aqua", icon: <MessageCircle /> },
+    { label: "Valor investido", value: brl(ad.total_spend), accent: "blue", icon: <Wallet /> },
+    { label: "Custo por conversa", value: ad.custo_por_conversa != null ? brl(ad.custo_por_conversa) : "—", accent: "orange", icon: <Target /> },
+  ];
   const metrics: [string, string][] = [
-    ["Conversas iniciadas", n(ad.total_conversas_iniciadas)],
-    ["Valor investido", brl(ad.total_spend)],
-    ["Custo por conversa", ad.custo_por_conversa != null ? brl(ad.custo_por_conversa) : "—"],
     ["Leads Meta", n(ad.total_leads_meta)],
     ["CPL Meta", ad.cpl_meta != null ? brl(ad.cpl_meta) : "—"],
     ["Impressões", n(ad.total_impressions)],
@@ -154,6 +157,17 @@ function AdDetail({ ad }: { ad: ConsolidatedAdRow }) {
         {ad.ad_count && ad.ad_count > 1 ? <StatusBadge tone="neutral" dot={false}>{ad.ad_count} conjuntos</StatusBadge> : null}
       </div>
       {ad.performance_reason && <p className="text-sm text-zinc-400">{ad.performance_reason}</p>}
+      <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {headline.map((h) => (
+          <div key={h.label} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <IconChip icon={h.icon} accent={h.accent} size="sm" />
+            <div className="min-w-0">
+              <dt className="truncate text-xs text-zinc-500">{h.label}</dt>
+              <dd className="text-base font-semibold tabular-nums text-white">{h.value}</dd>
+            </div>
+          </div>
+        ))}
+      </dl>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
         {metrics.map(([label, value]) => (
           <div key={label} className="min-w-0">
@@ -315,6 +329,7 @@ export default function DashboardAnunciosPage() {
       return sortDir === "desc" ? bv - av : av - bv;
     });
   }, [rows, groupByCreative, search, statusFilter, perfFilter, sortKey, sortDir]);
+  const maxConversas = useMemo(() => filtered.reduce((m, r) => Math.max(m, num(r.total_conversas_iniciadas)), 0), [filtered]);
 
   const activeImages = useMemo(() => {
     const consolidated = consolidateAdsList(rows);
@@ -522,7 +537,7 @@ export default function DashboardAnunciosPage() {
                                 onClick={() => openDetail(r.id, !isDesktop())}
                                 className={cn(
                                   "flex w-full gap-3 rounded-xl p-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-400/60",
-                                  isSel ? "bg-white/[0.07]" : "hover:bg-white/[0.04]",
+                                  isSel ? "bg-emerald-500/[0.08] ring-1 ring-inset ring-emerald-400/25" : "hover:bg-white/[0.04]",
                                 )}
                               >
                                 <Thumb row={r} className="size-12 shrink-0 text-lg" />
@@ -535,6 +550,10 @@ export default function DashboardAnunciosPage() {
                                   <span className="mt-1.5 block text-xs tabular-nums text-zinc-400">
                                     {n(r.total_conversas_iniciadas)} conversas · {brl(r.total_spend)}
                                     {r.custo_por_conversa != null ? ` · ${brl(r.custo_por_conversa)} cada` : ""}
+                                  </span>
+                                  {/* Volume de conversas relativo ao anúncio que mais trouxe: dá para comparar sem ler números. */}
+                                  <span className="mt-1.5 block h-1 w-full overflow-hidden rounded-full bg-white/[0.05]" aria-hidden>
+                                    <span className="ds-grow block h-full rounded-full" style={{ width: `${maxConversas > 0 ? Math.max(2, (num(r.total_conversas_iniciadas) / maxConversas) * 100) : 0}%`, background: CHART.aqua }} />
                                   </span>
                                 </span>
                               </button>

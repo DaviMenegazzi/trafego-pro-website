@@ -1,4 +1,4 @@
-import { Button, EmptyState, IconButton, Input, MenuButton, SegmentedControl, StatusBadge, Surface } from "@/components/ds";
+import { Avatar, Button, EmptyState, IconButton, Input, MenuButton, SegmentedControl, StatusBadge, Surface } from "@/components/ds";
 import { formatPhone } from "@/lib/format";
 import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
@@ -186,9 +186,7 @@ export function TalentCandidatesList({
                 onClick={() => setSelectedCandidate(c)}
                 className="flex w-full items-center gap-3.5 px-4 py-3 text-left outline-none transition-colors hover:bg-white/[0.03] focus-visible:bg-white/[0.05]"
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-sm font-semibold text-zinc-200">
-                  {displayName.charAt(0).toUpperCase()}
-                </span>
+                <Avatar name={displayName} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium text-zinc-100">{displayName}</span>

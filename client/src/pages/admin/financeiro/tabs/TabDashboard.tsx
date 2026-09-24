@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SegmentedControl, StatTile, StatusBadge, Surface, SurfaceHeader } from "@/components/ds";
+import { AlertTriangle, BarChart3, Coins, Landmark, PieChart, Receipt } from "lucide-react";
 import { formatCurrency, formatCurrencyCompact, formatMonthKey, formatPercent } from "@/lib/format";
 import { CHART, CHART_CHROME, chartAxisTick, chartTooltipStyle } from "@/lib/chartPalette";
 import type { DatabaseState } from "../types";
@@ -139,15 +140,20 @@ export function TabDashboard({ dbState }: TabDashboardProps) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="Receita" value={formatCurrency(d.receita)} hint={`${d.paidUnitsCount} unidades pagaram · ticket ${formatCurrency(d.ticketMedio)}`} />
-        <StatTile label="Despesas pagas" value={formatCurrency(d.despesas)} hint={`${d.paidDespesasCount} lançamentos`} />
+        <StatTile icon={<Landmark />} accent="aqua" trend={chartData.map((m) => m.receita)} label="Receita" value={formatCurrency(d.receita)} hint={`${d.paidUnitsCount} unidades pagaram · ticket ${formatCurrency(d.ticketMedio)}`} />
+        <StatTile icon={<Receipt />} accent="orange" trend={chartData.map((m) => m.despesas)} label="Despesas pagas" value={formatCurrency(d.despesas)} hint={`${d.paidDespesasCount} lançamentos`} />
         <StatTile
+          icon={<Coins />}
+          accent="blue"
+          trend={chartData.map((m) => m.lucro)}
           label="Lucro"
           value={formatCurrency(d.lucro)}
           hint={d.receita > 0 ? `Margem ${formatPercent(d.margem)}` : undefined}
           status={d.lucro < 0 ? { tone: "critical", label: "Prejuízo" } : undefined}
         />
         <StatTile
+          icon={<AlertTriangle />}
+          accent="neutral"
           label="Inadimplência"
           value={d.inadimplencia}
           hint={d.inadimplencia === 1 ? "unidade sem pagamento" : "unidades sem pagamento"}
@@ -156,7 +162,7 @@ export function TabDashboard({ dbState }: TabDashboardProps) {
       </div>
 
       <Surface>
-        <SurfaceHeader title="Divisão do lucro" description={d.lucro > 0 ? `${formatCurrency(d.lucro)} divididos pela regra societária.` : `Sem lucro positivo em ${mesLabel}; não há divisão.`} />
+        <SurfaceHeader icon={<PieChart />} accent="violet" title="Divisão do lucro" description={d.lucro > 0 ? `${formatCurrency(d.lucro)} divididos pela regra societária.` : `Sem lucro positivo em ${mesLabel}; não há divisão.`} />
         {d.lucro > 0 && (
           <dl className="grid gap-px bg-white/[0.06] sm:grid-cols-5">
             {[
@@ -178,6 +184,8 @@ export function TabDashboard({ dbState }: TabDashboardProps) {
       {chartData.length > 0 && (
         <Surface>
           <SurfaceHeader
+            icon={<BarChart3 />}
+            accent="blue"
             title="Mês a mês"
             description="Receita, despesas pagas e lucro de cada mês com movimento."
             actions={

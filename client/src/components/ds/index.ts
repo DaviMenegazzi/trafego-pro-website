@@ -9,7 +9,7 @@ export { Menu, ActionsMenu, MenuButton, Popover, PopoverClose, type MenuItem } f
 export { Dialog, Sheet } from "./dialog";
 export { ConfirmProvider, useConfirm } from "./confirm";
 export { DatePicker, DateRangePicker, isoToDate, dateToIso, type IsoRange } from "./date-picker";
-export { PageHeader, Page, Surface, SurfaceHeader, StatTile, StatusBadge, EmptyState, InlineNotice, type BadgeTone } from "./layout";
+export { PageHeader, Page, Surface, SurfaceHeader, StatTile, StatusBadge, EmptyState, InlineNotice, IconChip, Sparkline, DeltaPill, Meter, Avatar, ACCENTS, type Accent, type Delta, type BadgeTone } from "./layout";
 export { toast, toastWithUndo } from "./toast";
 export { CurrencyInput } from "./currency-input";
 export { TabBar } from "./tabs";

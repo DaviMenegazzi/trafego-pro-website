@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { PiggyBank, TrendingUp, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Button, CurrencyInput, Field, IconButton, Input, InlineNotice, StatTile, Surface, SurfaceHeader, useConfirm } from "@/components/ds";
 import { formatCurrency } from "@/lib/format";
@@ -84,7 +84,7 @@ export function CaixaDespesasFixas({ dbState }: { dbState: DatabaseState }) {
 
   return (
     <Surface>
-      <SurfaceHeader title="Caixa e despesas fixas" description="Reserva da empresa e custos recorrentes; usados na projeção de fim de ano." />
+      <SurfaceHeader icon={<Wallet />} accent="brand" title="Caixa e despesas fixas" description="Reserva da empresa e custos recorrentes; usados na projeção de fim de ano." />
       <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,20rem)_1fr]">
         <div className="space-y-4">
           <Field label="Saldo atual em caixa" htmlFor="caixa-saldo">
@@ -100,8 +100,8 @@ export function CaixaDespesasFixas({ dbState }: { dbState: DatabaseState }) {
         </div>
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
-            <StatTile label="Saldo atual" value={formatCurrency(saldo)} />
-            <StatTile label="Projeção no fim do ano" value={formatCurrency(projecao)} hint={`Saldo + ${mesesRestantes} meses de receita média − despesas fixas`} />
+            <StatTile icon={<PiggyBank />} accent="brand" label="Saldo atual" value={formatCurrency(saldo)} />
+            <StatTile icon={<TrendingUp />} accent="blue" label="Projeção no fim do ano" value={formatCurrency(projecao)} hint={`Saldo + ${mesesRestantes} meses de receita média − despesas fixas`} />
           </div>
           {meta > 0 && (
             <InlineNotice tone={projecao >= meta ? "info" : "warning"}>

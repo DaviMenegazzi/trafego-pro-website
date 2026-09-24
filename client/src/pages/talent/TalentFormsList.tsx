@@ -130,7 +130,8 @@ export function TalentFormsList({
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredForms.map((f) => (
-            <Surface key={f.id} as="article" className="group relative flex flex-col p-5 transition-colors hover:border-white/15">
+            <Surface key={f.id} as="article" className="group relative flex flex-col overflow-hidden p-5 transition-all duration-200 hover:-translate-y-px hover:border-emerald-400/25">
+              <span aria-hidden className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r to-transparent ${f.isPublished ? "from-emerald-400/70" : "from-amber-400/60"}`} />
               <div className="flex items-start justify-between gap-3">
                 <StatusBadge tone={f.isPublished ? "good" : "warning"}>{f.isPublished ? "Publicado" : "Rascunho"}</StatusBadge>
                 <div className="relative z-10 -mr-2 -mt-1.5">
@@ -166,8 +167,8 @@ export function TalentFormsList({
               </p>
 
               <div className="relative z-10 mt-4 flex items-center gap-2 border-t border-white/[0.06] pt-4">
-                <Button size="sm" onClick={() => onSelectForm(f, "candidates")}>
-                  <Users />
+                <Button size="sm" className="border-teal-400/25 bg-teal-500/10 text-teal-100 hover:bg-teal-500/15" onClick={() => onSelectForm(f, "candidates")}>
+                  <Users className="text-teal-300" />
                   {f.candidateCount ?? 0} {(f.candidateCount ?? 0) === 1 ? "candidato" : "candidatos"}
                 </Button>
                 <div className="ml-auto flex min-w-0 items-center gap-1">

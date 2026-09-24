@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ActionsMenu,
+  Avatar,
   Button,
   CheckboxField,
   Dialog,
@@ -580,11 +581,9 @@ export default function DashboardUsuariosPage() {
                 const name = profile.full_name || profile.user_email.split("@")[0];
                 const available = clients.filter((c) => !profile.client_access.some((a) => a.client_id === c.id));
                 return (
-                  <li key={profile.id} className={cn("group flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center", isInactive && "opacity-70")}>
+                  <li key={profile.id} className={cn("group relative flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center", isInactive && "opacity-70", isPending && "bg-amber-500/[0.04] before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-amber-400 before:content-['']")}>
                     <div className="flex min-w-0 flex-1 items-start gap-3">
-                      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] text-sm font-semibold text-zinc-200">
-                        {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="size-10 object-cover" /> : name.charAt(0).toUpperCase()}
-                      </span>
+                      <Avatar name={name} src={profile.avatar_url} />
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="truncate text-sm font-medium text-zinc-100">{name}</span>

@@ -298,12 +298,15 @@ function NavLink({ item, active, collapsed, onNavigate, dense = false }: { item:
       aria-label={collapsed ? item.label : undefined}
       onClick={onNavigate}
       className={cn(
-        "group flex items-center gap-3 overflow-hidden rounded-lg text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-emerald-400/60",
+        "group relative flex items-center gap-3 overflow-hidden rounded-lg text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-emerald-400/60",
         collapsed ? "size-10 justify-center" : cn("px-3", dense ? "h-9" : "h-10"),
-        active ? "bg-white/[0.09] text-white" : "text-zinc-400 hover:bg-white/[0.045] hover:text-zinc-100",
+        active
+          ? "bg-gradient-to-r from-emerald-500/15 to-emerald-500/[0.03] font-medium text-white ring-1 ring-inset ring-emerald-400/15"
+          : "text-zinc-400 hover:bg-white/[0.045] hover:text-zinc-100",
       )}
     >
-      <Icon className={cn("size-4 shrink-0", active ? "text-white" : "text-zinc-500 group-hover:text-zinc-300")} />
+      {active && <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-emerald-400" />}
+      <Icon className={cn("size-4 shrink-0 transition-colors", active ? "text-emerald-300" : "text-zinc-500 group-hover:text-zinc-300")} />
       {!collapsed && <span className="truncate">{item.label}</span>}
     </Link>
   );

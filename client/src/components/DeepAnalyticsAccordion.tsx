@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, Target } from "lucide-react";
+import { Activity, AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, Lightbulb, Sigma, Stethoscope, Target, TrendingUp } from "lucide-react";
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Button, EmptyState, StatusBadge, Surface, SurfaceHeader, type BadgeTone } from "@/components/ds";
+import { Button, EmptyState, Meter, StatusBadge, Surface, SurfaceHeader, type BadgeTone } from "@/components/ds";
 import { CHART, CHART_CHROME, chartAxisTick, chartTooltipStyle } from "@/lib/chartPalette";
 import { formatCurrency, formatNumber, formatRatio, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -101,6 +101,24 @@ export const STATUS_META: Record<PredictiveUnitProfile["statusFlag"], { label: s
   NORMAL: { label: "Estável", tone: "good", icon: CheckCircle2 },
 };
 
+/** Faixa colorida à esquerda do cartão/linha, pela situação (acompanha o selo com texto). */
+export const STATUS_STRIPE: Record<PredictiveUnitProfile["statusFlag"], string> = {
+  CRITICO: "before:bg-rose-400",
+  ATENCAO: "before:bg-amber-400",
+  NORMAL: "before:bg-emerald-400",
+};
+export const STRIPE_BASE = "relative before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:content-['']";
+
+/** Cor da nota A–D (a letra continua escrita; a cor só reforça). */
+export const GRADE_STYLE: Record<string, string> = {
+  A: "bg-emerald-500/12 text-emerald-300 ring-emerald-400/25",
+  B: "bg-teal-500/12 text-teal-200 ring-teal-400/20",
+  C: "bg-amber-500/12 text-amber-300 ring-amber-400/25",
+  D: "bg-rose-500/12 text-rose-300 ring-rose-400/25",
+};
+
+const scoreTone = (v: number): "good" | "warning" | "critical" => (v >= 75 ? "good" : v >= 50 ? "warning" : "critical");
+
 export function goalLabel(gp: PredictiveUnitProfile["goalProbability"]) {
   return gp.targetIsDefault ? `${formatNumber(gp.totalTarget)} (meta padrão)` : formatNumber(gp.totalTarget);
 }
@@ -157,9 +175,9 @@ export function PredictiveSummaryCard({ data, loading, onOpen }: { data: Predict
   }
   const status = STATUS_META[data.statusFlag];
   return (
-    <Surface className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
+    <Surface className={cn("flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4", STRIPE_BASE, STATUS_STRIPE[data.statusFlag])}>
       <div className="flex min-w-[16rem] flex-1 items-center gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] font-display text-lg font-semibold text-white" aria-label={`Nota ${data.score.grade}`}>
+        <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl font-display text-lg font-semibold ring-1 ring-inset", GRADE_STYLE[data.score.grade] ?? "bg-white/[0.05] text-white ring-white/10")} aria-label={`Nota ${data.score.grade}`}>
           {data.score.grade}
         </span>
         <div className="min-w-0">
@@ -189,9 +207,7 @@ function Pillar({ label, weight, value, hint }: { label: string; weight: string;
         </span>
         <span className="tabular-nums font-medium text-white">{formatNumber(value)}</span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={value} aria-label={label}>
-        <div className="h-full rounded-full bg-zinc-300" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
-      </div>
+      <Meter value={value / 100} tone={scoreTone(value)} label={label} />
       <p className="text-xs text-zinc-500">{hint}</p>
     </div>
   );
@@ -238,8 +254,10 @@ export function PredictiveAnalysis({ data, loading, failed }: { data: Predictive
 
   return (
     <div className="space-y-4">
-      <Surface>
+      <Surface className={cn(STRIPE_BASE, STATUS_STRIPE[data.statusFlag])}>
         <SurfaceHeader
+          icon={<Stethoscope />}
+          accent={data.statusFlag === "NORMAL" ? "brand" : "neutral"}
           title={data.diagnosis.hypothesisTitle}
           description={`${data.diagnosis.evidenceLevel} · ${data.confidence.description}`}
           actions={<StatusBadge tone={status.tone}>{status.label}</StatusBadge>}
@@ -256,8 +274,8 @@ export function PredictiveAnalysis({ data, loading, failed }: { data: Predictive
               ))}
             </ul>
           </div>
-          <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
-            <p className="text-sm font-medium text-zinc-200">Ação recomendada</p>
+          <div className="rounded-xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-4">
+            <p className="flex items-center gap-2 text-sm font-medium text-emerald-200"><Lightbulb className="size-4" aria-hidden />Ação recomendada</p>
             <p className="mt-1.5 text-sm leading-6 text-zinc-300">{data.diagnosis.actionPlan}</p>
           </div>
         </div>
@@ -265,7 +283,7 @@ export function PredictiveAnalysis({ data, loading, failed }: { data: Predictive
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Surface>
-          <SurfaceHeader title={`Saúde da unidade: ${formatNumber(data.score.scoreFinal)}/100 (nota ${data.score.grade})`} description={data.score.scoreSummary} />
+          <SurfaceHeader icon={<Activity />} accent="violet" title={`Saúde da unidade: ${formatNumber(data.score.scoreFinal)}/100 (nota ${data.score.grade})`} description={data.score.scoreSummary} />
           <div className="grid gap-5 p-5 sm:grid-cols-2">
             <Pillar label="Custo por conversa" weight="35%" value={data.score.notaCpl} hint={`Média 30 dias: ${formatCurrency(cpl.mean30d)}`} />
             <Pillar label="Conversão de cliques" weight="25%" value={data.score.notaConversao} hint={`Taxa: ${formatRatio(data.confidenceInterval.conversionRate)}`} />
@@ -275,7 +293,7 @@ export function PredictiveAnalysis({ data, loading, failed }: { data: Predictive
         </Surface>
 
         <Surface>
-          <SurfaceHeader title="Meta do mês" description={`Faltam ${gp.daysLeft} dias para fechar o mês`} actions={<Target className="size-4 text-zinc-500" />} />
+          <SurfaceHeader icon={<Target />} accent="aqua" title="Meta do mês" description={`Faltam ${gp.daysLeft} dias para fechar o mês`} />
           <div className="space-y-5 p-5">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Stat label="Meta" value={goalLabel(gp)} hint={`${formatRatio(pctGoal, 0)} atingido`} />
@@ -288,12 +306,7 @@ export function PredictiveAnalysis({ data, loading, failed }: { data: Predictive
                 <span className="text-zinc-300">Chance de bater a meta</span>
                 <span className="font-semibold tabular-nums text-white">{formatRatio(gp.probability)}</span>
               </div>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/[0.08]">
-                <div
-                  className={cn("h-full rounded-full", gp.probability >= 0.75 ? "bg-emerald-400" : gp.probability >= 0.4 ? "bg-amber-400" : "bg-rose-400")}
-                  style={{ width: `${Math.max(2, gp.probability * 100)}%` }}
-                />
-              </div>
+              <Meter className="mt-2 h-2" value={gp.probability} tone={gp.probability >= 0.75 ? "good" : gp.probability >= 0.4 ? "warning" : "critical"} label="Chance de bater a meta" />
               <p className="mt-2 text-xs leading-5 text-zinc-500">{gp.paceExplanation}</p>
               {gp.targetIsDefault && (
                 <p className="mt-1 text-xs leading-5 text-amber-200/80">Esta unidade não tem meta cadastrada; o cálculo usa a meta padrão.</p>
@@ -305,6 +318,8 @@ export function PredictiveAnalysis({ data, loading, failed }: { data: Predictive
 
       <Surface>
         <SurfaceHeader
+          icon={<TrendingUp />}
+          accent="orange"
           title="Custo por conversa: diário e média de 7 dias"
           description={`Média de 30 dias ${formatCurrency(cpl.mean30d)} · limite de atenção ${formatCurrency(cpl.upperBound2Sigma)} (média + 2 desvios)`}
         />
@@ -331,7 +346,7 @@ export function PredictiveAnalysis({ data, loading, failed }: { data: Predictive
       </Surface>
 
       <Surface>
-        <SurfaceHeader title="Indicadores estatísticos" description="Janela de 30 dias" />
+        <SurfaceHeader icon={<Sigma />} accent="blue" title="Indicadores estatísticos" description="Janela de 30 dias" />
         <div className="grid gap-5 p-5 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             label="Taxa de conversão (IC 95%)"

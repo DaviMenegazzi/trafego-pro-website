@@ -74,13 +74,13 @@ export function SegmentedControl<T extends string>({
               "inline-flex h-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-40",
               size === "sm" ? "text-xs" : "text-sm",
               fullWidth && "flex-1",
-              selected ? "bg-white/[0.12] text-white shadow-sm" : "text-zinc-400 hover:text-zinc-100",
+              selected ? "bg-emerald-500/15 text-emerald-100 shadow-sm ring-1 ring-inset ring-emerald-400/30" : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
             )}
           >
             {option.tone && option.tone !== "default" && <span className={cn("size-1.5 rounded-full", toneDot[option.tone])} aria-hidden />}
             {option.label}
             {option.count !== undefined && (
-              <span className={cn("tabular-nums", selected ? "text-zinc-300" : "text-zinc-500")}>{option.count}</span>
+              <span className={cn("rounded px-1 tabular-nums", selected ? "bg-emerald-400/15 text-emerald-200" : "bg-white/[0.05] text-zinc-400")}>{option.count}</span>
             )}
           </button>
         );

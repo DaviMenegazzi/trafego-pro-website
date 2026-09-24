@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Archive, ArrowRight, Check, ChevronDown, Plus } from "lucide-react";
+import { Archive, ArrowRight, Building2, CalendarCheck, Check, ChevronDown, Coins, Landmark, PiggyBank, Plus, Receipt, TrendingUp } from "lucide-react";
 import {
   ActionsMenu,
   Button,
@@ -8,6 +8,7 @@ import {
   Dialog,
   EmptyState,
   Field,
+  Meter,
   StatTile,
   StatusBadge,
   Surface,
@@ -415,8 +416,9 @@ export function TabFinanceiro({ dbState, onClientRegistered, onSelectClient, onC
       {/* Unidades */}
       <Surface>
         <SurfaceHeader
+          icon={<Building2 />}
           title={`Unidades pagantes · ${clientesOrdenadosPorVenc.length}`}
-          description="Abra uma unidade para ver a ficha, as cobranças e os checklists."
+          description={`Situação de ${formatMonthKey(mesCobKey, true)}. Abra uma unidade para ver a ficha e os checklists.`}
           actions={<Button variant="primary" onClick={() => setShowNewUnit(true)}><Plus />Nova unidade</Button>}
         />
         {clientesOrdenadosPorVenc.length === 0 ? (
@@ -428,13 +430,21 @@ export function TabFinanceiro({ dbState, onClientRegistered, onSelectClient, onC
                 key={c.id}
                 type="button"
                 onClick={() => onSelectClient?.(c.id)}
-                className="group flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-zinc-950/40 px-4 py-3 text-left outline-none transition-colors hover:border-white/15 hover:bg-white/[0.03] focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                className="group flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-zinc-950/40 px-4 py-3 text-left outline-none transition-all duration-200 hover:-translate-y-px hover:border-emerald-400/30 hover:bg-emerald-500/[0.04] focus-visible:ring-2 focus-visible:ring-emerald-400/60"
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium text-zinc-100">{c.nome}</span>
-                  <span className="block text-xs tabular-nums text-zinc-500">{formatCurrency(c.mensalidade)} · dia {c.vencDia || "—"}</span>
+                  <span className="mt-0.5 flex items-center gap-2 text-xs tabular-nums text-zinc-500">
+                    {formatCurrency(c.mensalidade)} · dia {c.vencDia || "—"}
+                    {mesCobKey >= (c.mesInicial || "2026_07") &&
+                      (dbState.cobrancas?.[c.id]?.[mesCobKey]?.recebido ? (
+                        <StatusBadge tone="good" className="px-1.5 py-0 text-[11px]">Pago</StatusBadge>
+                      ) : (
+                        <StatusBadge tone="warning" className="px-1.5 py-0 text-[11px]">Em aberto</StatusBadge>
+                      ))}
+                  </span>
                 </span>
-                <ArrowRight className="size-4 shrink-0 text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-300" />
+                <ArrowRight className="size-4 shrink-0 text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-300" />
               </button>
             ))}
           </div>
@@ -444,10 +454,20 @@ export function TabFinanceiro({ dbState, onClientRegistered, onSelectClient, onC
       {/* Cobranças do mês */}
       <Surface className="overflow-hidden">
         <SurfaceHeader
+          icon={<CalendarCheck />}
+          accent="aqua"
           title="Cobranças"
           description={`${previsaoMes.unidadesConfirmadasCount} de ${previsaoMes.unidadesAtivasCount} recebidas · ${formatCurrency(previsaoMes.faturamentoConfirmado)} de ${formatCurrency(previsaoMes.faturamentoPrevisto)}`}
           actions={<MonthPicker value={mesCobKey} onChange={setMesCobKey} label="Mês da cobrança" />}
         />
+        <div className="flex items-center gap-3 border-b border-white/[0.06] px-5 py-2.5">
+          <Meter
+            value={previsaoMes.faturamentoPrevisto > 0 ? previsaoMes.faturamentoConfirmado / previsaoMes.faturamentoPrevisto : 0}
+            tone={previsaoMes.progressoConfirmacao >= 100 ? "good" : "brand"}
+            label="Recebido em relação ao previsto"
+          />
+          <span className="shrink-0 text-xs font-medium tabular-nums text-emerald-300">{previsaoMes.progressoConfirmacao}% recebido</span>
+        </div>
         {cobrancasDoMes.length === 0 ? (
           <EmptyState title={`Nenhuma cobrança em ${mesLabel}`} description="As unidades entram nas cobranças a partir do primeiro mês cadastrado." />
         ) : (
@@ -533,15 +553,17 @@ export function TabFinanceiro({ dbState, onClientRegistered, onSelectClient, onC
       {/* Previsão e divisão */}
       <Surface>
         <SurfaceHeader
+          icon={<TrendingUp />}
+          accent="violet"
           title={`Previsão de ${mesLabel}`}
           description={`${previsaoMes.unidadesAtivasCount} unidades pagantes · repasse previsto para o dia 30. Mude o mês em Cobranças.`}
         />
         <div className="space-y-5 p-5">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatTile label="Faturamento previsto" value={formatCurrency(previsaoMes.faturamentoPrevisto)} hint={`${formatCurrency(previsaoMes.faturamentoConfirmado)} já recebido`} />
-            <StatTile label="Despesas previstas" value={formatCurrency(previsaoMes.totalDespesas)} hint={`Fixas ${formatCurrency(previsaoMes.despFixasTotal)} · do mês ${formatCurrency(previsaoMes.despVariaveisTotal)}`} />
-            <StatTile label="Lucro previsto" value={formatCurrency(previsaoMes.lucroTotalPrevisto)} hint={previsaoMes.lucroTotalConfirmado > 0 ? `${formatCurrency(previsaoMes.lucroTotalConfirmado)} com o que já entrou` : "Faturamento − despesas"} />
-            <StatTile label="Caixa da empresa (50%)" value={formatCurrency(previsaoMes.caixaPrevisto)} hint="Metade do lucro fica na empresa" />
+            <StatTile icon={<Landmark />} accent="aqua" label="Faturamento previsto" value={formatCurrency(previsaoMes.faturamentoPrevisto)} hint={`${formatCurrency(previsaoMes.faturamentoConfirmado)} já recebido`} />
+            <StatTile icon={<Receipt />} accent="orange" label="Despesas previstas" value={formatCurrency(previsaoMes.totalDespesas)} hint={`Fixas ${formatCurrency(previsaoMes.despFixasTotal)} · do mês ${formatCurrency(previsaoMes.despVariaveisTotal)}`} />
+            <StatTile icon={<Coins />} accent="blue" label="Lucro previsto" value={formatCurrency(previsaoMes.lucroTotalPrevisto)} hint={previsaoMes.lucroTotalConfirmado > 0 ? `${formatCurrency(previsaoMes.lucroTotalConfirmado)} com o que já entrou` : "Faturamento − despesas"} />
+            <StatTile icon={<PiggyBank />} accent="brand" label="Caixa da empresa (50%)" value={formatCurrency(previsaoMes.caixaPrevisto)} hint="Metade do lucro fica na empresa" />
           </div>
           <div>
             <h3 className="mb-2 text-sm font-medium text-zinc-200">

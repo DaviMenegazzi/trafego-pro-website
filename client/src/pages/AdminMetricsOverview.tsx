@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { ChevronDown, FileSpreadsheet, HelpCircle, RefreshCw, Search } from "lucide-react";
+import { Activity, ChevronDown, FileSpreadsheet, HelpCircle, MessageCircle, RefreshCw, Search, Target, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ActionsMenu,
   EmptyState,
   IconButton,
+  IconChip,
   Input,
+  Meter,
   Page,
   PageHeader,
   Popover,
@@ -17,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ds";
-import { PredictiveAnalysis, STATUS_META, goalLabel, type PredictiveUnitProfile } from "@/components/DeepAnalyticsAccordion";
+import { GRADE_STYLE, PredictiveAnalysis, STATUS_META, STATUS_STRIPE, STRIPE_BASE, goalLabel, type PredictiveUnitProfile } from "@/components/DeepAnalyticsAccordion";
 import { formatCurrency, formatNumber, formatRatio } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -42,12 +44,6 @@ export interface GlobalAnalyticsReport {
 type StatusFilter = "ALL" | "CRITICO" | "ATENCAO" | "NORMAL";
 type SortBy = "score" | "cpl" | "risk" | "name";
 
-const GRADE_CLASS: Record<string, string> = {
-  A: "text-emerald-300",
-  B: "text-zinc-200",
-  C: "text-amber-300",
-  D: "text-rose-300",
-};
 
 /** Como ler os números da tela (antes um bloco fixo que empurrava a lista). */
 function HowToRead() {
@@ -77,8 +73,11 @@ function StatusMix({ summary, total }: { summary: GlobalAnalyticsReport["summary
   ];
   const sum = Math.max(1, parts.reduce((s, p) => s + p.n, 0));
   return (
-    <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-zinc-900/60 p-4 sm:p-5">
-      <p className="text-sm text-zinc-400">Situação das unidades</p>
+    <div className="ds-rise min-w-0 rounded-2xl border border-white/[0.08] bg-zinc-900/60 p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm text-zinc-400">Situação das unidades</p>
+        <IconChip icon={<Activity />} accent="violet" size="sm" />
+      </div>
       <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums text-white sm:text-[28px]">{formatNumber(total)}</p>
       <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden>
         {parts.map((p) => <div key={p.label} className={p.cls} style={{ width: `${(p.n / sum) * 100}%` }} />)}
@@ -267,13 +266,17 @@ export default function AdminMetricsOverviewPage() {
 
         {report && (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatTile label="Investimento no mês" value={formatCurrency(report.totalMonthSpend)} hint="Todas as contas ativas" />
-            <StatTile
-              label="Leads no mês"
-              value={formatNumber(report.totalMonthLeads)}
-              hint={`de ${formatNumber(report.totalNetworkTarget)} da meta · ${formatNumber(report.networkGoalPacePct, 1)}%`}
-            />
-            <StatTile label="Custo médio por conversa" value={formatCurrency(report.avgNetworkCpl)} hint="Ponderado pelo volume" />
+            <StatTile label="Investimento no mês" icon={<Wallet />} accent="blue" value={formatCurrency(report.totalMonthSpend)} hint="Todas as contas ativas" />
+            <div className="ds-rise min-w-0 rounded-2xl border border-white/[0.08] bg-zinc-900/60 p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm text-zinc-400">Leads no mês</p>
+                <IconChip icon={<MessageCircle />} accent="aqua" size="sm" />
+              </div>
+              <p className="mt-1.5 font-display text-2xl font-semibold text-white sm:text-[28px]">{formatNumber(report.totalMonthLeads)}</p>
+              <Meter className="mt-2" value={report.networkGoalPacePct / 100} tone="brand" label="Leads em relação à meta da rede" />
+              <p className="mt-1.5 text-xs text-zinc-500">{formatNumber(report.networkGoalPacePct, 1)}% de {formatNumber(report.totalNetworkTarget)} da meta</p>
+            </div>
+            <StatTile label="Custo médio por conversa" icon={<Target />} accent="orange" value={formatCurrency(report.avgNetworkCpl)} hint="Ponderado pelo volume" />
             <StatusMix summary={report.summary} total={report.totalUnits} />
           </div>
         )}
@@ -319,7 +322,7 @@ export default function AdminMetricsOverviewPage() {
               const gp = p.goalProbability;
               const pct = gp.totalTarget > 0 ? gp.currentLeads / gp.totalTarget : 0;
               return (
-                <div key={p.unitId}>
+                <div key={p.unitId} className={cn(STRIPE_BASE, STATUS_STRIPE[p.statusFlag])}>
                   <button
                     type="button"
                     aria-expanded={isOpen}
@@ -327,7 +330,7 @@ export default function AdminMetricsOverviewPage() {
                     className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-3 px-5 py-4 text-left outline-none transition-colors hover:bg-white/[0.02] focus-visible:bg-white/[0.04] lg:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,2fr)_auto]"
                   >
                     <span
-                      className={cn("flex size-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] font-display text-base font-semibold", GRADE_CLASS[p.score.grade] ?? "text-zinc-200")}
+                      className={cn("flex size-10 items-center justify-center rounded-xl font-display text-base font-semibold ring-1 ring-inset", GRADE_STYLE[p.score.grade] ?? "bg-white/[0.04] text-zinc-200 ring-white/10")}
                       aria-label={`Nota ${p.score.grade}, ${p.score.scoreFinal} de 100`}
                     >
                       {p.score.grade}
@@ -342,7 +345,10 @@ export default function AdminMetricsOverviewPage() {
                     <span className="col-span-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:col-span-1">
                       <Kpi label="Custo 7 dias" value={formatCurrency(p.cplMetrics.sma7Current)} hint={p.cplMetrics.trendLabel} />
                       <Kpi label="Leads / meta" value={`${formatNumber(gp.currentLeads)} / ${goalLabel(gp)}`} hint={`${formatRatio(pct, 0)} atingido`} />
-                      <Kpi label="Chance da meta" value={formatRatio(gp.probability, 0)} hint={`ritmo ${formatNumber(gp.currentLeadsPerDay, 1)}/dia`} />
+                      <div className="min-w-0">
+                        <Kpi label="Chance da meta" value={formatRatio(gp.probability, 0)} />
+                        <Meter className="mt-1.5 max-w-[7rem]" value={gp.probability} tone={gp.probability >= 0.75 ? "good" : gp.probability >= 0.4 ? "warning" : "critical"} label={`Chance de bater a meta: ${formatRatio(gp.probability, 0)}`} />
+                      </div>
                       <Kpi label="Conversão" value={formatRatio(p.confidenceInterval.conversionRate)} hint={`confiança ${p.confidence.level.toLowerCase()}`} />
                     </span>
                     <ChevronDown className={cn("col-start-3 row-start-1 size-4 text-zinc-500 transition-transform lg:col-start-4", isOpen && "rotate-180")} />

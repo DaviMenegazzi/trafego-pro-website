@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Download, FileSpreadsheet, Inbox, Plus, RefreshCw } from "lucide-react";
-import { Button, DateRangePicker, EmptyState, IconButton, MenuButton, Page, PageHeader, Select, Sheet, Surface } from "@/components/ds";
+import { Download, FileSpreadsheet, Handshake, Inbox, Percent, Plus, RefreshCw, Star, Users } from "lucide-react";
+import { Button, DateRangePicker, EmptyState, IconButton, MenuButton, Page, PageHeader, Select, Sheet, StatTile, Surface } from "@/components/ds";
+import { cn } from "@/lib/utils";
+
+/** Nota 1–5 com cor pela faixa (o número continua escrito). */
+function Rating({ value }: { value: number }) {
+  if (!value) return <span className="text-zinc-600">—</span>;
+  const tone = value >= 4 ? "bg-emerald-500/12 text-emerald-300" : value === 3 ? "bg-white/[0.06] text-zinc-300" : "bg-rose-500/12 text-rose-300";
+  return <span className={cn("inline-flex min-w-[2.5rem] justify-center rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums", tone)}>{value}/5</span>;
+}
 import { formatDate, formatDateRange, formatDateTime, formatNumber, formatRatio } from "@/lib/format";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
@@ -103,6 +111,17 @@ export default function DashboardFeedbackLeadsList() {
 
   const open = feedbacks.find((f) => f.id === openId) ?? null;
 
+  // Resumo dos registros filtrados: o que a tabela diz, em quatro números.
+  const summary = useMemo(() => {
+    const received = feedbacks.reduce((a, f) => a + (f.totalLeads || 0), 0);
+    const closed = feedbacks.reduce((a, f) => a + (f.leadsConverted || 0), 0);
+    const avg = (pick: (f: Feedback) => number) => {
+      const vals = feedbacks.map(pick).filter((v) => v > 0);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    };
+    return { received, closed, rate: received > 0 ? closed / received : 0, quality: avg((f) => f.leadQuality), satisfaction: avg((f) => f.agencySatisfaction) };
+  }, [feedbacks]);
+
   return (
     <AppLayout>
       <Page>
@@ -148,6 +167,15 @@ export default function DashboardFeedbackLeadsList() {
           </div>
         </PageHeader>
 
+        {feedbacks.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatTile icon={<Users />} accent="aqua" label="Leads recebidos" value={formatNumber(summary.received)} hint={`em ${formatNumber(feedbacks.length)} feedbacks`} />
+            <StatTile icon={<Handshake />} accent="brand" label="Fecharam" value={formatNumber(summary.closed)} hint={`${formatRatio(summary.rate)} de conversão`} />
+            <StatTile icon={<Star />} accent="violet" label="Qualidade média dos leads" value={summary.quality ? `${formatNumber(summary.quality, 1)}/5` : "—"} hint="nota das unidades" />
+            <StatTile icon={<Percent />} accent="blue" label="Satisfação com a agência" value={summary.satisfaction ? `${formatNumber(summary.satisfaction, 1)}/5` : "—"} hint="média das respostas" />
+          </div>
+        )}
+
         <Surface className="overflow-hidden">
           {loading && feedbacks.length === 0 ? (
             <EmptyState title="Carregando feedbacks…" />
@@ -180,9 +208,11 @@ export default function DashboardFeedbackLeadsList() {
                       <td className="max-w-[180px] truncate px-3 py-3 text-zinc-400">{feedback.responsible}</td>
                       <td className="px-3 py-3 text-right">{formatNumber(feedback.totalLeads)}</td>
                       <td className="px-3 py-3 text-right font-medium text-white">{formatNumber(feedback.leadsConverted)}</td>
-                      <td className="px-3 py-3 text-right">{feedback.totalLeads > 0 ? formatRatio(feedback.leadsConverted / feedback.totalLeads) : "—"}</td>
-                      <td className="px-3 py-3 text-right">{feedback.leadQuality ? `${feedback.leadQuality}/5` : "—"}</td>
-                      <td className="py-3 pl-3 pr-5 text-right">{feedback.agencySatisfaction ? `${feedback.agencySatisfaction}/5` : "—"}</td>
+                      <td className="px-3 py-3 text-right">
+                        {feedback.totalLeads > 0 ? formatRatio(feedback.leadsConverted / feedback.totalLeads) : "—"}
+                      </td>
+                      <td className="px-3 py-3 text-right"><Rating value={feedback.leadQuality} /></td>
+                      <td className="py-3 pl-3 pr-5 text-right"><Rating value={feedback.agencySatisfaction} /></td>
                     </tr>
                   ))}
                 </tbody>

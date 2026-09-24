@@ -8,7 +8,7 @@ import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
 import { PredictiveAnalysis, PredictiveSummaryCard, usePredictiveProfile } from "@/components/DeepAnalyticsAccordion";
 import {
   Button, DateRangePicker, IconButton, InlineNotice, MenuButton, Page, PageHeader, SegmentedControl, StatTile, StatusBadge,
-  Surface, SurfaceHeader, Tooltip, type BadgeTone,
+  Surface, SurfaceHeader, Tooltip, type Accent, type BadgeTone,
 } from "@/components/ds";
 import { useClientContext } from "@/contexts/ClientContext";
 import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
@@ -21,7 +21,7 @@ import { createRequestGate } from "@/lib/requestGate";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, ReferenceLine, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
-import { RefreshCw, ChevronDown, Download, FileSpreadsheet, Image as ImageIcon, Database, AlertTriangle } from "lucide-react";
+import { RefreshCw, ChevronDown, Download, FileSpreadsheet, Image as ImageIcon, Database, AlertTriangle, Wallet, MessageCircle, Target, Reply } from "lucide-react";
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
@@ -96,10 +96,10 @@ type DashboardCacheEntry = {
 
 const dashboardMemoryCache = new Map<string, DashboardCacheEntry>();
 
-function ChartPanel({ title, description, children, className }: { title: string; description?: string; children: React.ReactNode; className?: string }) {
+function ChartPanel({ title, description, children, className, icon, accent }: { title: string; description?: string; children: React.ReactNode; className?: string; icon?: React.ReactNode; accent?: Accent }) {
   return (
     <Surface className={className}>
-      <SurfaceHeader title={title} description={description} />
+      <SurfaceHeader title={title} description={description} icon={icon} accent={accent} />
       <div className="h-[220px] w-full px-3 pb-3 pt-4 sm:h-[260px]">{children}</div>
     </Surface>
   );
@@ -403,16 +403,51 @@ export default function DashboardPage() {
 
   const costStatus = kpi.custoConversa > 0 ? statusFor(kpi.custoConversa) : null;
 
+  // Variação dentro do próprio período (a API não traz o período anterior):
+  // compara a 2ª metade dos dias com a 1ª, e o rótulo diz isso.
+  const halves = useMemo(() => {
+    const rows = [...daily].sort((a, b) => String(a.date_start).localeCompare(String(b.date_start)));
+    if (rows.length < 4) return null;
+    const mid = Math.floor(rows.length / 2);
+    const agg = (part: DailyRow[]) => {
+      const spend = part.reduce((a, r) => a + num(r.total_spend), 0);
+      const conv = part.reduce((a, r) => a + num(r.total_conversas_iniciadas), 0);
+      const resp = part.reduce((a, r) => a + num(r.total_conversas_respondidas), 0);
+      const conn = part.reduce((a, r) => a + num(r.total_messaging_connections), 0);
+      return { spend, conv, cost: conv > 0 ? spend / conv : 0, rate: calculateResponseRate(resp, conn) };
+    };
+    return { a: agg(rows.slice(0, mid)), b: agg(rows.slice(rows.length - mid)) };
+  }, [daily]);
+  const change = (key: "spend" | "conv" | "cost" | "rate") =>
+    halves && halves.a[key] > 0 ? (halves.b[key] - halves.a[key]) / halves.a[key] : undefined;
+  const deltaLabel = "2ª metade vs. 1ª";
+  const series = (pick: (r: DailyRow) => number) =>
+    [...daily].sort((a, b) => String(a.date_start).localeCompare(String(b.date_start))).map(pick);
+
   const primaryKpis = [
-    { label: "Total investido", value: brl(kpi.spend), hint: "verba Meta Ads no período" },
-    { label: "Conversas iniciadas", value: n(kpi.conv), hint: "inícios de conversa no WhatsApp" },
+    {
+      label: "Total investido", value: brl(kpi.spend), hint: "verba Meta Ads no período",
+      icon: <Wallet />, accent: "blue" as const, goodWhen: "neutral" as const, delta: change("spend"),
+      trend: series((r) => num(r.total_spend)),
+    },
+    {
+      label: "Conversas iniciadas", value: n(kpi.conv), hint: "inícios de conversa no WhatsApp",
+      icon: <MessageCircle />, accent: "aqua" as const, goodWhen: "up" as const, delta: change("conv"),
+      trend: series((r) => num(r.total_conversas_iniciadas)),
+    },
     {
       label: "Custo por conversa",
       value: brl(kpi.custoConversa),
       hint: "investimento ÷ conversas",
       status: costStatus ? { tone: STATUS_TONE[costStatus] === "good" ? "good" as const : STATUS_TONE[costStatus] === "warning" ? "warning" as const : "critical" as const, label: costStatus } : undefined,
+      icon: <Target />, accent: "orange" as const, goodWhen: "down" as const, delta: change("cost"),
+      trend: series((r) => num(r.custo_por_conversa) || (num(r.total_conversas_iniciadas) > 0 ? num(r.total_spend) / num(r.total_conversas_iniciadas) : 0)),
     },
-    { label: "Taxa de resposta", value: pct(responseRate), hint: "conversas respondidas" },
+    {
+      label: "Taxa de resposta", value: pct(responseRate), hint: "conversas respondidas",
+      icon: <Reply />, accent: "violet" as const, goodWhen: "up" as const, delta: change("rate"),
+      trend: series((r) => calculateResponseRate(num(r.total_conversas_respondidas), num(r.total_messaging_connections))),
+    },
   ];
 
   const supportingKpis = [
@@ -529,7 +564,17 @@ export default function DashboardPage() {
           <>
             <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
               {primaryKpis.map((k) => (
-                <StatTile key={k.label} label={k.label} value={k.value} hint={k.status ? undefined : k.hint} status={k.status} />
+                <StatTile
+                  key={k.label}
+                  label={k.label}
+                  value={k.value}
+                  hint={k.status || k.delta !== undefined ? undefined : k.hint}
+                  status={k.status}
+                  icon={k.icon}
+                  accent={k.accent}
+                  delta={k.delta !== undefined ? { value: k.delta, label: deltaLabel, goodWhen: k.goodWhen } : undefined}
+                  trend={k.trend}
+                />
               ))}
             </div>
 
@@ -545,7 +590,7 @@ export default function DashboardPage() {
             {isAdmin && <PredictiveSummaryCard data={predictive.data} loading={predictive.loading} onOpen={() => setView("analysis")} />}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <ChartPanel title="Conversas iniciadas por dia">
+              <ChartPanel title="Conversas iniciadas por dia" icon={<MessageCircle />} accent="aqua">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chart} margin={{ left: 0, right: 8, top: 4 }}>
                     <defs>
@@ -563,7 +608,7 @@ export default function DashboardPage() {
                 </ResponsiveContainer>
               </ChartPanel>
 
-              <ChartPanel title="Investimento por dia">
+              <ChartPanel title="Investimento por dia" icon={<Wallet />} accent="blue">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chart} margin={{ left: 0, right: 8, top: 4 }}>
                     <CartesianGrid stroke={CHART_CHROME.grid} vertical={false} />
@@ -576,7 +621,7 @@ export default function DashboardPage() {
               </ChartPanel>
             </div>
 
-            <ChartPanel title="Custo por conversa" description={`Linha tracejada: média do período (${brl(kpi.custoConversa)})`}>
+            <ChartPanel title="Custo por conversa" icon={<Target />} accent="orange" description={`Linha tracejada: média do período (${brl(kpi.custoConversa)})`}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chart} margin={{ left: 0, right: 8, top: 4 }}>
                   <CartesianGrid stroke={CHART_CHROME.grid} vertical={false} />

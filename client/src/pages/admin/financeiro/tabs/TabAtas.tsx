@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import {
   ActionsMenu,
   Button,
@@ -99,6 +99,8 @@ export function TabAtas({ dbState, currentUser = "admin" }: TabAtasProps) {
   return (
     <Surface>
       <SurfaceHeader
+        icon={<FileText />}
+        accent="violet"
         title={`Atas de reunião · ${atasOrdenadas.length}`}
         description="Alinhamentos entre sócios, pautas comerciais e decisões."
         actions={<Button variant="primary" onClick={() => setOpen(true)}><Plus />Nova ata</Button>}

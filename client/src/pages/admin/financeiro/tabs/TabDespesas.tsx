@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { CalendarRange, Plus, Receipt } from "lucide-react";
 import { ActionsMenu, Button, EmptyState, Select, StatusBadge, Surface, SurfaceHeader, useConfirm } from "@/components/ds";
 import { formatCurrency, formatMonthKey } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -84,6 +84,8 @@ export function TabDespesas({ dbState }: TabDespesasProps) {
     <div className="space-y-6">
       <Surface className="overflow-hidden">
         <SurfaceHeader
+          icon={<Receipt />}
+          accent="orange"
           title={`Despesas da operação · ${despesasFiltradas.length}`}
           description="Clique na situação para alternar entre pendente e paga."
           actions={
@@ -156,7 +158,7 @@ export function TabDespesas({ dbState }: TabDespesasProps) {
       <CaixaDespesasFixas dbState={dbState} />
 
       <Surface className="overflow-hidden">
-        <SurfaceHeader title="Resumo por mês" />
+        <SurfaceHeader icon={<CalendarRange />} accent="blue" title="Resumo por mês" />
         {resumoMeses.length === 0 ? (
           <p className="px-5 py-4 text-sm text-zinc-500">Nenhuma despesa ainda.</p>
         ) : (

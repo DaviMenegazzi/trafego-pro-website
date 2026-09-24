@@ -147,20 +147,21 @@ export async function fetchUserAccess(
 
   // Busca acessos por UID ou pelo ID do perfil
   const userIdsToQuery = Array.from(new Set([supabaseUid, profile.id].filter(Boolean)));
-  const { data: accessRows } = await sb
+  const { data: accessRows, error: accessError } = await sb
     .from("user_client_access")
     .select("client_id")
     .in("user_id", userIdsToQuery);
+
+  if (accessError) {
+    console.error("[auth] Falha ao consultar unidades autorizadas:", accessError.message);
+    return { role: "", allowedClientIds: [], pixelAccess: false, status: "access_error", profileId: profile.id };
+  }
 
   const clientIds = (accessRows ?? []).map((r: { client_id: string }) => String(r.client_id));
 
   // 2. Roles de equipe (viewer, designer, cs, account_manager, traffic_manager, copywriter)
   if (isTeamRole(role)) {
-    if (clientIds.length > 0) {
-      return { role, allowedClientIds: clientIds, pixelAccess, status: profile.status, profileId: profile.id };
-    }
-    // Equipe interna sem restrição de cliente específico -> acesso padrão às contas da agência
-    return { role, allowedClientIds: ["*"], pixelAccess, status: profile.status, profileId: profile.id };
+    return { role, allowedClientIds: clientIds, pixelAccess, status: profile.status, profileId: profile.id };
   }
 
   // 3. client_viewer: só vê o que está expressamente em user_client_access
@@ -247,7 +248,7 @@ export function getSupabaseForRequest(req: express.Request) {
 }
 
 // ─── Middlewares de Autorização ─────────────────────────────────────────────
-export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+export async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   // 1. Tenta obter o token do cookie HttpOnly seguro primeiro
   let token = readCookie(req, APP_TOKEN_COOKIE);
 
@@ -274,6 +275,34 @@ export function requireAuth(req: express.Request, res: express.Response, next: e
   if (!payload.allowedClientIds || !Array.isArray(payload.allowedClientIds)) {
     res.status(401).json({ error: "Token inválido ou malformado — faça login novamente" });
     return;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    const accessToken = readCookie(req, SUPABASE_ACCESS_COOKIE);
+    const sb = getSupabaseForAccessToken(accessToken);
+    if (!accessToken || !sb) {
+      res.status(401).json({ error: "Sessão Supabase expirada" });
+      return;
+    }
+    try {
+      const { data: authData, error: authError } = await sb.auth.getUser(accessToken);
+      if (authError || authData.user?.id !== payload.id) {
+        res.status(401).json({ error: "Sessão Supabase expirada" });
+        return;
+      }
+      const current = await fetchUserAccess(payload.id, accessToken, sb, payload.email);
+      const tokenUnits = [...payload.allowedClientIds].sort();
+      const currentUnits = [...current.allowedClientIds].sort();
+      if (current.status !== "active" || current.role !== payload.role ||
+          JSON.stringify(tokenUnits) !== JSON.stringify(currentUnits)) {
+        res.status(401).json({ error: "Permissões alteradas. Faça login novamente." });
+        return;
+      }
+    } catch (error) {
+      console.error("[auth] Falha ao revalidar acesso:", error);
+      res.status(503).json({ error: "Não foi possível validar a sessão" });
+      return;
+    }
   }
 
   req.claims = payload;

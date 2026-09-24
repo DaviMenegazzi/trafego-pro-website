@@ -223,6 +223,8 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
       localStorage.removeItem("tp_token");
       localStorage.removeItem("tp_user");
       localStorage.removeItem("tp_selected_client_id");
+      localStorage.removeItem("tp_db");
+      sessionStorage.removeItem("tp_cached_clients");
       window.location.href = "/login";
     });
   }

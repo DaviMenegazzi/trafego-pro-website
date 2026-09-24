@@ -38,7 +38,11 @@ const DATA_DIR = path.resolve(process.cwd(), "data");
 const TOKENS_FILE = path.join(DATA_DIR, "external_ai_tokens.json");
 
 function getDbUri(): string | null {
-  return process.env.DATABASE_URL || process.env.DRIZZLE_DATABASE_URL || null;
+  const uri = process.env.DATABASE_URL || process.env.DRIZZLE_DATABASE_URL || null;
+  if (!uri && process.env.NODE_ENV === "production") {
+    throw new Error("DATABASE_URL obrigatória para tokens externos em produção");
+  }
+  return uri;
 }
 
 function db(): Pool {
@@ -84,6 +88,7 @@ function saveTokensFile(tokens: LocalTokenStoreItem[]): void {
     fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2), "utf-8");
   } catch (err) {
     console.error("[external-ai] Erro ao salvar tokens locais:", err);
+    throw err;
   }
 }
 

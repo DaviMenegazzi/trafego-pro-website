@@ -69,6 +69,8 @@ export default function Login() {
 
       localStorage.setItem("tp_token", data.token);
       localStorage.setItem("tp_user", JSON.stringify(data.user));
+      sessionStorage.removeItem("tp_cached_clients");
+      localStorage.removeItem("tp_db");
       markDashboardPostLoginRefresh();
       navigate("/dashboard");
     } catch {

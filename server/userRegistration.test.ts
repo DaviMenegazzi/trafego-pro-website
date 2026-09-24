@@ -82,6 +82,18 @@ describe("User Registration and Admin Approval Policy", () => {
     expect(access.status).toBe("active");
   });
 
+  it("does not turn a team user with no grants into a global administrator", async () => {
+    const mockSupabase = {
+      from: (table: string) => table === "user_profiles"
+        ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({
+            data: { id: "team-1", email: "team@example.test", role: "viewer", status: "active" }, error: null,
+          }) }) }) }
+        : { select: () => ({ in: async () => ({ data: [], error: null }) }) },
+    };
+    const access = await fetchUserAccess("team-1", "token", mockSupabase);
+    expect(access.allowedClientIds).toEqual([]);
+  });
+
   it("retains only the declared role justification in a new registration profile", () => {
     expect(buildPendingRegistrationBio("Gestor de unidade")).toBe("Justificativa: Gestor de unidade");
     expect(buildPendingRegistrationBio()).toBe("");

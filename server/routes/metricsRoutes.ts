@@ -239,8 +239,7 @@ metricsRouter.get("/metrics/clients", requireAuth, async (req, res) => {
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Falha inesperada ao carregar unidades";
     console.error("[metrics/clients] Falha ao carregar unidades:", message);
-    const fallback = KNOWN_DEFAULT_CLIENTS.map((c) => ({ id: c.id, name: c.name, client_group: c.client_group }));
-    res.json({ configured: true, clients: fallback, source: "fallback" });
+    res.status(502).json({ error: "Não foi possível carregar as unidades" });
   }
 });
 
@@ -364,11 +363,12 @@ metricsRouter.get("/metrics/campaigns", requireAuth, async (req, res) => {
     const allowed = req.claims!.allowedClientIds;
     const allRows: any[] = [];
     for (const cid of allowed) {
-      const { data } = await sb.rpc("fn_campaign_period_summary", {
+      const { data, error } = await sb.rpc("fn_campaign_period_summary", {
         p_client_id: cid,
         p_date_start: start ?? null,
         p_date_stop: end ?? null,
       });
+      if (error) { res.status(502).json({ error: error.message }); return; }
       if (data) allRows.push(...data);
     }
     res.json({
@@ -406,6 +406,10 @@ metricsRouter.get("/metrics/campaigns", requireAuth, async (req, res) => {
 // Endpoint otimizado que retorna métricas diárias e de campanhas em uma única requisição
 metricsRouter.get("/metrics/dashboard-bundle", requireAuth, async (req, res) => {
   const { clientId, start, end } = req.query as { clientId?: string; start?: string; end?: string };
+  if (!clientId && !isAdmin(req.claims!)) {
+    res.status(400).json({ error: "Selecione uma unidade para consultar as métricas" });
+    return;
+  }
   if (clientId) recordClientAccess(clientId);
 
   // 1. Caminho Meta Direct (se ativo e cliente especificado)
@@ -468,6 +472,11 @@ metricsRouter.get("/metrics/dashboard-bundle", requireAuth, async (req, res) => 
         p_date_stop: end ?? null,
       }),
     ]);
+
+    if (dailyRes.error || campaignsRes.error) {
+      res.status(502).json({ error: dailyRes.error?.message || campaignsRes.error?.message });
+      return;
+    }
 
     const dailyRows = dailyRes.data ?? [];
     const campaignRows = campaignsRes.data ?? [];

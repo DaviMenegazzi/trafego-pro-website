@@ -42,47 +42,29 @@ export default function AdminFinanceiroPage() {
     }
   }, [isAuthorizedAdmin, setLocation]);
 
-  const [dbState, setDbState] = useState<DatabaseState>(() => {
-    if (!isAuthorizedAdmin) {
-      return {
-        clientes: {},
-        cobrancas: {},
-        checklists: {},
-        arquivados: {},
-        despesas: {},
-        atas: {},
-        caixa: { saldo: 0, metaFimAno: 0 },
-        despFixas: {},
-        logs: [],
-      };
-    }
+  // Os dados financeiros não ficam mais em cache no navegador: chegam só pela API.
+  const [dbState, setDbState] = useState<DatabaseState>(() => ({
+    clientes: {},
+    cobrancas: {},
+    checklists: {},
+    arquivados: {},
+    despesas: {},
+    atas: {},
+    caixa: { saldo: 0, metaFimAno: 0 },
+    despFixas: {},
+    logs: [],
+  }));
+  const [financialReady, setFinancialReady] = useState(false);
+  const [financialError, setFinancialError] = useState<string | null>(null);
+
+  // Remove a cópia financeira deixada por versões anteriores.
+  useEffect(() => {
     try {
-      const raw = JSON.parse(localStorage.getItem("tp_db") || "{}");
-      return {
-        clientes: raw.clientes || {},
-        cobrancas: raw.cobrancas || {},
-        checklists: raw.checklists || {},
-        arquivados: raw.arquivados || {},
-        despesas: raw.despesas || {},
-        atas: raw.atas || {},
-        caixa: raw.caixa || { saldo: 0, metaFimAno: 0 },
-        despFixas: raw.despFixas || {},
-        logs: raw.logs || [],
-      };
+      localStorage.removeItem("tp_db");
     } catch {
-      return {
-        clientes: {},
-        cobrancas: {},
-        checklists: {},
-        arquivados: {},
-        despesas: {},
-        atas: {},
-        caixa: { saldo: 0, metaFimAno: 0 },
-        despFixas: {},
-        logs: [],
-      };
+      // ignore
     }
-  });
+  }, []);
 
   const [activeTab, setActiveTab] = useState<"fin" | "desp" | "dash" | "ata" | "cli">("fin");
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
@@ -109,13 +91,11 @@ export default function AdminFinanceiroPage() {
     const unsubscribe = subscribeToFinancialDB(
       (data) => {
         setDbState(data);
-        try {
-          localStorage.setItem("tp_db", JSON.stringify(data));
-        } catch {
-          // ignore
-        }
+        setFinancialReady(true);
+        setFinancialError(null);
       },
-      () => {
+      (error) => {
+        setFinancialError(error.message);
         toast.error("Não foi possível sincronizar os dados do financeiro.");
       }
     );
@@ -167,11 +147,6 @@ export default function AdminFinanceiroPage() {
           },
         },
       };
-      try {
-        localStorage.setItem("tp_db", JSON.stringify(next));
-      } catch {
-        // Não impede a atualização visual quando o cache local estiver indisponível.
-      }
       return next;
     });
   };
@@ -236,6 +211,20 @@ export default function AdminFinanceiroPage() {
     { value: "dash" as const, label: "Resumo" },
     { value: "ata" as const, label: "Atas" },
   ];
+
+  if (isAuthorizedAdmin && !financialReady) {
+    return (
+      <AppLayout>
+        <div className="mx-auto max-w-xl p-8 text-center text-white">
+          <div role="status" aria-label="Carregando dados financeiros" className="mx-auto mb-5 size-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+          <h1 className="text-xl font-semibold">Financeiro</h1>
+          <p className="mt-3 text-sm text-zinc-400">
+            {financialError ? `Não foi possível carregar os dados: ${financialError}. Tentando novamente.` : "Carregando dados financeiros..."}
+          </p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

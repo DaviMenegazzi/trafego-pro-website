@@ -13,7 +13,11 @@ const KEYS_FILE = path.join(DATA_DIR, "form_api_keys.json");
 const SUBMISSIONS_FILE = path.join(DATA_DIR, "form_submissions.json");
 
 function getDbUri(): string | null {
-  return process.env.DATABASE_URL || process.env.DRIZZLE_DATABASE_URL || null;
+  const uri = process.env.DATABASE_URL || process.env.DRIZZLE_DATABASE_URL || null;
+  if (!uri && process.env.NODE_ENV === "production") {
+    throw new Error("DATABASE_URL obrigatória para armazenar formulários em produção");
+  }
+  return uri;
 }
 
 function db(): Pool {
@@ -135,6 +139,7 @@ function saveKeysFile(keys: LocalKeyItem[]): void {
     fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2), "utf-8");
   } catch (err) {
     console.error("[forms] Erro ao salvar chaves locais:", err);
+    throw err;
   }
 }
 
@@ -159,6 +164,7 @@ function saveSubmissionsFile(submissions: FormSubmissionRecord[]): void {
     fs.writeFileSync(SUBMISSIONS_FILE, JSON.stringify(submissions, null, 2), "utf-8");
   } catch (err) {
     console.error("[forms] Erro ao salvar submissões locais:", err);
+    throw err;
   }
 }
 
@@ -405,8 +411,6 @@ export async function createFormSubmissionSql(input: {
       submittedAt: now,
     };
     submissions.unshift(submission);
-    // Manter no máximo 10.000 submissões no arquivo local
-    if (submissions.length > 10_000) submissions.length = 10_000;
     saveSubmissionsFile(submissions);
     return submission;
   }

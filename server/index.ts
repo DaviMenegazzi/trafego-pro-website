@@ -40,6 +40,7 @@ import { feedbackRouter } from "./routes/feedbackRoutes.js";
 import { formRouter } from "./routes/formRoutes.js";
 import { userAccessRouter } from "./routes/userAccessRoutes.js";
 import { healthRouter } from "./routes/healthRoutes.js";
+import { financialRouter } from "./routes/financialRoutes.js";
 import { startDailyMetricsBackupScheduler } from "./dailyMetricsBackupService.js";
 import { startEvolutionLiveAiFlushLoop } from "./evolutionLeadStageBuffer.js";
 
@@ -123,6 +124,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.use("/api", formRouter);
   app.use("/api", userAccessRouter);
   app.use("/api", healthRouter);
+  app.use("/api", financialRouter);
 
   // ─── Arquivos Estáticos e Fallback (Produção) ───────────────────────────────
   if (process.env.NODE_ENV === "production") {

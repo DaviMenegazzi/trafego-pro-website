@@ -20,6 +20,7 @@ import {
   listFormSubmissionsSql,
   revokeFormApiKeySql,
 } from "./formSubmissionSql.js";
+import { getSiteSupabase } from "./siteSupabase.js";
 import { signToken, startServer } from "./index.js";
 
 describe("Form Submission Security Policy", () => {
@@ -173,6 +174,7 @@ describe("Form Submissions Endpoints Integration", () => {
 
   let validRawKey = "";
   let createdKeyId = "";
+  const testStartedAt = new Date().toISOString();
   let testSubmissionId = "";
 
   beforeAll(async () => {
@@ -203,6 +205,14 @@ describe("Form Submissions Endpoints Integration", () => {
   afterAll(async () => {
     if (createdKeyId) await revokeFormApiKeySql(createdKeyId);
     if (testSubmissionId) await deleteFormSubmissionSql(testSubmissionId);
+    // O banco é o Supabase real: apaga as chaves criadas por este teste (revogar não basta).
+    const { data: testKeys } = await getSiteSupabase().from("form_api_keys").select("id")
+      .in("name", ["LP Caxias Integrada", "Chave Temporária"]).gte("created_at", testStartedAt);
+    const testKeyIds = (testKeys ?? []).map((key) => key.id as string);
+    if (testKeyIds.length) {
+      await getSiteSupabase().from("form_submissions").delete().in("form_key_id", testKeyIds);
+      await getSiteSupabase().from("form_api_keys").delete().in("id", testKeyIds);
+    }
     if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
   });
 

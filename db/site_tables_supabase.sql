@@ -236,3 +236,17 @@ grant execute on function public.create_social_post_with_media(jsonb, jsonb) to 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('social-media', 'social-media', true, 52428800, array['image/jpeg','image/png','image/webp','video/mp4','video/quicktime'])
 on conflict (id) do nothing;
+
+-- Migração site_tables_legacy_columns: colunas legadas vindas do MySQL do Manus.
+alter table public.feedback_leads
+  add column if not exists leads_card integer,
+  add column if not exists leads_consultation integer,
+  add column if not exists leads_dentistry integer,
+  add column if not exists leads_business_pj integer,
+  add column if not exists leads_out_of_area integer,
+  add column if not exists leads_answered integer,
+  add column if not exists leads_no_answer integer,
+  add column if not exists sales_closed integer;
+alter table public.external_ai_api_tokens
+  add column if not exists revoked_by_user_id text,
+  add column if not exists updated_at timestamptz;

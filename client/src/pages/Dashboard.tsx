@@ -5,9 +5,9 @@ import { AppLayout } from "@/components/AppLayout";
 import { DashboardMetricsExportModal } from "@/components/DashboardMetricsExportModal";
 import { DashboardState } from "@/components/DashboardState";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
-import { PredictiveAnalysis, PredictiveSummaryCard, usePredictiveProfile } from "@/components/DeepAnalyticsAccordion";
+import { PredictiveAnalysis, usePredictiveProfile } from "@/components/DeepAnalyticsAccordion";
 import {
-  Button, DateRangePicker, IconButton, InlineNotice, MenuButton, Page, PageHeader, SegmentedControl, StatTile, StatusBadge,
+  Button, DateRangePicker, IconButton, InlineNotice, Page, PageHeader, SegmentedControl, StatTile, StatusBadge,
   Surface, SurfaceHeader, Tooltip, type Accent, type BadgeTone,
 } from "@/components/ds";
 import { useClientContext } from "@/contexts/ClientContext";
@@ -21,7 +21,7 @@ import { createRequestGate } from "@/lib/requestGate";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, ReferenceLine, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
-import { RefreshCw, ChevronDown, Download, FileSpreadsheet, Image as ImageIcon, Database, AlertTriangle, Wallet, MessageCircle, Target, Reply } from "lucide-react";
+import { RefreshCw, ChevronDown, FileSpreadsheet, Database, AlertTriangle, Wallet, MessageCircle, Target, Camera } from "lucide-react";
 
 function useAuthGuard() {
   const [, setLocation] = useLocation();
@@ -412,28 +412,22 @@ export default function DashboardPage() {
     const agg = (part: DailyRow[]) => {
       const spend = part.reduce((a, r) => a + num(r.total_spend), 0);
       const conv = part.reduce((a, r) => a + num(r.total_conversas_iniciadas), 0);
-      const resp = part.reduce((a, r) => a + num(r.total_conversas_respondidas), 0);
-      const conn = part.reduce((a, r) => a + num(r.total_messaging_connections), 0);
-      return { spend, conv, cost: conv > 0 ? spend / conv : 0, rate: calculateResponseRate(resp, conn) };
+      return { spend, conv, cost: conv > 0 ? spend / conv : 0 };
     };
     return { a: agg(rows.slice(0, mid)), b: agg(rows.slice(rows.length - mid)) };
   }, [daily]);
-  const change = (key: "spend" | "conv" | "cost" | "rate") =>
+  const change = (key: "spend" | "conv" | "cost") =>
     halves && halves.a[key] > 0 ? (halves.b[key] - halves.a[key]) / halves.a[key] : undefined;
   const deltaLabel = "2ª metade vs. 1ª";
-  const series = (pick: (r: DailyRow) => number) =>
-    [...daily].sort((a, b) => String(a.date_start).localeCompare(String(b.date_start))).map(pick);
 
   const primaryKpis = [
     {
       label: "Total investido", value: brl(kpi.spend), hint: "verba Meta Ads no período",
       icon: <Wallet />, accent: "blue" as const, goodWhen: "neutral" as const, delta: change("spend"),
-      trend: series((r) => num(r.total_spend)),
     },
     {
       label: "Conversas iniciadas", value: n(kpi.conv), hint: "inícios de conversa no WhatsApp",
       icon: <MessageCircle />, accent: "aqua" as const, goodWhen: "up" as const, delta: change("conv"),
-      trend: series((r) => num(r.total_conversas_iniciadas)),
     },
     {
       label: "Custo por conversa",
@@ -441,12 +435,6 @@ export default function DashboardPage() {
       hint: "investimento ÷ conversas",
       status: costStatus ? { tone: STATUS_TONE[costStatus] === "good" ? "good" as const : STATUS_TONE[costStatus] === "warning" ? "warning" as const : "critical" as const, label: costStatus } : undefined,
       icon: <Target />, accent: "orange" as const, goodWhen: "down" as const, delta: change("cost"),
-      trend: series((r) => num(r.custo_por_conversa) || (num(r.total_conversas_iniciadas) > 0 ? num(r.total_spend) / num(r.total_conversas_iniciadas) : 0)),
-    },
-    {
-      label: "Taxa de resposta", value: pct(responseRate), hint: "conversas respondidas",
-      icon: <Reply />, accent: "violet" as const, goodWhen: "up" as const, delta: change("rate"),
-      trend: series((r) => calculateResponseRate(num(r.total_conversas_respondidas), num(r.total_messaging_connections))),
     },
   ];
 
@@ -501,15 +489,10 @@ export default function DashboardPage() {
                 disabled={loading || clientsLoading || !selectedClientId}
               />
               {canExport && (
-                <MenuButton
-                  label="Exportar"
-                  icon={<Download />}
-                  disabled={loading || !hasMetrics}
-                  items={[
-                    { label: "Imagem para WhatsApp", hint: "Resumo executivo em PNG", icon: <ImageIcon />, onSelect: () => setPrintModalOpen(true) },
-                    { label: "Planilha Excel", hint: "Resumo, dias e campanhas", icon: <FileSpreadsheet />, onSelect: exportMetricsForActiveUnit },
-                  ]}
-                />
+                <Button disabled={loading || !hasMetrics} onClick={exportMetricsForActiveUnit}>
+                  <FileSpreadsheet />
+                  Planilha Excel
+                </Button>
               )}
             </>
           }
@@ -532,12 +515,24 @@ export default function DashboardPage() {
               />
             </div>
             {isAdmin && (
-              <SegmentedControl
-                aria-label="Visão"
-                value={view}
-                onValueChange={setView}
-                options={[{ value: "overview", label: "Visão geral" }, { value: "analysis", label: "Análise" }]}
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <SegmentedControl
+                  aria-label="Visão"
+                  value={view}
+                  onValueChange={setView}
+                  options={[{ value: "overview", label: "Visão geral" }, { value: "analysis", label: "Análise" }]}
+                />
+                {canExport && (
+                  <Button
+                    variant="primary"
+                    disabled={loading || !hasMetrics}
+                    onClick={() => setPrintModalOpen(true)}
+                  >
+                    <Camera />
+                    Imagem para WhatsApp
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </PageHeader>
@@ -562,7 +557,7 @@ export default function DashboardPage() {
           <DashboardState {...dashboardState} />
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
               {primaryKpis.map((k) => (
                 <StatTile
                   key={k.label}
@@ -573,7 +568,6 @@ export default function DashboardPage() {
                   icon={k.icon}
                   accent={k.accent}
                   delta={k.delta !== undefined ? { value: k.delta, label: deltaLabel, goodWhen: k.goodWhen } : undefined}
-                  trend={k.trend}
                 />
               ))}
             </div>
@@ -587,7 +581,6 @@ export default function DashboardPage() {
               ))}
             </Surface>
 
-            {isAdmin && <PredictiveSummaryCard data={predictive.data} loading={predictive.loading} onOpen={() => setView("analysis")} />}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <ChartPanel title="Conversas iniciadas por dia" icon={<MessageCircle />} accent="aqua">

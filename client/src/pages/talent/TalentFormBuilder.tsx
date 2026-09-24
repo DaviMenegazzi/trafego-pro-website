@@ -356,11 +356,11 @@ export function TalentFormBuilder({
             <div className="flex items-center gap-2">
               <FileCheck2 className="size-4 text-emerald-400" />
               <h3 className="font-display text-sm font-semibold text-zinc-100">
-                Publicação & Status
+                Publicação
               </h3>
             </div>
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
                 form.isPublished
                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                   : "bg-amber-500/10 text-amber-400 border-amber-500/20"
@@ -387,14 +387,14 @@ export function TalentFormBuilder({
 
           {/* Public Link Box */}
           <div className="rounded-xl border border-white/5 bg-zinc-950/40 p-3 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-zinc-400">
+            <div className="flex items-center justify-between text-xs text-zinc-400">
               <span className="flex items-center gap-1.5">
                 <Globe className="size-3 text-zinc-500" />
                 Link público da vaga
               </span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-black/40 px-2.5 py-1.5">
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-300">
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-300">
                 {publicUrl}
               </span>
               <Tooltip content={"Copiar link"}>
@@ -424,7 +424,7 @@ export function TalentFormBuilder({
               href={publicUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition"
+              className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition"
             >
               <ExternalLink className="size-3" />
               Abrir formulário em nova aba
@@ -457,15 +457,13 @@ export function TalentFormBuilder({
           <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
             <div className="flex items-center gap-2">
               <ImageIcon className="size-4 text-emerald-400" />
-              <h3 className="font-display text-xs font-semibold uppercase tracking-wider text-zinc-300">
-                Logo / Marca da Vaga
-              </h3>
+              <h3 className="text-sm font-semibold text-zinc-100">Logo da vaga</h3>
             </div>
             {form.bannerUrl && (
-              <span className="text-[10px] text-emerald-400 font-medium">Ativa</span>
+              <span className="text-xs text-emerald-400 font-medium">Ativa</span>
             )}
           </div>
-          <p className="text-[11px] text-zinc-400 leading-relaxed">
+          <p className="text-xs text-zinc-400 leading-relaxed">
             Esta imagem é exibida no topo do link público onde o candidato preenche as respostas.
           </p>
 
@@ -481,14 +479,14 @@ export function TalentFormBuilder({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300 hover:bg-white/10 transition"
+                  className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/10 transition"
                 >
                   Trocar imagem
                 </button>
                 <button
                   type="button"
                   onClick={() => onFormChange({ ...form, bannerUrl: null })}
-                  className="rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-[11px] text-red-400 hover:bg-red-500/20 transition"
+                  className="rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs text-red-400 hover:bg-red-500/20 transition"
                 >
                   Remover
                 </button>
@@ -510,7 +508,7 @@ export function TalentFormBuilder({
                   <span className="block text-xs font-medium text-zinc-300">
                     Enviar logo personalizada
                   </span>
-                  <span className="block text-[10px] text-zinc-500 mt-0.5">
+                  <span className="block text-xs text-zinc-500 mt-0.5">
                     PNG, JPG ou SVG (até 5 MB)
                   </span>
                 </>
@@ -529,13 +527,11 @@ export function TalentFormBuilder({
 
         {/* Basic Form Settings (Title, Description, Success) */}
         <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-5 backdrop-blur-sm space-y-3.5">
-          <h3 className="font-display text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            Cabeçalho & Textos da Vaga
-          </h3>
+          <h3 className="text-sm font-semibold text-zinc-100">Textos da página</h3>
 
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400">
-              Título do Formulário
+            <label className="block text-xs font-medium text-zinc-400">
+              Título
             </label>
             <input
               type="text"
@@ -549,8 +545,8 @@ export function TalentFormBuilder({
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400">
-              Subtítulo / Descrição
+            <label className="block text-xs font-medium text-zinc-400">
+              Descrição
             </label>
             <textarea
               value={form.subtitle}
@@ -564,8 +560,8 @@ export function TalentFormBuilder({
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400">
-              Termo LGPD / Consentimento
+            <label className="block text-xs font-medium text-zinc-400">
+              Termo de consentimento (LGPD)
             </label>
             <textarea
               value={form.lgpdDisclaimer}
@@ -578,8 +574,8 @@ export function TalentFormBuilder({
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400">
-              Mensagem de Sucesso (Pós-Envio)
+            <label className="block text-xs font-medium text-zinc-400">
+              Mensagem depois do envio
             </label>
             <input
               type="text"
@@ -606,11 +602,9 @@ export function TalentFormBuilder({
         <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.03] p-5 backdrop-blur-sm space-y-3">
           <div className="flex items-center gap-2 text-red-400">
             <AlertTriangle className="size-4" />
-            <h3 className="font-display text-xs font-semibold uppercase tracking-wider">
-              Zona de Perigo
-            </h3>
+            <h3 className="text-sm font-semibold">Excluir formulário</h3>
           </div>
-          <p className="text-[11px] text-zinc-400 leading-relaxed">
+          <p className="text-xs text-zinc-400 leading-relaxed">
             Ao excluir este formulário, todas as perguntas e respostas de candidatos vinculadas serão removidas permanentemente.
           </p>
 

@@ -292,6 +292,7 @@ _Relatório de performance gerado pela Tráfego Pro._`;
           <button
             type="button"
             onClick={onClose}
+            aria-label="Fechar"
             className="size-8 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-400 hover:text-white hover:border-white/20 flex items-center justify-center transition-all"
           >
             <X className="size-4" />

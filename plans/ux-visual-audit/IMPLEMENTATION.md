@@ -16,6 +16,7 @@ Branch `davi/zen-hypatia-j9j6w6`. Uma fase por commit, cada uma verificada antes
 | `<select>` nativo | 13+ | 0 | Idem. |
 | `<input type="date">` | 4 | 0 | `DatePicker` com calendário pt-BR. |
 | Botões só com `title=` | 60+ | 0 | `IconButton` com `aria-label` e `Tooltip`. Restam 5 `title=` em **texto truncado** (nome longo de unidade, data completa ao passar o mouse), de propósito. |
+| Elementos interativos medidos (66 capturas desktop + celular, `tools/elstats.cjs`) | 2.658 · 806 com dica só em `title=` · 24 só-ícone sem nome · 128 controles nativos | 2.503 · **0** com `title=` · **0** só-ícone sem nome · 30 "nativos" | Os 30 restantes são os `<input type="checkbox">` ocultos que o Radix cria dentro de `<form>` para enviar o valor (invisíveis e fora do foco); os controles visíveis são do DS. |
 | Navegador | — | Todas as telas em 1440×900 e 390×844, sem erro de código no console | Os únicos erros de console são recursos externos bloqueados no sandbox (Google Fonts, gtag, `manus-storage`), iguais aos de antes. Sem conteúdo cortado fora da tela (verificado por script em cada fase). |
 
 Falhas de teste pré-existentes (idênticas antes e depois): `evolutionSupabaseConnection` (1), `evolutionSupabaseRpc` (2), `evolutionSupabaseSchema` (1), `evolutionWebhook` (5 + arquivo), `feedback-leads` (2, MySQL), `metaAdsValidation` (1), `metaAppCredentials` (1), `supabase` (5).
@@ -40,7 +41,8 @@ Falhas de teste pré-existentes (idênticas antes e depois): `evolutionSupabaseC
 | `1ca80db` | 4 · Configurações | Um botão de mostrar senha por campo (antes um revelava os três), dica do e-mail visível, regra de senha antes do erro. |
 | `1404847` | 4 · Login/Cadastro | Três selos de segurança removidos, campos de 44px, Checkbox, olhos focáveis com nome, textos em frase. |
 | `923ee95` | 4 · Home | "Área do cliente" no topo (no celular, "Entrar"); cartões de serviço sem a seta ↗ que sugeria link. |
-| _este commit_ | 5 · Final | Rotas sob demanda (bundle), capturas "depois", ferramentas atualizadas e este relatório. |
+| `84e09ca` | 5 · Bundle e relatório | Rotas sob demanda, ferramentas atualizadas e este relatório. |
+| _commit seguinte_ | 5 · Capturas | `after/` com as 67 capturas e `after/elements.json`; botão "Fechar" dos modais de exportação ganhou `aria-label` (único só-ícone sem nome que as capturas acharam). |
 
 ## Desvios do plano e por quê
 

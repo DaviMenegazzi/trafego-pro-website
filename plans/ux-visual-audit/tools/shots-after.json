@@ -262,7 +262,7 @@
    {
     "role": {
      "role": "radio",
-     "name": "Ativos"
+     "name": "Ativas"
     },
     "wait": 700
    }
@@ -277,9 +277,9 @@
    {
     "role": {
      "role": "button",
-     "name": "Como ler a classificação"
+     "name": "Como a classificação"
     },
-    "wait": 600
+    "wait": 700
    }
   ]
  },
@@ -815,10 +815,16 @@
    {
     "role": {
      "role": "button",
-     "name": "Formulários",
-     "exact": true
+     "name": "^Trabalhe na"
     },
-    "wait": 800
+    "wait": 1000
+   },
+   {
+    "role": {
+     "role": "combobox",
+     "name": "Trocar de formulário"
+    },
+    "wait": 700
    }
   ]
  }

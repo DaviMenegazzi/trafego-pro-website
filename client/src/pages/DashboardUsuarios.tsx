@@ -1,30 +1,30 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { Copy, Plus, RefreshCw, Search, Sparkles, X } from "lucide-react";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import {
-  ShieldCheck,
-  Plus,
-  Trash2,
-  X,
-  Users2,
-  UserCog,
-  Building2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Check,
-  Filter,
-  Search,
-  KeyRound,
-  Copy,
-  ChevronDown,
-  ChevronUp,
-  AlertCircle,
-  UserCheck,
-  Sparkles,
-} from "lucide-react";
-import { toast } from "sonner";
-
+  ActionsMenu,
+  Button,
+  CheckboxField,
+  Dialog,
+  EmptyState,
+  Field,
+  IconButton,
+  Input,
+  Page,
+  PageHeader,
+  Popover,
+  RadioGroup,
+  RadioOption,
+  SegmentedControl,
+  Select,
+  StatusBadge,
+  Surface,
+  useConfirm,
+  type BadgeTone,
+} from "@/components/ds";
+import { cn } from "@/lib/utils";
 function useAuthGuard() {
   const [, setLocation] = useLocation();
   useEffect(() => {
@@ -81,39 +81,34 @@ const ROLE_LABELS: Record<string, string> = {
   none: "Sem acesso",
 };
 
-const ROLE_COLORS: Record<string, string> = {
-  admin: "bg-[rgba(139,92,246,0.15)] text-[#a78bfa] border-purple-500/20",
-  viewer: "bg-[rgba(59,130,246,0.15)] text-[#60a5fa] border-blue-500/20",
-  client_viewer: "bg-[rgba(234,179,8,0.15)] text-[#facc15] border-yellow-500/20",
-  designer: "bg-[rgba(236,72,153,0.15)] text-[#f472b6] border-pink-500/20",
-  cs: "bg-[rgba(34,197,94,0.15)] text-[#22c55e] border-emerald-500/20",
-  account_manager: "bg-[rgba(251,146,60,0.15)] text-[#fb923c] border-orange-500/20",
-  traffic_manager: "bg-[rgba(14,165,233,0.15)] text-[#0ea5e9] border-sky-500/20",
-  copywriter: "bg-[rgba(168,85,247,0.15)] text-[#a855f7] border-purple-500/20",
-  none: "bg-[rgba(100,116,139,0.15)] text-[#94a3b8] border-slate-500/20",
-};
+const ROLE_ORDER = ["viewer", "client_viewer", "designer", "cs", "account_manager", "traffic_manager", "copywriter", "admin"];
+const ROLE_OPTIONS = ROLE_ORDER.map((value) => ({ value, label: ROLE_LABELS[value] }));
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-  pending: "text-amber-400 bg-amber-500/10 border-amber-500/20 animate-pulse",
-  inactive: "text-rose-400 bg-rose-500/10 border-rose-500/20",
-  disabled: "text-rose-400 bg-rose-500/10 border-rose-500/20",
-  blocked: "text-rose-400 bg-rose-500/10 border-rose-500/20",
-  rejected: "text-rose-400 bg-rose-500/10 border-rose-500/20",
-  inativo: "text-rose-400 bg-rose-500/10 border-rose-500/20",
-  desativado: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+// Só o status tem cor; o cargo fica em texto neutro.
+const STATUS_META: Record<string, { label: string; tone: BadgeTone }> = {
+  active: { label: "Ativo", tone: "good" },
+  pending: { label: "Pendente", tone: "warning" },
+  rejected: { label: "Recusado", tone: "critical" },
 };
+const statusMeta = (status: string) => STATUS_META[status] ?? { label: "Inativo", tone: "neutral" as BadgeTone };
 
-const STATUS_LABELS: Record<string, string> = {
-  active: "Ativo",
-  pending: "Pendente de Aprovação",
-  inactive: "Inativo",
-  disabled: "Inativo",
-  blocked: "Inativo",
-  rejected: "Recusado",
-  inativo: "Inativo",
-  desativado: "Inativo",
-};
+/** Senha aleatória gerada no navegador (sem senha padrão conhecida pela equipe). */
+function generateStrongPassword(length = 16) {
+  const sets = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%&*?"];
+  const all = sets.join("");
+  const random = (n: number) => {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] % n;
+  };
+  const chars = sets.map((set) => set[random(set.length)]);
+  while (chars.length < length) chars.push(all[random(all.length)]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = random(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
 
 function token() {
   return localStorage.getItem("tp_token") ?? "";
@@ -130,7 +125,7 @@ function authHeaders(): HeadersInit {
 export default function DashboardUsuariosPage() {
   useAuthGuard();
   useEffect(() => {
-    document.title = "Tráfego Pro — Usuários e Permissões";
+    document.title = "Tráfego Pro — Usuários";
   }, []);
 
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
@@ -139,7 +134,6 @@ export default function DashboardUsuariosPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
   // Modais
   const [showModal, setShowModal] = useState(false);
@@ -147,9 +141,10 @@ export default function DashboardUsuariosPage() {
   const [deletePermanent, setDeletePermanent] = useState(false);
   const [approvingProfile, setApprovingProfile] = useState<ProfileRow | null>(null);
   const [resetPasswordProfile, setResetPasswordProfile] = useState<ProfileRow | null>(null);
-  const [newPasswordInput, setNewPasswordInput] = useState("Trafego@2026");
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { confirm } = useConfirm();
 
   // Form novo usuário manual
   const [formEmail, setFormEmail] = useState("");
@@ -157,15 +152,13 @@ export default function DashboardUsuariosPage() {
   const [formRole, setFormRole] = useState("viewer");
   const [formPassword, setFormPassword] = useState("");
   const [saving, setSaving] = useState(false);
+  const [formEmailError, setFormEmailError] = useState("");
 
   // Modal de Aprovação state
   const [approveRole, setApproveRole] = useState("viewer");
   const [approveClientIds, setApproveClientIds] = useState<string[]>([]);
   const [approving, setApproving] = useState(false);
 
-  // Grant access inline state
-  const [grantingUserId, setGrantingUserId] = useState<string | null>(null);
-  const [grantClientId, setGrantClientId] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -238,16 +231,23 @@ export default function DashboardUsuariosPage() {
     return true;
   });
 
-  function copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text);
-    setCopiedEmail(text);
-    toast.success("E-mail copiado para a área de transferência!");
-    setTimeout(() => setCopiedEmail(null), 2000);
+  async function copyToClipboard(text: string, what = "E-mail") {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${what} copiado`);
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
   }
 
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
     if (!resetPasswordProfile) return;
+    if (newPasswordInput.trim().length < 8) {
+      setPasswordError("Use ao menos 8 caracteres, ou gere uma senha forte");
+      document.getElementById("reset-password")?.focus();
+      return;
+    }
     setResettingPassword(true);
     try {
       const res = await fetch(`/api/user-access/${resetPasswordProfile.id}/reset-password`, {
@@ -261,7 +261,7 @@ export default function DashboardUsuariosPage() {
         toast.error(data.error || "Erro ao redefinir senha");
         return;
       }
-      toast.success(data.message || "Senha atualizada com sucesso!");
+      toast.success(data.message || "Senha redefinida");
       setResetPasswordProfile(null);
     } catch {
       toast.error("Erro de conexão");
@@ -273,7 +273,8 @@ export default function DashboardUsuariosPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!formEmail.trim()) {
-      toast.error("Preencha o e-mail");
+      setFormEmailError("Informe o e-mail");
+      document.getElementById("novo-usuario-email")?.focus();
       return;
     }
     setSaving(true);
@@ -295,9 +296,9 @@ export default function DashboardUsuariosPage() {
         return;
       }
       if (data.temporaryPassword) {
-        toast.success(`Usuário cadastrado! Senha inicial: ${data.temporaryPassword}`, { duration: 10000 });
+        toast.success(`Usuário cadastrado. Senha inicial: ${data.temporaryPassword}`, { duration: 15000, action: { label: "Copiar", onClick: () => void copyToClipboard(data.temporaryPassword, "Senha") } });
       } else {
-        toast.success("Usuário cadastrado com sucesso!");
+        toast.success("Usuário cadastrado");
       }
       setShowModal(false);
       setFormEmail("");
@@ -370,7 +371,7 @@ export default function DashboardUsuariosPage() {
         return;
       }
 
-      toast.success(`Usuário ${approvingProfile.full_name || approvingProfile.user_email} aprovado com sucesso!`);
+      toast.success(`${approvingProfile.full_name || approvingProfile.user_email} aprovado`);
       setApprovingProfile(null);
       fetchData();
     } catch {
@@ -381,6 +382,13 @@ export default function DashboardUsuariosPage() {
   }
 
   async function handleReject(profile: ProfileRow) {
+    const ok = await confirm({
+      title: `Recusar o cadastro de ${profile.full_name || profile.user_email}?`,
+      description: "A pessoa não consegue entrar. O cadastro fica como inativo e pode ser reativado depois.",
+      confirmLabel: "Recusar cadastro",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/user-access/${profile.id}/reject`, {
         method: "POST",
@@ -394,7 +402,7 @@ export default function DashboardUsuariosPage() {
         return;
       }
 
-      toast.success("Cadastro recusado/inativado.");
+      toast.success("Cadastro recusado");
       fetchData();
     } catch {
       toast.error("Erro de conexão");
@@ -418,7 +426,7 @@ export default function DashboardUsuariosPage() {
         toast.error(err.error || (deletePermanent ? "Erro ao excluir usuário" : "Erro ao desativar"));
         return;
       }
-      toast.success(deletePermanent ? "Usuário excluído definitivamente com sucesso" : "Usuário desativado com sucesso");
+      toast.success(deletePermanent ? "Usuário excluído" : "Usuário desativado");
       setConfirmDelete(null);
       setDeletePermanent(false);
       fetchData();
@@ -428,6 +436,17 @@ export default function DashboardUsuariosPage() {
   }
 
   async function handleRoleChange(profile: ProfileRow, newRole: string) {
+    if (newRole === profile.role) return;
+    // Admin tem acesso a tudo: dar ou tirar esse cargo pede confirmação.
+    if (newRole === "admin" || profile.role === "admin") {
+      const name = profile.full_name || profile.user_email;
+      const ok = await confirm(
+        newRole === "admin"
+          ? { title: `Tornar ${name} administrador?`, description: "Admin vê todas as unidades, o Financeiro e pode gerenciar usuários.", confirmLabel: "Tornar admin", tone: "danger" }
+          : { title: `Tirar o acesso de admin de ${name}?`, description: `Passa a ver só as unidades vinculadas, como ${ROLE_LABELS[newRole] ?? newRole}.`, confirmLabel: "Alterar cargo", tone: "danger" },
+      );
+      if (!ok) return;
+    }
     try {
       const res = await fetch(`/api/user-access/${profile.id}`, {
         method: "PUT",
@@ -464,9 +483,7 @@ export default function DashboardUsuariosPage() {
         toast.error(err.error || "Erro ao conceder acesso");
         return;
       }
-      toast.success("Acesso concedido");
-      setGrantingUserId(null);
-      setGrantClientId("");
+      toast.success("Unidade vinculada");
       fetchData();
     } catch {
       toast.error("Erro de conexão");
@@ -485,812 +502,301 @@ export default function DashboardUsuariosPage() {
         toast.error(err.error || "Erro ao revogar acesso");
         return;
       }
-      toast.success("Acesso revogado");
+      toast.success("Unidade desvinculada");
       fetchData();
     } catch {
       toast.error("Erro de conexão");
     }
   }
 
+  const unitsLabel = (profile: ProfileRow) =>
+    profile.role === "admin"
+      ? "Todas as unidades"
+      : profile.client_access.length === 0
+      ? "Sem unidades"
+      : profile.client_access.length === 1
+      ? clientName(profile.client_access[0])
+      : `${profile.client_access.length} unidades`;
+
   return (
     <AppLayout>
-      <div className="px-4 md:px-8 py-6 space-y-6 max-w-[1200px] mx-auto">
-        
-        {/* Header com Ação Principal */}
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-              <ShieldCheck className="size-6 text-emerald-400" /> Usuários e Permissões
-            </h1>
-            <p className="text-xs text-zinc-400 mt-1">
-              Controle de contas, redefinição de senhas, permissões por cargo e vinculação de franquias.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-[0.98]"
-          >
-            <Plus className="size-4" /> Cadastrar Usuário
-          </button>
-        </header>
+      <Page width="medium">
+        <PageHeader
+          title="Usuários"
+          subtitle="Contas, cargos e unidades que cada pessoa pode ver."
+          actions={
+            <>
+              <IconButton label="Atualizar" icon={<RefreshCw className={loading ? "animate-spin" : undefined} />} onClick={() => void fetchData()} disabled={loading} />
+              <Button variant="primary" onClick={() => setShowModal(true)}><Plus />Novo usuário</Button>
+            </>
+          }
+        />
 
-        {/* Cards de Métricas e Visão Geral */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div
-            onClick={() => { setStatusFilter("all"); setRoleFilter("all"); }}
-            className={`glass-card p-4 cursor-pointer transition-all rounded-2xl border ${
-              statusFilter === "all" ? "border-emerald-500/50 bg-emerald-500/[0.04]" : "border-zinc-800/80 hover:border-zinc-700"
-            }`}
-          >
-            <div className="flex items-center justify-between text-zinc-400 mb-1">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Total de Contas</span>
-              <Users2 className="size-4 text-zinc-400" />
-            </div>
-            <div className="text-2xl font-bold text-white">{profiles.length}</div>
-          </div>
-
-          <div
-            onClick={() => setStatusFilter("active")}
-            className={`glass-card p-4 cursor-pointer transition-all rounded-2xl border ${
-              statusFilter === "active" ? "border-emerald-500/50 bg-emerald-500/[0.04]" : "border-zinc-800/80 hover:border-zinc-700"
-            }`}
-          >
-            <div className="flex items-center justify-between text-zinc-400 mb-1">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-emerald-400">Ativos</span>
-              <UserCheck className="size-4 text-emerald-400" />
-            </div>
-            <div className="text-2xl font-bold text-emerald-400">{activeCount}</div>
-          </div>
-
-          <div
-            onClick={() => setStatusFilter("pending")}
-            className={`glass-card p-4 cursor-pointer transition-all rounded-2xl border ${
-              statusFilter === "pending"
-                ? "border-amber-500/60 bg-amber-500/[0.08]"
-                : pendingCount > 0
-                ? "border-amber-500/40 bg-amber-500/[0.03] hover:border-amber-500/60"
-                : "border-zinc-800/80 hover:border-zinc-700"
-            }`}
-          >
-            <div className="flex items-center justify-between text-zinc-400 mb-1">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-amber-400">Pendentes</span>
-              <Clock className={`size-4 text-amber-400 ${pendingCount > 0 ? "animate-pulse" : ""}`} />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-amber-400">{pendingCount}</span>
-              {pendingCount > 0 && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
-                  Requer Aprovação
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div
-            onClick={() => setStatusFilter("inactive")}
-            className={`glass-card p-4 cursor-pointer transition-all rounded-2xl border ${
-              statusFilter === "inactive" ? "border-rose-500/50 bg-rose-500/[0.04]" : "border-zinc-800/80 hover:border-zinc-700"
-            }`}
-          >
-            <div className="flex items-center justify-between text-zinc-400 mb-1">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Inativos</span>
-              <Trash2 className="size-4 text-zinc-500" />
-            </div>
-            <div className="text-2xl font-bold text-zinc-400">{inactiveCount}</div>
-          </div>
-        </div>
-
-        {/* Barra de Busca e Filtros */}
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-zinc-900/80 p-3 rounded-2xl border border-zinc-800/90 shadow-sm">
-          {/* Campo de Busca */}
-          <div className="relative flex-1 min-w-[260px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-zinc-400" />
-            <input
-              type="text"
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-full sm:w-72">
+            <Input
+              leading={<Search />}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nome, e-mail, cargo ou franquia..."
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-9 py-2 text-xs text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+              placeholder="Buscar nome, e-mail ou unidade"
+              aria-label="Buscar usuários"
+              trailing={searchQuery ? <IconButton label="Limpar busca" size="sm" icon={<X />} onClick={() => setSearchQuery("")} /> : undefined}
             />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Filtro de Cargo */}
-            <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-400">
-              <Filter className="size-3.5 text-zinc-400" />
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="bg-transparent text-xs text-zinc-200 outline-none cursor-pointer"
-              >
-                <option value="all" className="bg-zinc-900">Todos os cargos</option>
-                <option value="admin" className="bg-zinc-900">Admin</option>
-                <option value="account_manager" className="bg-zinc-900">Gestor de Conta</option>
-                <option value="traffic_manager" className="bg-zinc-900">Tráfego</option>
-                <option value="designer" className="bg-zinc-900">Designer</option>
-                <option value="cs" className="bg-zinc-900">CS</option>
-                <option value="copywriter" className="bg-zinc-900">Copywriter</option>
-                <option value="viewer" className="bg-zinc-900">Visualizador</option>
-                <option value="client_viewer" className="bg-zinc-900">Cliente</option>
-              </select>
-            </div>
-
-            {/* Abas de Status */}
-            <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1">
-              <button
-                onClick={() => setStatusFilter("all")}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  statusFilter === "all" ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                onClick={() => setStatusFilter("pending")}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  statusFilter === "pending"
-                    ? "bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                Pendentes {pendingCount > 0 && `(${pendingCount})`}
-              </button>
-              <button
-                onClick={() => setStatusFilter("active")}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  statusFilter === "active" ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                Ativos
-              </button>
-              <button
-                onClick={() => setStatusFilter("inactive")}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  statusFilter === "inactive" ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                Inativos
-              </button>
-            </div>
-          </div>
+          <SegmentedControl
+            aria-label="Situação"
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+            options={[
+              { value: "all", label: "Todos", count: profiles.length },
+              { value: "pending", label: "Pendentes", count: pendingCount, tone: pendingCount > 0 ? "warning" : undefined },
+              { value: "active", label: "Ativos", count: activeCount },
+              { value: "inactive", label: "Inativos", count: inactiveCount },
+            ]}
+          />
+          <Select
+            aria-label="Cargo"
+            value={roleFilter}
+            onValueChange={setRoleFilter}
+            className="w-full sm:ml-auto sm:w-48"
+            options={[{ value: "all", label: "Todos os cargos" }, ...ROLE_OPTIONS]}
+          />
         </div>
 
-        {/* Estado de Carregamento */}
-        {loading && (
-          <div className="glass-card p-12 text-center text-xs text-zinc-400 rounded-2xl flex flex-col items-center gap-3">
-            <div className="size-6 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
-            Carregando usuários e permissões...
-          </div>
-        )}
-
-        {/* Nenhum Resultado */}
-        {!loading && filteredProfiles.length === 0 && (
-          <div className="glass-card flex flex-col items-center justify-center py-16 gap-3 rounded-2xl border border-zinc-800">
-            <Users2 className="size-12 text-zinc-600" />
-            <p className="text-sm font-medium text-zinc-300">Nenhum usuário encontrado</p>
-            <p className="text-xs text-zinc-500 max-w-sm text-center">
-              {searchQuery
-                ? `Nenhum resultado corresponde à busca "${searchQuery}". Tente outros termos.`
-                : "Não há contas cadastradas com os filtros selecionados."}
-            </p>
-          </div>
-        )}
-
-        {/* Lista de Cards de Usuários */}
-        {!loading && filteredProfiles.length > 0 && (
-          <div className="space-y-3">
-            {filteredProfiles.map((profile) => {
-              const isExpanded = expandedId === profile.id;
-              const isPending = profile.status === "pending";
-              const isInactive = profile.status !== "active" && profile.status !== "pending";
-
-              return (
-                <div
-                  key={profile.id}
-                  className={`glass-card rounded-2xl overflow-hidden transition-all border ${
-                    isPending
-                      ? "border-amber-500/50 bg-amber-500/[0.02]"
-                      : isInactive
-                      ? "border-zinc-800/60 opacity-60 hover:opacity-100"
-                      : "border-zinc-800/80 hover:border-zinc-700 bg-zinc-900/40"
-                  }`}
-                >
-                  {/* Linha Principal do Usuário */}
-                  <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    {/* Bloco de Informações Pessoais */}
-                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                      {/* Avatar com Iniciais */}
-                      <div className="size-11 rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700/80 flex items-center justify-center shrink-0 shadow-inner">
-                        {profile.avatar_url ? (
-                          <img
-                            src={profile.avatar_url}
-                            alt=""
-                            className="size-11 rounded-2xl object-cover"
-                          />
-                        ) : (
-                          <span className="text-sm font-bold text-emerald-400">
-                            {(profile.full_name || profile.user_email).charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Nome, Email e Detalhes */}
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-semibold text-white truncate">
-                            {profile.full_name || profile.user_email.split("@")[0]}
-                          </h3>
-
-                          {/* Cargo Badge */}
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-                              ROLE_COLORS[profile.role] ?? ROLE_COLORS.none
-                            }`}
-                          >
-                            {ROLE_LABELS[profile.role] ?? profile.role}
-                          </span>
-
-                          {/* Status Badge */}
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-medium border ${
-                              STATUS_COLORS[profile.status] ?? STATUS_COLORS.active
-                            }`}
-                          >
-                            <span className="size-1.5 rounded-full bg-current" />
-                            {STATUS_LABELS[profile.status] ?? profile.status}
-                          </span>
+        <Surface className="overflow-hidden">
+          {loading && profiles.length === 0 ? (
+            <EmptyState title="Carregando usuários…" />
+          ) : filteredProfiles.length === 0 ? (
+            <EmptyState
+              title="Nenhum usuário encontrado"
+              description={searchQuery ? `Nada corresponde a "${searchQuery}".` : "Não há contas com estes filtros."}
+            />
+          ) : (
+            <ul className="divide-y divide-white/[0.06]">
+              {filteredProfiles.map((profile) => {
+                const isPending = profile.status === "pending";
+                const isInactive = !isPending && profile.status !== "active";
+                const status = statusMeta(profile.status);
+                const name = profile.full_name || profile.user_email.split("@")[0];
+                const available = clients.filter((c) => !profile.client_access.some((a) => a.client_id === c.id));
+                return (
+                  <li key={profile.id} className={cn("group flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center", isInactive && "opacity-70")}>
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] text-sm font-semibold text-zinc-200">
+                        {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="size-10 object-cover" /> : name.charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="truncate text-sm font-medium text-zinc-100">{name}</span>
+                          <span className="text-sm text-zinc-500">· {ROLE_LABELS[profile.role] ?? profile.role}</span>
+                          <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                         </div>
-
-                        {/* E-mail com Ação de Copiar */}
-                        <div className="flex items-center gap-2 text-xs text-zinc-400">
+                        <div className="flex items-center gap-1 text-sm text-zinc-400">
                           <span className="truncate">{profile.user_email}</span>
-                          <button
-                            onClick={() => copyToClipboard(profile.user_email)}
-                            className="text-zinc-500 hover:text-zinc-300 p-0.5 rounded transition-colors"
-                            title="Copiar e-mail"
-                          >
-                            {copiedEmail === profile.user_email ? (
-                              <Check className="size-3 text-emerald-400" />
-                            ) : (
-                              <Copy className="size-3" />
-                            )}
-                          </button>
+                          <IconButton
+                            label="Copiar e-mail"
+                            size="sm"
+                            className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                            icon={<Copy />}
+                            onClick={() => void copyToClipboard(profile.user_email)}
+                          />
                         </div>
-
-                        {/* Justificativa / Unidade Solicitada (se houver) */}
-                        {profile.bio && (
-                          <div className="text-[11px] text-amber-300/80 bg-amber-500/[0.08] border border-amber-500/20 px-2.5 py-1 rounded-lg inline-block max-w-full truncate mt-1">
-                            {profile.bio}
-                          </div>
-                        )}
+                        {profile.bio && <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{profile.bio}</p>}
                       </div>
                     </div>
 
-                    {/* Bloco de Unidades e Ações Rápidas */}
-                    <div className="flex flex-wrap items-center gap-2.5 lg:self-center border-t lg:border-t-0 pt-3 lg:pt-0 border-zinc-800/80">
-                      {/* Botão de Expansão de Unidades */}
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : profile.id)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
-                          profile.client_access.length > 0
-                            ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-700"
-                            : "bg-zinc-950/60 border-zinc-850 text-zinc-500 hover:text-zinc-300"
-                        }`}
-                        title="Ver unidades vinculadas"
+                    <div className="flex flex-wrap items-center gap-2 pl-[52px] lg:pl-0">
+                      <Popover
+                        align="end"
+                        className="w-72"
+                        trigger={
+                          <Button variant="secondary" size="sm" className="max-w-[12rem]">
+                            <span className="truncate">{unitsLabel(profile)}</span>
+                          </Button>
+                        }
                       >
-                        <Building2 className="size-3.5 text-emerald-400" />
-                        <span>
-                          {profile.role === "admin"
-                            ? "Todas (Admin)"
-                            : profile.client_access.length === 0
-                            ? "Sem unidades"
-                            : `${profile.client_access.length} ${profile.client_access.length === 1 ? "unidade" : "unidades"}`}
-                        </span>
-                        {isExpanded ? <ChevronUp className="size-3 text-zinc-400" /> : <ChevronDown className="size-3 text-zinc-400" />}
-                      </button>
+                        <div className="space-y-3 p-3">
+                          <p className="text-xs text-zinc-400">
+                            {profile.role === "admin" ? "Administradores veem todas as unidades." : "Unidades que esta pessoa pode ver."}
+                          </p>
+                          {profile.client_access.length > 0 && (
+                            <ul className="space-y-1">
+                              {profile.client_access.map((access, i) => (
+                                <li key={`${access.client_id}-${i}`} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm text-zinc-200 hover:bg-white/[0.04]">
+                                  <span className="truncate">{clientName(access)}</span>
+                                  <IconButton label={`Desvincular ${clientName(access)}`} size="sm" icon={<X />} onClick={() => void handleRevokeAccess(access.id)} />
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {profile.role !== "admin" && available.length > 0 && (
+                            <Select
+                              aria-label="Vincular unidade"
+                              value=""
+                              placeholder="Vincular unidade…"
+                              size="sm"
+                              onValueChange={(cid) => { if (cid) void handleGrantAccess(profile.id, cid); }}
+                              options={available.map((c) => ({ value: c.id, label: c.name, description: c.client_group }))}
+                            />
+                          )}
+                        </div>
+                      </Popover>
 
                       {isPending ? (
-                        /* Ações de Aprovação para Usuários Pendentes */
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openApproveModal(profile)}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold shadow-[0_0_15px_rgba(16,185,129,0.25)] transition-all"
-                          >
-                            <CheckCircle2 className="size-4" /> Aprovar
-                          </button>
-                          <button
-                            onClick={() => handleReject(profile)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-800 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 text-zinc-400 text-xs transition-colors"
-                          >
-                            <XCircle className="size-4" /> Recusar
-                          </button>
-                        </div>
+                        <>
+                          <Button variant="primary" size="sm" onClick={() => void openApproveModal(profile)}>Aprovar</Button>
+                          <Button variant="ghost" size="sm" onClick={() => void handleReject(profile)}>Recusar</Button>
+                        </>
                       ) : (
-                        /* Ações para Usuários Ativos / Inativos */
-                        <div className="flex items-center gap-1.5">
-                          {/* Seletor de Cargo Inline */}
-                          <select
+                        <>
+                          <Select
+                            aria-label={`Cargo de ${name}`}
                             value={profile.role}
-                            onChange={(e) => handleRoleChange(profile, e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-zinc-300 outline-none hover:border-zinc-700 cursor-pointer"
-                          >
-                            <option value="viewer">Visualizador</option>
-                            <option value="client_viewer">Cliente</option>
-                            <option value="designer">Designer</option>
-                            <option value="cs">CS</option>
-                            <option value="account_manager">Gestor de Conta</option>
-                            <option value="traffic_manager">Tráfego</option>
-                            <option value="copywriter">Copywriter</option>
-                            <option value="admin">Admin</option>
-                            <option value="none">Sem acesso</option>
-                          </select>
-
-                          {/* Botão Redefinir Senha */}
-                          <button
-                            onClick={() => {
-                              setResetPasswordProfile(profile);
-                              setNewPasswordInput("Trafego@2026");
-                            }}
-                            className="size-8 flex items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950 hover:bg-amber-500/10 hover:border-amber-500/40 text-zinc-400 hover:text-amber-300 transition-colors"
-                            title="Redefinir Senha"
-                          >
-                            <KeyRound className="size-3.5" />
-                          </button>
-
-                          {/* Botão Desativar / Excluir */}
-                          <button
-                            onClick={() => {
-                              setConfirmDelete(profile);
-                              setDeletePermanent(false);
-                            }}
-                            className="size-8 flex items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950 hover:bg-rose-500/10 hover:border-rose-500/40 text-zinc-400 hover:text-rose-400 transition-colors"
-                            title="Desativar ou Excluir Usuário"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </div>
+                            size="sm"
+                            className="w-40"
+                            onValueChange={(v) => void handleRoleChange(profile, v)}
+                            options={[...ROLE_OPTIONS, { value: "none", label: "Sem acesso" }]}
+                          />
+                          <ActionsMenu
+                            label={`Mais ações para ${name}`}
+                            size="sm"
+                            items={[
+                              { label: "Redefinir senha", onSelect: () => { setResetPasswordProfile(profile); setNewPasswordInput(""); setPasswordError(""); } },
+                              { label: "Desativar ou excluir", tone: "danger", onSelect: () => { setConfirmDelete(profile); setDeletePermanent(false); } },
+                            ]}
+                          />
+                        </>
                       )}
                     </div>
-                  </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Surface>
+      </Page>
 
-                  {/* Painel Retrátil: Gestão de Franquias/Unidades Vinculadas */}
-                  {isExpanded && (
-                    <div className="border-t border-zinc-800/80 p-4 sm:p-5 bg-zinc-950/70 space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h4 className="text-xs font-semibold text-zinc-200 flex items-center gap-2">
-                            <Building2 className="size-4 text-emerald-400" /> Franquias Vinculadas a este Usuário
-                          </h4>
-                          <p className="text-[11px] text-zinc-500 mt-0.5">
-                            O usuário terá acesso às métricas e dados das unidades autorizadas abaixo.
-                          </p>
-                        </div>
+      {/* Redefinir senha */}
+      <Dialog
+        open={Boolean(resetPasswordProfile)}
+        onOpenChange={(open) => { if (!open) setResetPasswordProfile(null); }}
+        size="sm"
+        title="Redefinir senha"
+        description={resetPasswordProfile ? `${resetPasswordProfile.full_name || resetPasswordProfile.user_email} · ${resetPasswordProfile.user_email}` : undefined}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setResetPasswordProfile(null)}>Cancelar</Button>
+            <Button type="submit" form="reset-password-form" variant="primary" loading={resettingPassword}>Redefinir senha</Button>
+          </>
+        }
+      >
+        <form id="reset-password-form" onSubmit={handleResetPassword} noValidate className="space-y-3">
+          <Field label="Nova senha" htmlFor="reset-password" error={passwordError} hint="Envie a senha à pessoa por um canal seguro; ela pode trocá-la em Configurações.">
+            <Input
+              id="reset-password"
+              autoComplete="new-password"
+              value={newPasswordInput}
+              aria-invalid={Boolean(passwordError) || undefined}
+              onChange={(e) => { setNewPasswordInput(e.target.value); setPasswordError(""); }}
+              className="font-mono"
+              trailing={newPasswordInput ? <IconButton label="Copiar senha" size="sm" icon={<Copy />} onClick={() => void copyToClipboard(newPasswordInput, "Senha")} /> : undefined}
+            />
+          </Field>
+          <Button variant="secondary" size="sm" onClick={() => { setNewPasswordInput(generateStrongPassword()); setPasswordError(""); }}>
+            <Sparkles />Gerar senha forte
+          </Button>
+        </form>
+      </Dialog>
 
-                        <button
-                          onClick={() => setGrantingUserId(profile.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 text-xs font-semibold transition-colors"
-                        >
-                          <Plus className="size-3.5" /> Vincular nova franquia
-                        </button>
-                      </div>
-
-                      {/* Formulário Inline para Vincular Unidade */}
-                      {grantingUserId === profile.id && (
-                        <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.04] max-w-xl">
-                          <select
-                            value={grantClientId}
-                            onChange={(e) => setGrantClientId(e.target.value)}
-                            className="flex-1 min-w-[200px] text-xs rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-white outline-none focus:border-emerald-500"
-                          >
-                            <option value="">Selecione uma franquia...</option>
-                            {clients
-                              .filter((c) => !profile.client_access.some((a) => a.client_id === c.id))
-                              .map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name} {c.client_group ? `(${c.client_group})` : ""}
-                                </option>
-                              ))}
-                          </select>
-                          <button
-                            onClick={() => handleGrantAccess(profile.id, grantClientId)}
-                            className="px-3.5 py-2 rounded-xl bg-emerald-500 text-zinc-950 text-xs font-semibold hover:bg-emerald-400 transition-colors"
-                          >
-                            Confirmar Vínculo
-                          </button>
-                          <button
-                            onClick={() => {
-                              setGrantingUserId(null);
-                              setGrantClientId("");
-                            }}
-                            className="px-3 py-2 rounded-xl border border-zinc-800 text-xs text-zinc-400 hover:bg-zinc-900 transition-colors"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Lista de Unidades Vinculadas */}
-                      {profile.client_access.length === 0 ? (
-                        <div className="p-4 rounded-xl border border-dashed border-zinc-800 text-center text-xs text-zinc-500">
-                          {profile.role === "admin"
-                            ? "Usuários administradores possuem acesso irrestrito a todas as franquias da rede."
-                            : "Nenhuma franquia vinculada individualmente a este usuário."}
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {profile.client_access.map((access, i) => (
-                            <div
-                              key={`${access.client_id}-${i}`}
-                              className="group flex items-center gap-2 rounded-xl border border-zinc-800/90 bg-zinc-900/90 px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-700 transition-all shadow-sm"
-                            >
-                              <Building2 className="size-3.5 text-emerald-400" />
-                              <span className="font-medium">{clientName(access)}</span>
-                              {access.client_group && (
-                                <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-                                  {access.client_group}
-                                </span>
-                              )}
-                              <button
-                                onClick={() => handleRevokeAccess(access.id)}
-                                className="text-zinc-500 hover:text-rose-400 p-0.5 rounded transition-colors ml-1"
-                                title="Desvincular acesso"
-                              >
-                                <X className="size-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Modal: Redefinir Senha */}
-        {resetPasswordProfile && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-            <div className="glass-card w-full max-w-md p-6 space-y-4 rounded-2xl border border-zinc-800 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                  <KeyRound className="size-5 text-amber-400" /> Redefinir Senha de Usuário
-                </h2>
-                <button
-                  onClick={() => setResetPasswordProfile(null)}
-                  className="size-7 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-
-              <div className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs text-zinc-300">
-                Usuário: <strong className="text-white">{resetPasswordProfile.full_name || resetPasswordProfile.user_email}</strong>
-                <br />
-                <span className="text-zinc-400">{resetPasswordProfile.user_email}</span>
-              </div>
-
-              <form onSubmit={handleResetPassword} className="space-y-4">
-                <div>
-                  <label className="text-xs text-zinc-300 font-medium mb-1.5 block">
-                    Nova Senha
-                  </label>
-                  <input
-                    type="text"
-                    value={newPasswordInput}
-                    onChange={(e) => setNewPasswordInput(e.target.value)}
-                    required
-                    placeholder="Ex: Trafego@2026"
-                    className="w-full text-xs rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-white outline-none focus:border-amber-500 font-mono"
+      {/* Aprovar cadastro */}
+      <Dialog
+        open={Boolean(approvingProfile)}
+        onOpenChange={(open) => { if (!open) setApprovingProfile(null); }}
+        size="md"
+        title="Aprovar cadastro"
+        description={approvingProfile ? `${approvingProfile.full_name || approvingProfile.user_email} · ${approvingProfile.user_email}` : undefined}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setApprovingProfile(null)}>Cancelar</Button>
+            <Button variant="primary" loading={approving} onClick={() => void handleConfirmApprove()}>Aprovar e liberar acesso</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {approvingProfile?.bio && <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-sm text-zinc-300">{approvingProfile.bio}</p>}
+          <Field label="Cargo">
+            <Select aria-label="Cargo" value={approveRole} onValueChange={setApproveRole} options={ROLE_OPTIONS.map((o) => (o.value === "admin" ? { ...o, label: "Admin (acesso total)" } : o))} />
+          </Field>
+          {approveRole !== "admin" && (
+            <Field label={`Unidades (${approveClientIds.length} selecionadas)`}>
+              <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-2">
+                {clients.map((c) => (
+                  <CheckboxField
+                    key={c.id}
+                    id={`approve-${c.id}`}
+                    className="rounded-md px-1.5 py-1 hover:bg-white/[0.03]"
+                    label={c.name}
+                    description={c.client_group}
+                    checked={approveClientIds.includes(c.id)}
+                    onCheckedChange={(checked) =>
+                      setApproveClientIds((prev) => (checked ? [...prev, c.id] : prev.filter((id) => id !== c.id)))
+                    }
                   />
-                  <p className="text-[11px] text-zinc-500 mt-1">
-                    Defina a senha desejada ou envie o link de redefinição para o e-mail do usuário.
-                  </p>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setResetPasswordProfile(null)}
-                    className="px-4 py-2 rounded-xl border border-zinc-800 text-xs text-zinc-400 hover:bg-zinc-900 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={resettingPassword}
-                    className="px-4 py-2 rounded-xl bg-amber-500 text-zinc-950 text-xs font-semibold hover:bg-amber-400 transition-colors disabled:opacity-50"
-                  >
-                    {resettingPassword ? "Atualizando..." : "Confirmar Nova Senha"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Modal: Aprovar Cadastro com Seleção de Franquias */}
-        {approvingProfile && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-            <div className="glass-card w-full max-w-lg p-6 space-y-4 rounded-2xl border border-zinc-800 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                  <CheckCircle2 className="size-5 text-emerald-400" /> Aprovar Cadastro de Usuário
-                </h2>
-                <button
-                  onClick={() => setApprovingProfile(null)}
-                  className="size-7 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400"
-                >
-                  <X className="size-4" />
-                </button>
+                ))}
               </div>
+            </Field>
+          )}
+        </div>
+      </Dialog>
 
-              <div className="p-3.5 bg-zinc-900/80 rounded-xl border border-zinc-800 space-y-1 text-xs">
-                <div className="text-zinc-200 font-medium">
-                  {approvingProfile.full_name || approvingProfile.user_email}
-                </div>
-                <div className="text-zinc-400">{approvingProfile.user_email}</div>
-                {approvingProfile.bio && (
-                  <div className="text-amber-300/90 text-[11px] pt-1">
-                    {approvingProfile.bio}
-                  </div>
-                )}
-              </div>
+      {/* Novo usuário */}
+      <Dialog
+        open={showModal}
+        onOpenChange={setShowModal}
+        size="sm"
+        title="Novo usuário"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancelar</Button>
+            <Button type="submit" form="novo-usuario-form" variant="primary" loading={saving}>Cadastrar</Button>
+          </>
+        }
+      >
+        <form id="novo-usuario-form" onSubmit={handleCreate} noValidate className="space-y-4">
+          <Field label="E-mail" htmlFor="novo-usuario-email" required error={formEmailError}>
+            <Input id="novo-usuario-email" type="email" value={formEmail} aria-invalid={Boolean(formEmailError) || undefined} onChange={(e) => { setFormEmail(e.target.value); setFormEmailError(""); }} placeholder="pessoa@vidacard.com.br" />
+          </Field>
+          <Field label="Nome completo" htmlFor="novo-usuario-nome" optional>
+            <Input id="novo-usuario-nome" value={formFullName} onChange={(e) => setFormFullName(e.target.value)} />
+          </Field>
+          <Field label="Cargo">
+            <Select aria-label="Cargo" value={formRole} onValueChange={setFormRole} options={ROLE_OPTIONS} />
+          </Field>
+          <Field label="Senha inicial" htmlFor="novo-usuario-senha" optional hint="Deixe vazio para gerar uma senha temporária.">
+            <Input id="novo-usuario-senha" autoComplete="new-password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} className="font-mono" />
+          </Field>
+        </form>
+      </Dialog>
 
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-zinc-300 font-medium mb-1.5 block">Cargo a Atribuir</label>
-                  <select
-                    value={approveRole}
-                    onChange={(e) => setApproveRole(e.target.value)}
-                    className="w-full text-xs rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-white outline-none focus:border-emerald-500"
-                  >
-                    <option value="viewer">Visualizador</option>
-                    <option value="client_viewer">Cliente</option>
-                    <option value="designer">Designer</option>
-                    <option value="cs">CS</option>
-                    <option value="account_manager">Gestor de Conta</option>
-                    <option value="traffic_manager">Tráfego</option>
-                    <option value="copywriter">Copywriter</option>
-                    <option value="admin">Admin (Acesso Total)</option>
-                  </select>
-                </div>
-
-                {approveRole !== "admin" && (
-                  <div>
-                    <label className="text-xs text-zinc-300 font-medium mb-1.5 block">
-                      Franquias / Unidades Autorizadas ({approveClientIds.length} selecionadas)
-                    </label>
-                    <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-xs">
-                      {clients.map((c) => {
-                        const checked = approveClientIds.includes(c.id);
-                        return (
-                          <label
-                            key={c.id}
-                            className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-zinc-900 cursor-pointer text-zinc-200"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setApproveClientIds((prev) => [...prev, c.id]);
-                                } else {
-                                  setApproveClientIds((prev) => prev.filter((id) => id !== c.id));
-                                }
-                              }}
-                              className="rounded border-zinc-700 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
-                            />
-                            <span className="truncate">{c.name}</span>
-                            {c.client_group && (
-                              <span className="text-[10px] text-zinc-500 ml-auto">{c.client_group}</span>
-                            )}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setApprovingProfile(null)}
-                  className="px-4 py-2 rounded-xl border border-zinc-800 text-xs text-zinc-400 hover:bg-zinc-900 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={approving}
-                  onClick={handleConfirmApprove}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 text-zinc-950 text-xs font-semibold hover:bg-emerald-400 transition-colors shadow-[0_0_15px_rgba(16,185,129,0.25)] disabled:opacity-50"
-                >
-                  {approving ? "Liberando Acesso..." : "Confirmar e Liberar Acesso"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal: Convidar/Criar Usuário Manualmente */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-            <div className="glass-card w-full max-w-md p-6 space-y-4 rounded-2xl border border-zinc-800 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                  <UserCog className="size-5 text-emerald-400" /> Cadastrar Novo Usuário
-                </h2>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="size-7 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreate} className="space-y-3.5">
-                <div>
-                  <label className="text-xs text-zinc-300 font-medium mb-1 block">E-mail *</label>
-                  <input
-                    type="email"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                    required
-                    placeholder="usuario@vidacard.com.br"
-                    className="w-full text-xs rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-white outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-zinc-300 font-medium mb-1 block">Nome Completo</label>
-                  <input
-                    type="text"
-                    value={formFullName}
-                    onChange={(e) => setFormFullName(e.target.value)}
-                    placeholder="Ex: Leonardo da Silva"
-                    className="w-full text-xs rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-white outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-zinc-300 font-medium mb-1 block">Cargo</label>
-                  <select
-                    value={formRole}
-                    onChange={(e) => setFormRole(e.target.value)}
-                    className="w-full text-xs rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-white outline-none focus:border-emerald-500"
-                  >
-                    <option value="viewer">Visualizador</option>
-                    <option value="client_viewer">Cliente</option>
-                    <option value="designer">Designer</option>
-                    <option value="cs">CS</option>
-                    <option value="account_manager">Gestor de Conta</option>
-                    <option value="traffic_manager">Tráfego</option>
-                    <option value="copywriter">Copywriter</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs text-zinc-300 font-medium mb-1 block">
-                    Senha Inicial <span className="text-zinc-500 font-normal">(opcional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formPassword}
-                    onChange={(e) => setFormPassword(e.target.value)}
-                    placeholder="Ex: Trafego@2026 (ou deixe vazio para gerar automática)"
-                    className="w-full text-xs rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-white outline-none focus:border-emerald-500 font-mono"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="px-4 py-2 rounded-xl border border-zinc-800 text-xs text-zinc-400 hover:bg-zinc-900 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-4 py-2 rounded-xl bg-emerald-500 text-zinc-950 text-xs font-semibold hover:bg-emerald-400 transition-colors disabled:opacity-50"
-                  >
-                    {saving ? "Cadastrando..." : "Cadastrar Usuário"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Modal: Confirmar Desativação ou Exclusão */}
-        {confirmDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-            <div className="glass-card w-full max-w-md p-6 space-y-4 rounded-2xl border border-zinc-800 shadow-2xl">
-              <div className="flex items-center gap-3 text-rose-400">
-                <AlertCircle className="size-6 shrink-0" />
-                <h2 className="text-base font-semibold text-white">
-                  {deletePermanent ? "Excluir Usuário Definitivamente" : "Desativar Acesso do Usuário"}
-                </h2>
-              </div>
-
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                Tem certeza que deseja gerenciar o acesso de{" "}
-                <strong className="text-white">{confirmDelete.full_name || confirmDelete.user_email}</strong>?
-              </p>
-
-              {/* Opção Alternar entre Desativar e Excluir */}
-              <div className="space-y-2 p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 text-xs">
-                <label className="flex items-start gap-2 cursor-pointer text-zinc-300">
-                  <input
-                    type="radio"
-                    name="deleteMode"
-                    checked={!deletePermanent}
-                    onChange={() => setDeletePermanent(false)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <span className="font-semibold text-white">Apenas Desativar (Recomendado)</span>
-                    <p className="text-[11px] text-zinc-500">
-                      O usuário é bloqueado e não conseguirá mais fazer login, mas o histórico é preservado.
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-2 cursor-pointer text-zinc-300 pt-1">
-                  <input
-                    type="radio"
-                    name="deleteMode"
-                    checked={deletePermanent}
-                    onChange={() => setDeletePermanent(true)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <span className="font-semibold text-rose-400">Excluir Definitivamente</span>
-                    <p className="text-[11px] text-zinc-500">
-                      Remove o perfil e desvincula todas as franquias da base de dados.
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    setConfirmDelete(null);
-                    setDeletePermanent(false);
-                  }}
-                  className="px-4 py-2 rounded-xl border border-zinc-800 text-xs text-zinc-400 hover:bg-zinc-900 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                    deletePermanent
-                      ? "bg-rose-600 text-white hover:bg-rose-700"
-                      : "bg-amber-500 text-zinc-950 hover:bg-amber-400"
-                  }`}
-                >
-                  {deletePermanent ? "Excluir Definitivamente" : "Confirmar Desativação"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Desativar ou excluir */}
+      <Dialog
+        open={Boolean(confirmDelete)}
+        onOpenChange={(open) => { if (!open) { setConfirmDelete(null); setDeletePermanent(false); } }}
+        size="sm"
+        title="Desativar ou excluir"
+        description={confirmDelete ? confirmDelete.full_name || confirmDelete.user_email : undefined}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setConfirmDelete(null); setDeletePermanent(false); }}>Cancelar</Button>
+            <Button variant="danger" onClick={() => void handleDelete()}>{deletePermanent ? "Excluir definitivamente" : "Desativar"}</Button>
+          </>
+        }
+      >
+        <RadioGroup value={deletePermanent ? "delete" : "disable"} onValueChange={(v) => setDeletePermanent(v === "delete")} aria-label="O que fazer">
+          <RadioOption id="del-disable" value="disable" label="Desativar (recomendado)" description="A pessoa não consegue mais entrar; o histórico fica preservado e dá para reativar." />
+          <RadioOption id="del-delete" value="delete" tone="danger" label="Excluir definitivamente" description="Remove o perfil e todos os vínculos com unidades. Não dá para desfazer." />
+        </RadioGroup>
+      </Dialog>
     </AppLayout>
   );
 }

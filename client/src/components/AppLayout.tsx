@@ -272,6 +272,8 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+const LOGO_SRC = "/brand/logo_trafego_pro_white_9daf2f2e.webp";
+
 // Grade de linhas finas e estáticas; a máscara apaga a grade em direção às bordas e ao pé da tela.
 const GRID_MASK = "radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 100%)";
 
@@ -439,8 +441,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Marca */}
       <div className={cn("flex h-16 shrink-0 items-center px-4", isCollapsed ? "justify-center" : "justify-between")}>
         {!isCollapsed && (
-          <Link href="/dashboard" onClick={closeMobile} className="rounded-md font-display text-sm font-semibold tracking-[0.14em] whitespace-nowrap text-white outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
-            TRÁFEGO<span className="text-zinc-500"> PRO</span>
+          <Link href="/dashboard" onClick={closeMobile} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+            <img src={LOGO_SRC} alt="Tráfego Pro" width={164} height={13} className="block h-[13px] w-auto" />
           </Link>
         )}
         {isMobile ? (
@@ -498,8 +500,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           paddingTop: "env(safe-area-inset-top, 0px)",
         }}
       >
-        <Link href="/dashboard" className="rounded-md font-display text-xs font-semibold tracking-[0.14em] text-white outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
-          TRÁFEGO<span className="text-zinc-500"> PRO</span>
+        <Link href="/dashboard" className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+          <img src={LOGO_SRC} alt="Tráfego Pro" width={126} height={10} className="block h-2.5 w-auto" />
         </Link>
         <div className="flex items-center gap-1.5">
           <ClientSelector variant="compact" />

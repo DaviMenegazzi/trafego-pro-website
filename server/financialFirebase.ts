@@ -18,36 +18,6 @@ function databaseUrl(): string {
   return (process.env.FIREBASE_DATABASE_URL || DEFAULT_DATABASE_URL).replace(/\/+$/, "");
 }
 
-/**
- * Sem conta de serviço (não temos acesso de dono ao projeto Firebase), o servidor fala
- * com o Realtime Database pela API REST, que funciona enquanto as regras do banco forem
- * abertas. O acesso pelo site continua protegido pelo login de admin do Supabase nas rotas.
- */
-function restDatabase(): FinancialDatabase {
-  const base = databaseUrl();
-  const call = async (path: string, method: string, body?: unknown) => {
-    const url = `${base}/${path.replace(/^\/+|\/+$/g, "")}.json`;
-    const response = await fetch(url, {
-      method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) throw new Error(`Firebase REST ${method} ${path || "/"}: HTTP ${response.status}`);
-    return response.json() as Promise<unknown>;
-  };
-  return {
-    ref(path = "") {
-      return {
-        async get() { const value = await call(path, "GET"); return { val: () => value }; },
-        async set(value) { await call(path, "PUT", value); },
-        async remove() { await call(path, "DELETE"); },
-        async update(values) { await call(path, "PATCH", values); },
-      };
-    },
-  };
-}
-
 function adminDatabase(serviceAccountJson: string): FinancialDatabase {
   const app = getApps().find((item) => item.name === "financial") ?? initializeApp({
     credential: cert(JSON.parse(serviceAccountJson)),
@@ -59,6 +29,9 @@ function adminDatabase(serviceAccountJson: string): FinancialDatabase {
 export function getFinancialDatabase(): FinancialDatabase {
   if (database) return database;
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  database = serviceAccountJson ? adminDatabase(serviceAccountJson) : restDatabase();
+  if (!serviceAccountJson) {
+    throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON é obrigatória para acesso ao financeiro");
+  }
+  database = adminDatabase(serviceAccountJson);
   return database;
 }

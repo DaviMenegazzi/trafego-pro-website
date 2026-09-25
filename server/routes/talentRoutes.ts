@@ -12,7 +12,7 @@ import {
   type SupabaseDashboardClient,
 } from "../auth.js";
 import { auditPiiAccess } from "../logger.js";
-import { DEFAULT_TALENT_RETENTION_DAYS, isSubmissionExpired } from "../dataRetentionPolicy.js";
+import { DEFAULT_TALENT_RETENTION_DAYS } from "../dataRetentionPolicy.js";
 import {
   getMetaDirectClients,
   isMetaDirectEnabled,
@@ -22,12 +22,14 @@ import {
 } from "../metaDirectService.js";
 import {
   validateTalentSubmission,
+  validateTalentLogoUpload,
   validateTalentUpload,
 } from "../talentBankPolicy.js";
 import {
   createTalentAttachmentUrl,
   createTalentFormForClient,
   createTalentSubmission,
+  cleanupExpiredTalentSubmissions,
   deleteTalentFormForClient,
   getPublicTalentForm,
   getTalentFormForClient,
@@ -35,6 +37,7 @@ import {
   listTalentSubmissions,
   saveTalentForm,
   talentSlugFromUnitName,
+  anonymizeTalentSubmissionForClient,
   updateTalentSubmission,
   uploadTalentAttachment,
   uploadTalentLogo,
@@ -357,15 +360,7 @@ talentRouter.get("/talent/admin/form", requireAuth, async (req, res) => {
       res.status(403).json({ error: "Sem acesso a esta unidade" });
       return;
     }
-    let form = await getTalentFormForClient(client.id, formId);
-    if (!form && !formId) {
-      form = await createTalentFormForClient({
-        clientId: client.id,
-        publicSlug: talentSlugFromUnitName(client.name, client.id),
-        title: `Trabalhe Conosco — ${client.name}`,
-        subtitle: "Faça parte do time Vida Card.",
-      });
-    }
+    const form = await getTalentFormForClient(client.id, formId);
     res.json({ unit: client, form, forms: await listTalentFormsForClient(client.id) });
   } catch (error) {
     console.error("[talent] Falha ao carregar formulário administrativo:", error);
@@ -462,7 +457,11 @@ talentRouter.delete("/talent/admin/forms/:id", requireAuth, async (req, res) => 
       res.status(403).json({ error: "Sem acesso a esta unidade" });
       return;
     }
-    await deleteTalentFormForClient(client.id, formId);
+    const deleted = await deleteTalentFormForClient(client.id, formId);
+    if (!deleted) {
+      res.status(404).json({ error: "Formulário não encontrado nesta unidade" });
+      return;
+    }
     res.json({ ok: true });
   } catch (error) {
     console.error("[talent] Falha ao deletar formulário:", error);
@@ -493,8 +492,9 @@ talentRouter.post(
       res.status(400).json({ error: "Nenhum arquivo de imagem enviado" });
       return;
     }
-    if (!file.mimetype.startsWith("image/")) {
-      res.status(400).json({ error: "O arquivo deve ser uma imagem (PNG, JPG, WEBP, SVG)" });
+    const logoError = validateTalentLogoUpload(file);
+    if (logoError) {
+      res.status(400).json({ error: logoError });
       return;
     }
     try {
@@ -620,12 +620,7 @@ talentRouter.delete("/talent/admin/submissions/:id/dsr", requireAuth, requireAdm
       res.status(403).json({ error: "Sem acesso a esta unidade" });
       return;
     }
-    const result = await updateTalentSubmission({
-      id: req.params.id,
-      clientId: client.id,
-      status: "reprovado",
-      notes: `[ANONIMIZADO CONFORME LGPD ART. 18 EM ${new Date().toISOString()}]`,
-    });
+    const result = await anonymizeTalentSubmissionForClient(req.params.id, client.id);
     if (!result) {
       res.status(404).json({ error: "Candidatura não encontrada" });
       return;
@@ -646,8 +641,13 @@ talentRouter.delete("/talent/admin/submissions/:id/dsr", requireAuth, requireAdm
 // ─── POST /api/talent/admin/retention/cleanup ────────────────────────────────
 // Expurgo de Retenção LGPD (Art. 15 e 16) para candidaturas com mais de 180 dias
 talentRouter.post("/talent/admin/retention/cleanup", requireAuth, requireAdmin, async (req, res) => {
-  const days = Number(req.body?.retentionDays) || DEFAULT_TALENT_RETENTION_DAYS;
+  const days = req.body?.retentionDays === undefined
+    ? DEFAULT_TALENT_RETENTION_DAYS : Number(req.body.retentionDays);
   const clientId = typeof req.body?.clientId === "string" ? req.body.clientId : "";
+  if (!Number.isInteger(days) || days < 1 || days > 3650) {
+    res.status(400).json({ error: "Retenção deve estar entre 1 e 3650 dias" });
+    return;
+  }
   try {
     let targetClientId: string | undefined;
     if (clientId) {
@@ -658,13 +658,14 @@ talentRouter.post("/talent/admin/retention/cleanup", requireAuth, requireAdmin, 
       }
       targetClientId = client.id;
     }
+    const result = await cleanupExpiredTalentSubmissions({ clientId: targetClientId, retentionDays: days });
     auditPiiAccess(req, {
       action: "delete",
       resourceType: "candidate_submission",
       resourceId: targetClientId ?? "all_units",
-      details: { retentionDays: days, execution: "scheduled_or_manual_cleanup" },
+      details: { retentionDays: days, deleted: result.deleted, hasMore: result.hasMore },
     });
-    res.json({ ok: true, retentionDays: days, status: "completed" });
+    res.json({ ok: true, retentionDays: days, deleted: result.deleted, status: result.hasMore ? "partial" : "completed" });
   } catch (error) {
     console.error("[talent] Falha no expurgo de retenção:", error);
     res.status(503).json({ error: "Não foi possível executar o expurgo de retenção" });

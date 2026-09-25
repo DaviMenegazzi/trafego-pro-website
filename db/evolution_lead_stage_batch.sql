@@ -75,6 +75,9 @@ begin
 end;
 $$;
 
+revoke execute on function public.move_evolution_lead_stage_batch(jsonb) from public, anon, authenticated;
+grant execute on function public.move_evolution_lead_stage_batch(jsonb) to service_role;
+
 -- Configuracao propria da automacao ao vivo (reaproveita a mesma tabela da
 -- automacao diaria). O check constraint original so permitia 'daily_lead_stage'.
 alter table public.evolution_ai_automation_settings

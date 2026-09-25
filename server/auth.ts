@@ -251,12 +251,24 @@ export function getSupabaseForRequest(req: express.Request) {
 export async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   // 1. Tenta obter o token do cookie HttpOnly seguro primeiro
   let token = readCookie(req, APP_TOKEN_COOKIE);
+  const cookieAuthenticated = Boolean(token);
 
   // 2. Fallback para header Authorization: Bearer <token> (compatibilidade durante transição)
   if (!token) {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
       token = authHeader.slice(7);
+    }
+  }
+
+  if (process.env.NODE_ENV === "production" && cookieAuthenticated &&
+      !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    const origin = req.get("origin");
+    const site = req.get("sec-fetch-site");
+    const expectedOrigin = `${req.protocol}://${req.get("host")}`;
+    if (site === "cross-site" || (origin && origin !== expectedOrigin)) {
+      res.status(403).json({ error: "Origem não autorizada" });
+      return;
     }
   }
 

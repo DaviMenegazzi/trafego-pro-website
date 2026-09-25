@@ -68,7 +68,8 @@ export default function Login() {
         localStorage.removeItem("tp_remember_identifier");
       }
 
-      localStorage.setItem("tp_token", data.token);
+      // Marcador de navegação: não contém credencial. A API usa cookies HttpOnly.
+      localStorage.setItem("tp_token", "cookie-session");
       saveConsent("granted");
       localStorage.setItem("tp_user", JSON.stringify(data.user));
       sessionStorage.removeItem("tp_cached_clients");

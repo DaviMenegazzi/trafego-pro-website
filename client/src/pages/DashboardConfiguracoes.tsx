@@ -73,7 +73,6 @@ export default function DashboardConfiguracoesPage() {
       });
       if (!response.ok) { toast.error(await readError(response, "Não foi possível salvar o nome")); return; }
       const data = await response.json();
-      localStorage.setItem("tp_token", data.token);
       localStorage.setItem("tp_user", JSON.stringify(data.user));
       setProfile(data.user);
       setSavedName(data.user?.name ?? "");

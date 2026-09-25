@@ -35,6 +35,7 @@ import {
   runDailyMetricsBackupRoutine,
 } from "../dailyMetricsBackupService.js";
 import { buildLeadProjection } from "../../shared/leadProjection.js";
+import { allowedImageProxyUrl, imageProxyHostResolvesPublicly } from "../imageProxyPolicy.js";
 
 export const metricsRouter = Router();
 
@@ -905,13 +906,18 @@ metricsRouter.get("/metrics/image-proxy", async (req, res) => {
 
   try {
     const rawUrl = req.query.url;
-    if (typeof rawUrl !== "string" || !rawUrl.startsWith("http")) {
+    const url = typeof rawUrl === "string"
+      ? allowedImageProxyUrl(rawUrl, [process.env.SUPABASE_URL, process.env.EVOLUTION_SUPABASE_URL])
+      : null;
+    if (!url || !(await imageProxyHostResolvesPublicly(url.hostname))) {
       res.setHeader("Content-Type", "image/png");
       res.status(200).send(TRANSPARENT_1PX_PNG);
       return;
     }
 
-    const response = await fetch(rawUrl, {
+    const response = await fetch(url, {
+      redirect: "error",
+      signal: AbortSignal.timeout(8_000),
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -919,19 +925,35 @@ metricsRouter.get("/metrics/image-proxy", async (req, res) => {
       },
     });
 
-    if (!response.ok) {
-      console.warn(`[image-proxy] Imagem externa indisponível (${response.status}):`, rawUrl);
+    const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+    const maxBytes = 5 * 1024 * 1024;
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (!response.ok || !["image/jpeg", "image/png", "image/webp", "image/avif"].includes(contentType ?? "") ||
+        contentLength > maxBytes || !response.body) {
       res.setHeader("Content-Type", "image/png");
       res.status(200).send(TRANSPARENT_1PX_PNG);
       return;
     }
 
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    res.setHeader("Content-Type", contentType);
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        res.setHeader("Content-Type", "image/png");
+        res.status(200).send(TRANSPARENT_1PX_PNG);
+        return;
+      }
+      chunks.push(value);
+    }
+    res.setHeader("Content-Type", contentType!);
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24h
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    res.send(buffer);
+    res.send(Buffer.concat(chunks, size));
   } catch (error: any) {
     console.warn("[image-proxy] Erro ao carregar imagem externa:", error?.message || error);
     res.setHeader("Content-Type", "image/png");

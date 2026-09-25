@@ -413,18 +413,21 @@ export function calculateScoreDesdobrado(
   conversaoAtual: number,
   metaAlcancadaPct: number,
   tendenciaCpl: "ALTA" | "QUEDA" | "ESTAVEL",
+  conversaoReferencia = 0.08,
 ): UnitScore {
-  // 1. Eficiência de CPL (35%)
+  // 1. Eficiência de CPL (35%): CPL igual à média histórica vale 80;
+  // 100 com CPL ~25% abaixo da média, 0 com CPL no dobro da média.
   let notaCpl = 70;
   if (cplAtual > 0 && cplHistorico > 0) {
     const ratio = cplHistorico / cplAtual;
-    notaCpl = Math.min(100, Math.max(0, (ratio - 0.5) * 100));
+    const bruta = ratio >= 1 ? 80 + (ratio - 1) * 60 : 80 - (1 - ratio) * 160;
+    notaCpl = Math.min(100, Math.max(0, bruta));
   }
 
-  // 2. Taxa de Conversão Clique -> WhatsApp (25%)
+  // 2. Taxa de Conversão Clique -> WhatsApp (25%), relativa à referência da própria unidade
   let notaConversao = 60;
-  if (conversaoAtual > 0) {
-    notaConversao = Math.min(100, Math.max(0, (conversaoAtual / 0.08) * 80));
+  if (conversaoAtual > 0 && conversaoReferencia > 0) {
+    notaConversao = Math.min(100, Math.max(0, (conversaoAtual / conversaoReferencia) * 80));
   }
 
   // 3. Trajetória da Tendência (20%)
@@ -433,7 +436,7 @@ export function calculateScoreDesdobrado(
   else if (tendenciaCpl === "ESTAVEL") notaTendencia = 80;
   else if (tendenciaCpl === "ALTA") notaTendencia = 35;
 
-  // 4. Progresso de Meta (20%)
+  // 4. Progresso de Meta (20%): leads acumulados vs. o esperado até o dia de hoje
   const notaVolume = Math.min(100, Math.max(0, metaAlcancadaPct * 100));
 
   const scoreFinal = Number((
@@ -676,7 +679,7 @@ export function buildPredictiveUnitProfile(
   const { mean: mu, stdDev: sigma, upperBound, lowerBound } = calculateNormalDistribution(dailyRows, 30);
   const sma7Series = calculateSma7Series(dailyRows, mu, upperBound);
   const currentSma7 = sma7Series[sma7Series.length - 1]?.sma7 ?? 0;
-  const prevSma7 = sma7Series[Math.max(0, sma7Series.length - 4)]?.sma7 ?? currentSma7;
+  const prevSma7 = sma7Series[Math.max(0, sma7Series.length - 8)]?.sma7 ?? currentSma7;
 
   let cplToday: number | null = null;
   let cplTodayDisp = "R$ — (sem atividade hoje)";
@@ -707,10 +710,10 @@ export function buildPredictiveUnitProfile(
 
   let trendDir: "ALTA" | "QUEDA" | "ESTAVEL" = "ESTAVEL";
   let trendLabel = "Estável (oscilação normal do leilão)";
-  if (trendPct >= 10) {
+  if (trendPct >= 15) {
     trendDir = "ALTA";
     trendLabel = `Alta (+${trendPct.toFixed(1)}% no SMA 7)`;
-  } else if (trendPct <= -10) {
+  } else if (trendPct <= -15) {
     trendDir = "QUEDA";
     trendLabel = `Queda (${trendPct.toFixed(1)}% no SMA 7)`;
   }
@@ -748,13 +751,22 @@ export function buildPredictiveUnitProfile(
     leads7d,
   );
 
-  const metaPct = target > 0 ? leadsMonth / target : 1.0;
+  const daysInMonth = new Date(Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth() + 1, 0)).getUTCDate();
+  const expectedLeadsToDate = target * (refDate.getUTCDate() / daysInMonth);
+  const metaPct = expectedLeadsToDate > 0 ? leadsMonth / expectedLeadsToDate : 1.0;
+
+  const last30Days = dailyRows.slice(-30);
+  const clicks30d = last30Days.reduce((acc, d) => acc + d.clicks, 0);
+  const leads30d = last30Days.reduce((acc, d) => acc + d.leads, 0);
+  const conversionReference = clicks30d > 0 && leads30d > 0 ? leads30d / clicks30d : 0.08;
+
   const score = calculateScoreDesdobrado(
     cplReference,
     mu,
     ci.conversionRate,
     metaPct,
     trendDir,
+    conversionReference,
   );
 
   const diagnosis = formulateHypothesisAndEvidence(

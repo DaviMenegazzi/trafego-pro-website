@@ -72,11 +72,58 @@ export async function getPriorityUnitsForBackup(maxUnits = 15): Promise<Priority
     });
   }
 
-  // 2. Completa com o catálogo de contas da Meta. O id da unidade no painel é o
-  // id da conta de anúncios; os UUIDs da tabela clients do Supabase não servem
-  // aqui (a Graph API responde "Object with ID 'act_<uuid>' does not exist").
+  // 2. Unidades com vínculos de usuários ativos no Supabase
   try {
-    if (priorityMap.size < maxUnits && isMetaDirectActive()) {
+    const sb = await getAuthedSupabase();
+    if (sb) {
+      const { data: userAccess } = await sb
+        .from("user_client_access")
+        .select("client_id, clients(id, name, status)")
+        .limit(30);
+
+      if (Array.isArray(userAccess)) {
+        for (const item of userAccess) {
+          const clientData = Array.isArray(item.clients) ? item.clients[0] : item.clients;
+          const id = item.client_id || clientData?.id;
+          if (id && !priorityMap.has(id)) {
+            priorityMap.set(id, {
+              id,
+              name: clientData?.name || id,
+              accountId: normalizeAccountId(id),
+              reason: "Vinculada a usuário ativo",
+            });
+          }
+        }
+      }
+
+      // Se ainda houver espaço, busca unidades marcadas como ativas
+      if (priorityMap.size < maxUnits) {
+        const { data: activeClients } = await sb
+          .from("clients")
+          .select("id, name")
+          .limit(maxUnits - priorityMap.size);
+
+        if (Array.isArray(activeClients)) {
+          for (const c of activeClients) {
+            if (c.id && !priorityMap.has(c.id)) {
+              priorityMap.set(c.id, {
+                id: c.id,
+                name: c.name || c.id,
+                accountId: normalizeAccountId(c.id),
+                reason: "Unidade ativa cadastrada",
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[daily-backup] Aviso ao buscar unidades prioritárias do Supabase:", err.message);
+  }
+
+  // 3. Fallback ou enriquecimento com catálogo de contas da Meta
+  try {
+    if (priorityMap.size < 5 && isMetaDirectActive()) {
       const metaClients = await getMetaDirectClients().catch(() => []);
       for (const m of metaClients.slice(0, maxUnits - priorityMap.size)) {
         if (!priorityMap.has(m.id) && !priorityMap.has(m.account_id)) {

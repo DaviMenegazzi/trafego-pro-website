@@ -437,10 +437,6 @@ export default function TalentPublicForm() {
                 <p className="mt-3 max-w-md text-base leading-relaxed text-zinc-400">{form.subtitle}</p>
               )}
             </div>
-            <p className="max-w-md text-sm leading-6 text-zinc-500">
-              Seus dados são usados apenas neste processo de recrutamento e seleção e guardados por até 180 dias.{" "}
-              <Link href="/privacidade" className="underline underline-offset-4 hover:text-zinc-300">Política de privacidade</Link>
-            </p>
           </aside>
 
           <form
@@ -492,11 +488,17 @@ export default function TalentPublicForm() {
           </form>
         </div>
       </section>
-      <footer className="mx-auto max-w-5xl px-5 pb-10 text-xs text-zinc-600">
+      <footer className="mx-auto max-w-5xl space-y-2 px-5 pb-10 text-xs text-zinc-600">
+        <p>
+          Seus dados são usados apenas neste processo de recrutamento e seleção e guardados por até 180 dias.{" "}
+          <Link href="/privacidade" className="text-zinc-500 underline underline-offset-4 hover:text-zinc-300">Política de privacidade</Link>
+        </p>
+        <p>
         Página criada com{" "}
         <Link href="/" className="text-zinc-500 underline-offset-4 hover:text-zinc-300 hover:underline">
           Tráfego Pro
         </Link>
+        </p>
       </footer>
     </main>
   );

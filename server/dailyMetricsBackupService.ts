@@ -78,18 +78,18 @@ export async function getPriorityUnitsForBackup(maxUnits = 15): Promise<Priority
     if (sb) {
       const { data: userAccess } = await sb
         .from("user_client_access")
-        .select("client_id, clients(id, name, status)")
+        .select("client_id, clients(id, name, status, meta_account_id)")
         .limit(30);
 
       if (Array.isArray(userAccess)) {
         for (const item of userAccess) {
           const clientData = Array.isArray(item.clients) ? item.clients[0] : item.clients;
           const id = item.client_id || clientData?.id;
-          if (id && !priorityMap.has(id)) {
+          if (id && clientData?.meta_account_id && !priorityMap.has(id)) {
             priorityMap.set(id, {
               id,
               name: clientData?.name || id,
-              accountId: normalizeAccountId(id),
+              accountId: normalizeAccountId(clientData.meta_account_id),
               reason: "Vinculada a usuário ativo",
             });
           }
@@ -100,7 +100,8 @@ export async function getPriorityUnitsForBackup(maxUnits = 15): Promise<Priority
       if (priorityMap.size < maxUnits) {
         const { data: activeClients } = await sb
           .from("clients")
-          .select("id, name")
+          .select("id, name, meta_account_id")
+          .not("meta_account_id", "is", null)
           .limit(maxUnits - priorityMap.size);
 
         if (Array.isArray(activeClients)) {
@@ -109,7 +110,8 @@ export async function getPriorityUnitsForBackup(maxUnits = 15): Promise<Priority
               priorityMap.set(c.id, {
                 id: c.id,
                 name: c.name || c.id,
-                accountId: normalizeAccountId(c.id),
+                // O id da unidade (UUID) é a chave do histórico; a Meta precisa do id da conta.
+                accountId: normalizeAccountId(c.meta_account_id),
                 reason: "Unidade ativa cadastrada",
               });
             }

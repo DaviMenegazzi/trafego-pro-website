@@ -34,6 +34,7 @@ import {
   recordClientAccess,
   runDailyMetricsBackupRoutine,
 } from "../dailyMetricsBackupService.js";
+import { buildLeadProjection } from "../../shared/leadProjection.js";
 
 export const metricsRouter = Router();
 
@@ -738,12 +739,14 @@ metricsRouter.get("/analytics/predictive", requireAuth, requireAdmin, async (req
     const end = now.toISOString().slice(0, 10);
     const startDate = new Date(now.getTime() - 30 * 86_400_000);
     const start = startDate.toISOString().slice(0, 10);
+    // A regressão da projeção precisa de mais histórico que os indicadores de 30 dias.
+    const projectionStart = new Date(now.getTime() - 90 * 86_400_000).toISOString().slice(0, 10);
 
     let dailyMetrics: DailyMetric[] = [];
 
     if (isMetaDirectActive()) {
       try {
-        const metaDaily = await getMetaDirectDaily(unitId, start, end);
+        const metaDaily = await getMetaDirectDaily(unitId, projectionStart, end);
         dailyMetrics = metaDaily.map((d) => ({
           date: d.date_start,
           spend: d.total_spend,
@@ -767,7 +770,7 @@ metricsRouter.get("/analytics/predictive", requireAuth, requireAdmin, async (req
           .from("vw_meta_ads_daily_summary")
           .select("date_start,total_spend,total_conversas_iniciadas,total_leads_meta,total_impressions,total_clicks")
           .eq("client_id", unitId)
-          .gte("date_start", start)
+          .gte("date_start", projectionStart)
           .lte("date_start", end)
           .order("date_start", { ascending: true });
 
@@ -789,8 +792,15 @@ metricsRouter.get("/analytics/predictive", requireAuth, requireAdmin, async (req
     }
 
     const customTarget = typeof req.query.target === "string" ? Number(req.query.target) : undefined;
-    const profile = buildPredictiveUnitProfile(unitId, unitName, dailyMetrics, customTarget, now);
-    res.json(profile);
+    const recentMetrics = dailyMetrics.filter((d) => d.date >= start);
+    const profile = buildPredictiveUnitProfile(unitId, unitName, recentMetrics, customTarget, now);
+    const projection = buildLeadProjection(
+      dailyMetrics,
+      profile.goalProbability.currentLeads,
+      profile.goalProbability.totalTarget,
+      profile.date,
+    );
+    res.json({ ...profile, projection });
   } catch (error) {
     console.error("[analytics] Falha ao processar análise preditiva:", error);
     res.status(500).json({ error: "Não foi possível gerar a análise preditiva" });

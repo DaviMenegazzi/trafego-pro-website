@@ -214,6 +214,11 @@ export default function Register() {
                     </Field>
                   </div>
 
+                  <p className="text-xs leading-5 text-zinc-500">
+                    Ao solicitar acesso, você concorda com o uso dos seus dados para criar e gerenciar sua conta e com os cookies de medição da plataforma, conforme a{" "}
+                    <Link href="/privacidade" className="text-zinc-300 underline underline-offset-4 hover:text-white">Política de privacidade</Link>.
+                  </p>
+
                   <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
                     {loading ? "Enviando…" : "Solicitar acesso"}
                     {!loading && <ArrowRight />}

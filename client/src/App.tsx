@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { AdminRoute } from "./components/AdminRoute";
 import { PixelRoute } from "./components/PixelRoute";
+import { CookieConsent } from "./components/CookieConsent";
 
 // Home, login e cadastro vão no pacote inicial (são a porta de entrada).
 // As demais telas carregam sob demanda: quem abre a home não baixa o
@@ -67,6 +68,7 @@ const TalentPublicForm = page(() => import("./pages/TalentPublicForm"));
 const TalentBankAdmin = page(() => import("./pages/TalentBankAdmin"));
 const EvolutionAdmin = page(() => import("./pages/EvolutionAdmin"));
 const SocialPublishingAdmin = page(() => import("./pages/SocialPublishingAdmin"));
+const PrivacyPolicy = page(() => import("./pages/PrivacyPolicy"));
 const AdminFinanceiro = page(() => import("./pages/admin/financeiro"));
 
 // Vitrine do design system: só em desenvolvimento, fora do bundle de produção.
@@ -152,6 +154,7 @@ function App() {
         <TooltipProvider delayDuration={400} skipDelayDuration={300}>
           <ConfirmProvider>
           <Toaster />
+          <CookieConsent />
           <Switch>
             <Route path={"/"} component={TrafegoProHome} />
             <Route path={"/pixel"} component={EvolutionAdmin} />
@@ -160,6 +163,8 @@ function App() {
             <Route path={"/evolution/"} component={EvolutionAdmin} />
             <Route path={"/publicacoes"} component={SocialPublishingAdmin} />
             <Route path={"/publicacoes/"} component={SocialPublishingAdmin} />
+            <Route path={"/privacidade"} component={PrivacyPolicy} />
+            <Route path={"/privacidade/"} component={PrivacyPolicy} />
             <Route path={"/trabalhe-conosco/:slug"} component={TalentPublicForm} />
             <Route component={ExistingSiteWithClientProvider} />
           </Switch>

@@ -1,6 +1,7 @@
 import { Button, CheckboxField, Field, IconButton, InlineNotice, Input } from "@/components/ds";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { saveConsent } from "@/lib/consent";
 import {
   Lock,
   User,
@@ -68,6 +69,7 @@ export default function Login() {
       }
 
       localStorage.setItem("tp_token", data.token);
+      saveConsent("granted");
       localStorage.setItem("tp_user", JSON.stringify(data.user));
       sessionStorage.removeItem("tp_cached_clients");
       localStorage.removeItem("tp_db");

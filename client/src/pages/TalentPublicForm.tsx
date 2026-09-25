@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
+import { saveConsent } from "@/lib/consent";
 import { ArrowLeft, CheckCircle2, FileText, Paperclip, X } from "lucide-react";
 import {
   Button,
@@ -349,6 +350,7 @@ export default function TalentPublicForm() {
         toast.error(result.error ?? "Não foi possível enviar a candidatura");
         return;
       }
+      saveConsent("granted");
       trackTalentFormSubmission({ form, answers });
       setSent(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -436,7 +438,8 @@ export default function TalentPublicForm() {
               )}
             </div>
             <p className="max-w-md text-sm leading-6 text-zinc-500">
-              Seus dados são usados apenas neste processo de recrutamento e seleção.
+              Seus dados são usados apenas neste processo de recrutamento e seleção e guardados por até 180 dias.{" "}
+              <Link href="/privacidade" className="underline underline-offset-4 hover:text-zinc-300">Política de privacidade</Link>
             </p>
           </aside>
 
@@ -476,6 +479,7 @@ export default function TalentPublicForm() {
                 }}
                 aria-invalid={Boolean(errors.__lgpd) || undefined}
                 label={<span className="text-zinc-300">{form.lgpdDisclaimer}</span>}
+                description="Ao enviar, você também autoriza cookies de medição (Google Analytics) neste site."
               />
               {errors.__lgpd && (
                 <p role="alert" className="pl-7 text-xs leading-5 text-rose-300">{errors.__lgpd}</p>

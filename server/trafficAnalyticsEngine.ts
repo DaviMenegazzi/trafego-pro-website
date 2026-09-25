@@ -519,15 +519,32 @@ export function formulateHypothesisAndEvidence(
     };
   }
 
-  // HIPÓTESE 4: Sub-investimento / Gargalo de Orçamento
-  if (ci.conversionRate >= 0.09 && gp.riskLevel === "RISCO_ALTO") {
-    facts.push(`Excelente taxa de conversão clique->conversa (${(ci.conversionRate * 100).toFixed(1)}%).`);
-    facts.push(`Ritmo atual (${gp.currentLeadsPerDay} leads/dia) abaixo do necessário (${gp.requiredLeadsPerDay} leads/dia) para fechar em ${gp.totalTarget} leads.`);
+  // HIPÓTESE 4: Volume insuficiente para a meta (conversão ok, mas o ritmo não fecha)
+  if (gp.riskLevel === "RISCO_ALTO" || gp.riskLevel === "MODERADA") {
+    const cplOk = cplMetrics.deviationVsMeanPct <= 10;
+    const fator = gp.currentLeadsPerDay > 0 ? gp.requiredLeadsPerDay / gp.currentLeadsPerDay : 0;
+    const cplBase = cplMetrics.sma7Current > 0 ? cplMetrics.sma7Current : cplMetrics.mean30d;
+    const investimentoDia = gp.requiredLeadsPerDay * cplBase;
+
+    facts.push(`Ritmo atual (${gp.currentLeadsPerDay} leads/dia) abaixo do necessário (${gp.requiredLeadsPerDay} leads/dia) para fechar ${gp.totalTarget} leads em ${gp.daysLeft}d.`);
+    facts.push(`CPL de 7d em R$ ${cplBase.toFixed(2)} (${cplMetrics.deviationLabel}) e conversão de ${(ci.conversionRate * 100).toFixed(1)}%.`);
+
+    let actionPlan: string;
+    if (!cplOk) {
+      actionPlan = "Recuperar eficiência antes de escalar: revisar criativos e públicos dos conjuntos com CPL acima da média, depois aumentar orçamento.";
+    } else if (fator > 2) {
+      actionPlan = `Aumentar orçamento para aproveitar o CPL baixo: seriam ~R$ ${investimentoDia.toFixed(0)}/dia para ${gp.requiredLeadsPerDay} leads/dia (${fator.toFixed(1)}x o ritmo atual). A meta dificilmente fecha neste mês; alinhe a expectativa com o cliente.`;
+    } else {
+      actionPlan = `Aumentar orçamento diário para ~R$ ${investimentoDia.toFixed(0)}/dia (${gp.requiredLeadsPerDay} leads/dia ao CPL atual) para fechar a meta.`;
+    }
+
     return {
-      evidenceLevel: "Evidência Forte",
-      hypothesisTitle: "Hipótese: Sub-investimento (Eficiência alta, volume insuficiente para meta)",
+      evidenceLevel: confidence.level === "ALTA" ? "Evidência Forte" : "Evidência Moderada",
+      hypothesisTitle: cplOk
+        ? "Hipótese: Sub-investimento (eficiência boa, volume insuficiente para a meta)"
+        : "Hipótese: Volume insuficiente com CPL acima da média",
       evidenceFacts: facts,
-      actionPlan: "Aumentar orçamento diário em +15% a +20% para aproveitar a boa eficiência e garantir o atingimento da meta.",
+      actionPlan,
     };
   }
 
@@ -543,8 +560,9 @@ export function formulateHypothesisAndEvidence(
   }
 
   // Operação Saudável
-  facts.push(`CPL alinhado à média (${cplMetrics.deviationLabel}).`);
-  facts.push(`Taxa de conversão saudável (${(ci.conversionRate * 100).toFixed(1)}%) com ritmo de meta em ${(gp.probability * 100).toFixed(1)}%.`);
+  const cplPosicao = cplMetrics.deviationVsMeanPct < -10 ? "abaixo da média" : "alinhado à média";
+  facts.push(`CPL ${cplPosicao} (${cplMetrics.deviationLabel}).`);
+  facts.push(`Taxa de conversão saudável (${(ci.conversionRate * 100).toFixed(1)}%) com chance de bater a meta em ${(gp.probability * 100).toFixed(1)}%.`);
   return {
     evidenceLevel: "Evidência Forte",
     hypothesisTitle: "Operação Saudável e no Ritmo da Meta",

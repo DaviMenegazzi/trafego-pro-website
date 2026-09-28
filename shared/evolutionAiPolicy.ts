@@ -6,11 +6,12 @@ export type EvolutionAiAutomationState = {
 
 export const AI_AUTOMATION_ACTOR = "automacao-ia-openai";
 export const AI_AUTOMATION_ACTOR_LAYA = "automacao-ia-laya";
+export const AI_AUTOMATION_ACTOR_TEXT_RULE = "automacao-regra-texto";
 
 export function isEvolutionAiAutomationRunning(state: EvolutionAiAutomationState | null | undefined): boolean {
   return state?.lastRunStatus === "running";
 }
 
 export function wasLastCrmUpdateMadeByAi(changedBy: string | null | undefined): boolean {
-  return changedBy === AI_AUTOMATION_ACTOR || changedBy === AI_AUTOMATION_ACTOR_LAYA;
+  return changedBy === AI_AUTOMATION_ACTOR || changedBy === AI_AUTOMATION_ACTOR_LAYA || changedBy === AI_AUTOMATION_ACTOR_TEXT_RULE;
 }

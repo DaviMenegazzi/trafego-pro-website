@@ -2,8 +2,10 @@ import { logger } from "./logger.js";
 import {
   moveEvolutionLeadCrmStageBatchSupabase,
   recordEvolutionAiClassificationRunsBatchSupabase,
+  setEvolutionLeadScoresBatchSupabase,
   type EvolutionAiClassificationRunInput,
   type EvolutionCrmStage,
+  type EvolutionLeadScoreUpdate,
 } from "./evolutionSupabaseStore.js";
 
 // Classificacao ao vivo (Laya) acumula aqui em memoria em vez de gravar no
@@ -22,9 +24,18 @@ type PendingStageUpdate = {
 
 const pendingStageUpdates = new Map<string, PendingStageUpdate>();
 const pendingRuns: EvolutionAiClassificationRunInput[] = [];
+const pendingScores = new Map<string, EvolutionLeadScoreUpdate>();
 
 export function bufferStageUpdate(update: PendingStageUpdate): void {
   pendingStageUpdates.set(update.leadId, update);
+}
+
+export function pendingStageFor(leadId: string): EvolutionCrmStage | null {
+  return pendingStageUpdates.get(leadId)?.toStage ?? null;
+}
+
+export function bufferLeadScore(update: EvolutionLeadScoreUpdate): void {
+  pendingScores.set(update.leadId, update);
 }
 
 export function bufferClassificationRun(run: EvolutionAiClassificationRunInput): void {
@@ -32,12 +43,14 @@ export function bufferClassificationRun(run: EvolutionAiClassificationRunInput):
   if (pendingRuns.length > 5000) pendingRuns.shift();
 }
 
-export type FlushSummary = { stageUpdates: number; runs: number; applied: number };
+export type FlushSummary = { stageUpdates: number; runs: number; applied: number; scores: number };
 
 export async function flushPendingEvolutionAiState(): Promise<FlushSummary> {
   const stageUpdates = Array.from(pendingStageUpdates.values());
   const runs = pendingRuns.splice(0, pendingRuns.length);
+  const scores = Array.from(pendingScores.values());
   pendingStageUpdates.clear();
+  pendingScores.clear();
 
   let applied = 0;
   if (stageUpdates.length) {
@@ -56,7 +69,15 @@ export async function flushPendingEvolutionAiState(): Promise<FlushSummary> {
       logger.error(`[evolution-live-ai] Falha ao gravar lote de execuções (${runs.length})`, { error: error instanceof Error ? error.message : String(error) });
     }
   }
-  return { stageUpdates: stageUpdates.length, runs: runs.length, applied };
+  if (scores.length) {
+    try {
+      await setEvolutionLeadScoresBatchSupabase(scores);
+    } catch (error) {
+      logger.error(`[evolution-live-ai] Falha ao gravar lote de scores (${scores.length} leads)`, { error: error instanceof Error ? error.message : String(error) });
+      for (const score of scores) if (!pendingScores.has(score.leadId)) bufferLeadScore(score);
+    }
+  }
+  return { stageUpdates: stageUpdates.length, runs: runs.length, applied, scores: scores.length };
 }
 
 let flushTimer: ReturnType<typeof setInterval> | null = null;
@@ -65,8 +86,8 @@ export function startEvolutionLiveAiFlushLoop(intervalMs: number): void {
   if (flushTimer) clearInterval(flushTimer);
   flushTimer = setInterval(() => {
     flushPendingEvolutionAiState().then((summary) => {
-      if (summary.stageUpdates || summary.runs) {
-        logger.info(`[evolution-live-ai] Flush: ${summary.applied}/${summary.stageUpdates} estágios aplicados, ${summary.runs} execuções registradas`);
+      if (summary.stageUpdates || summary.runs || summary.scores) {
+        logger.info(`[evolution-live-ai] Flush: ${summary.applied}/${summary.stageUpdates} estágios aplicados, ${summary.scores} scores, ${summary.runs} execuções registradas`);
       }
     }).catch((error) => logger.error("[evolution-live-ai] Erro inesperado no flush periódico", { error: error instanceof Error ? error.message : String(error) }));
   }, intervalMs);
@@ -78,6 +99,6 @@ export function stopEvolutionLiveAiFlushLoop(): void {
   flushTimer = null;
 }
 
-export function pendingCountsForTest(): { stageUpdates: number; runs: number } {
-  return { stageUpdates: pendingStageUpdates.size, runs: pendingRuns.length };
+export function pendingCountsForTest(): { stageUpdates: number; runs: number; scores: number } {
+  return { stageUpdates: pendingStageUpdates.size, runs: pendingRuns.length, scores: pendingScores.size };
 }

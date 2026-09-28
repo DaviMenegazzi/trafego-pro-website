@@ -5,6 +5,15 @@ export type EvolutionLeadClassification = "pendente" | "lead" | "nao_lead";
 export type EvolutionLeadStage = "novo" | "qualificado" | "negociacao" | "perdido" | "fechado";
 export type EvolutionCrmStage = "lead_not_responded" | "lead_responded" | "follow_up" | "lead_replied" | "negotiation" | "closed_won" | "closed_lost";
 
+export type EvolutionLeadTemperature = "HOT" | "WARM" | "COLD";
+
+export type EvolutionLeadScoreUpdate = {
+  leadId: string;
+  instanceName: string;
+  score: number;
+  temperature: EvolutionLeadTemperature;
+};
+
 export type EvolutionLead = {
   id: string;
   instanceName: string;
@@ -30,6 +39,9 @@ export type EvolutionLead = {
   crmStageUpdatedAt: string | null;
   crmStageUpdatedBy: string | null;
   isQuarantine: boolean;
+  leadScore: number | null;
+  temperature: EvolutionLeadTemperature | null;
+  leadScoreUpdatedAt: string | null;
 };
 
 export type EvolutionCrmStageHistory = {
@@ -180,10 +192,13 @@ function asLead(row: Row): EvolutionLead {
     crmStage: (text(row.crm_stage) as EvolutionCrmStage | null) ?? "lead_not_responded",
     crmStageUpdatedAt: iso(row.crm_stage_updated_at), crmStageUpdatedBy: text(row.crm_stage_updated_by),
     isQuarantine: row.is_quarantine === true,
+    leadScore: row.lead_score === null || row.lead_score === undefined ? null : number(row.lead_score),
+    temperature: row.temperature === "HOT" || row.temperature === "WARM" || row.temperature === "COLD" ? row.temperature : null,
+    leadScoreUpdatedAt: iso(row.lead_score_updated_at),
   };
 }
 
-const EVOLUTION_LEAD_SELECT = "id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by, is_quarantine";
+const EVOLUTION_LEAD_SELECT = "id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by, is_quarantine, lead_score, temperature, lead_score_updated_at";
 
 function asCrmHistory(row: Row): EvolutionCrmStageHistory {
   return {
@@ -518,6 +533,16 @@ export async function moveEvolutionLeadCrmStageBatchSupabase(
   return ((data ?? []) as Row[]).map((row) => ({
     leadId: String(row.lead_id), crmStage: String(row.crm_stage) as EvolutionCrmStage, crmStageUpdatedAt: iso(row.crm_stage_updated_at)!,
   }));
+}
+
+export async function setEvolutionLeadScoresBatchSupabase(updates: EvolutionLeadScoreUpdate[]): Promise<void> {
+  if (!updates.length) return;
+  const { error } = await getEvolutionSupabase().rpc("set_evolution_lead_scores_batch", {
+    p_updates: updates.map((update) => ({
+      lead_id: update.leadId, instance_name: update.instanceName, lead_score: update.score, temperature: update.temperature,
+    })),
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function listEvolutionMessagesSupabase(leadId: string): Promise<EvolutionMessage[]> {

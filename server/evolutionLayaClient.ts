@@ -1,67 +1,74 @@
 import { resilientFetch } from "./resilientFetch.js";
-import type { EvolutionCrmStage, EvolutionMessage } from "./evolutionSupabaseStore.js";
+
+// Cliente do serviço Laya compartilhado (services/laya-classifier), o mesmo que o SDR Flow usa
+// via /predict. O serviço roda uma inferência por vez para os dois projetos, então quem chama
+// precisa ficar fora do caminho do webhook e tolerar respostas lentas ou falhas.
 
 export const LAYA_MODEL_NAME = "laya";
 
-export type LayaClassification = {
-  proposedStage: EvolutionCrmStage;
+export type LayaConfig = {
+  url: string;
+  secret: string;
+  timeoutMs?: number;
+  fetcher?: typeof fetch;
+};
+
+export type LayaQuestion =
+  | { type: "choice"; instructions: string; criteria: Record<string, string> }
+  | { type: "score"; instructions: string; criteria: string[] }
+  | { type: "noul"; instructions: string; criteria?: { true?: string; false?: string } };
+
+export type LayaAnswer = {
+  type: "choice" | "score" | "noul";
+  choice?: string;
+  score?: number;
+  noul?: number;
   confidence: number;
 };
 
-const CRM_STAGES: EvolutionCrmStage[] = [
-  "lead_not_responded",
-  "lead_responded",
-  "follow_up",
-  "lead_replied",
-  "negotiation",
-  "closed_won",
-  "closed_lost",
-];
+function isAnswer(value: unknown): value is LayaAnswer {
+  const answer = value as LayaAnswer | null;
+  if (!answer || typeof answer !== "object") return false;
+  if (!Number.isFinite(answer.confidence) || answer.confidence < 0 || answer.confidence > 1) return false;
+  if (answer.type === "choice") return typeof answer.choice === "string";
+  if (answer.type === "score") return Number.isFinite(answer.score);
+  return answer.type === "noul" && Number.isFinite(answer.noul);
+}
 
-type LayaResponseBody = {
-  proposedStage?: string;
-  confidence?: number;
-  error?: string;
-};
+export function layaConfigFromEnv(env: NodeJS.ProcessEnv = process.env): LayaConfig | null {
+  const url = env.LAYA_SERVICE_URL?.trim();
+  const secret = env.LAYA_SERVICE_SECRET?.trim();
+  if (!url || !secret) return null;
+  return { url, secret, timeoutMs: Number(env.LAYA_TIMEOUT_MS) || 45_000 };
+}
 
-export async function classifyLeadStageWithLaya(
-  input: {
-    leadId: string;
-    instanceName: string;
-    currentStage: EvolutionCrmStage;
-    messages: Pick<EvolutionMessage, "direction" | "bodyText" | "sentAt">[];
-  },
-  options: { serviceUrl?: string; serviceSecret?: string; fetcher?: typeof fetch; timeoutMs?: number } = {},
-): Promise<LayaClassification> {
-  const serviceUrl = options.serviceUrl ?? process.env.LAYA_SERVICE_URL;
-  const serviceSecret = options.serviceSecret ?? process.env.LAYA_SERVICE_SECRET;
-  if (!serviceUrl) throw new Error("LAYA_SERVICE_URL não configurada");
-  if (!serviceSecret) throw new Error("LAYA_SERVICE_SECRET não configurada");
-
-  const fetcher = options.fetcher ?? resilientFetch;
-  const response = await fetcher(`${serviceUrl.replace(/\/$/, "")}/classify`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${serviceSecret}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      leadId: input.leadId,
-      instanceName: input.instanceName,
-      currentStage: input.currentStage,
-      messages: input.messages.map((message) => ({ direction: message.direction, bodyText: message.bodyText, sentAt: message.sentAt })),
-    }),
-    // Em CPU limitada a inferência leva ~3-9s e o serviço processa uma por vez (fila).
-    timeoutMs: options.timeoutMs ?? 45000,
-    maxRetries: 1,
-  } as RequestInit & { timeoutMs?: number; maxRetries?: number });
-
-  const rawBody = await response.text();
-  let body: LayaResponseBody = {};
-  try { body = JSON.parse(rawBody) as LayaResponseBody; } catch { /* handled below */ }
-  if (!response.ok) throw new Error(body.error || `Serviço Laya respondeu com HTTP ${response.status}`);
-  if (typeof body.proposedStage !== "string" || !CRM_STAGES.includes(body.proposedStage as EvolutionCrmStage)) {
-    throw new Error("Serviço Laya retornou uma etapa de CRM inválida");
+/** A Laya trunca um state em lista pela esquerda, então as mensagens mais novas sobrevivem. */
+export async function layaPredict(
+  config: LayaConfig,
+  state: string[],
+  questions: Record<string, LayaQuestion>,
+): Promise<Record<string, LayaAnswer>> {
+  const fetcher = config.fetcher ?? resilientFetch;
+  let response: Response;
+  try {
+    response = await fetcher(`${config.url.replace(/\/$/, "")}/predict`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.secret}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ state, questions }),
+      // Em CPU limitada a inferência leva ~3-9s e o serviço processa uma por vez (fila).
+      timeoutMs: config.timeoutMs ?? 45_000,
+      maxRetries: 1,
+    } as RequestInit & { timeoutMs?: number; maxRetries?: number });
+  } catch {
+    throw new Error("Laya indisponível ou tempo limite excedido.");
   }
-  if (typeof body.confidence !== "number" || !Number.isFinite(body.confidence) || body.confidence < 0 || body.confidence > 1) {
-    throw new Error("Serviço Laya retornou uma confiança inválida");
+  if (!response.ok) throw new Error(`Laya: HTTP ${response.status}.`);
+  const body = await response.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
+  const answers: Record<string, LayaAnswer> = {};
+  for (const id of Object.keys(questions)) {
+    const answer = body?.answers?.[id];
+    if (!isAnswer(answer) || answer.type !== questions[id]!.type) throw new Error(`Laya retornou uma resposta inválida para ${id}.`);
+    answers[id] = answer;
   }
-  return { proposedStage: body.proposedStage as EvolutionCrmStage, confidence: body.confidence };
+  return answers;
 }

@@ -323,7 +323,7 @@ evolutionRouter.post("/evolution/webhook", async (req, res) => {
         try {
           const leadId = await findEvolutionLeadIdSupabase(event.instanceName, event.contactKey);
           if (leadId) {
-            classifyLeadStageLive(leadId).catch((liveClassificationError) => {
+            classifyLeadStageLive(leadId, event.messageBody).catch((liveClassificationError) => {
               console.warn("[evolution] Falha ao classificar lead ao vivo:", liveClassificationError);
             });
           }

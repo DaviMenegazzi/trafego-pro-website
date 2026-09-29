@@ -1,5 +1,5 @@
-import { Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+import { Button, Input, SegmentedControl, Select } from "@/components/ds";
 import type { CrmFilters as CrmFiltersValue, CrmInstance } from "../../../../shared/crm";
 
 type FiltersProps = {
@@ -10,7 +10,21 @@ type FiltersProps = {
   onChange: (value: CrmFiltersValue) => void;
 };
 
-const selectClass = "h-9 rounded-lg border border-white/10 bg-black/30 px-2 text-sm text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/50";
+type TemperatureOption = "" | NonNullable<CrmFiltersValue["temperature"]>;
+
+const TEMPERATURE_OPTIONS: { value: TemperatureOption; label: string }[] = [
+  { value: "", label: "Todos" },
+  { value: "HOT", label: "Quentes" },
+  { value: "WARM", label: "Mornos" },
+  { value: "COLD", label: "Frios" },
+  { value: "unrated", label: "Não avaliados" },
+];
+
+const CLASSIFICATION_OPTIONS = [
+  { value: "", label: "Toda classificação" },
+  { value: "lead", label: "Leads confirmados" },
+  { value: "pendente", label: "Pendentes" },
+];
 
 export function CrmFilters({ value, search, instances, onSearchChange, onChange }: FiltersProps) {
   const active = Boolean(value.instanceName || value.temperature || value.classification || search.trim());
@@ -21,44 +35,52 @@ export function CrmFilters({ value, search, instances, onSearchChange, onChange 
   };
 
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-      <label className="relative min-w-0 sm:w-64">
-        <span className="sr-only">Buscar por nome ou telefone</span>
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="w-full sm:w-64">
         <Input
           value={search}
           maxLength={80}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Buscar nome ou telefone"
-          className="h-9 border-white/10 bg-black/30 pl-8 text-sm"
+          aria-label="Buscar nome ou telefone"
+          leading={<Search />}
         />
-      </label>
-      <div className="grid grid-cols-3 gap-2 sm:flex">
-        <select aria-label="Instância" value={value.instanceName ?? ""} onChange={(event) => update({ instanceName: event.target.value || undefined })} className={selectClass}>
-          <option value="">Todas as instâncias</option>
-          {instances.map((instance) => <option key={instance.instanceName} value={instance.instanceName}>{instance.displayName || instance.instanceName}</option>)}
-        </select>
-        <select aria-label="Temperatura" value={value.temperature ?? ""} onChange={(event) => update({ temperature: (event.target.value || undefined) as CrmFiltersValue["temperature"] })} className={selectClass}>
-          <option value="">Toda temperatura</option>
-          <option value="HOT">Quente</option>
-          <option value="WARM">Morno</option>
-          <option value="COLD">Frio</option>
-          <option value="unrated">Não avaliado</option>
-        </select>
-        <select aria-label="Classificação" value={value.classification ?? ""} onChange={(event) => update({ classification: (event.target.value || undefined) as CrmFiltersValue["classification"] })} className={selectClass}>
-          <option value="">Toda classificação</option>
-          <option value="lead">Lead confirmado</option>
-          <option value="pendente">Pendente</option>
-        </select>
       </div>
+      <SegmentedControl<TemperatureOption>
+        aria-label="Temperatura"
+        value={value.temperature ?? ""}
+        onValueChange={(next) => update({ temperature: next || undefined })}
+        options={TEMPERATURE_OPTIONS}
+        className="hidden sm:inline-flex"
+      />
+      <Select
+        aria-label="Temperatura"
+        value={value.temperature ?? ""}
+        onValueChange={(next) => update({ temperature: (next || undefined) as CrmFiltersValue["temperature"] })}
+        options={TEMPERATURE_OPTIONS.map((option) => ({ value: option.value, label: option.value ? option.label : "Toda temperatura" }))}
+        placeholder="Toda temperatura"
+        className="w-[calc(50%-0.25rem)] sm:hidden"
+      />
+      <Select
+        aria-label="Classificação"
+        value={value.classification ?? ""}
+        onValueChange={(next) => update({ classification: (next || undefined) as CrmFiltersValue["classification"] })}
+        options={CLASSIFICATION_OPTIONS}
+        placeholder="Toda classificação"
+        className="w-[calc(50%-0.25rem)] sm:w-48"
+      />
+      {instances.length > 1 && (
+        <Select
+          aria-label="Instância"
+          value={value.instanceName ?? ""}
+          onValueChange={(next) => update({ instanceName: next || undefined })}
+          placeholder="Todas as instâncias"
+          options={[{ value: "", label: "Todas as instâncias" }, ...instances.map((instance) => ({ value: instance.instanceName, label: instance.displayName || instance.instanceName }))]}
+          className="w-full sm:w-56"
+        />
+      )}
       {active && (
-        <button
-          type="button"
-          onClick={() => { onSearchChange(""); onChange({}); }}
-          className="flex h-9 items-center gap-1 self-start rounded-lg px-2 text-xs text-zinc-400 transition hover:bg-white/[.05] hover:text-zinc-200 sm:self-auto"
-        >
-          <X className="size-3.5" /> Limpar filtros
-        </button>
+        <Button variant="ghost" onClick={() => { onSearchChange(""); onChange({}); }}>Limpar</Button>
       )}
     </div>
   );

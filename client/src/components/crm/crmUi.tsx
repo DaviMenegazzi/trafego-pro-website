@@ -1,39 +1,35 @@
 import { formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale/pt-BR";
-import { Bot, Hand, Loader2 } from "lucide-react";
+import { Hand, Loader2, Sparkles } from "lucide-react";
+import { Tooltip } from "@/components/ds";
 import { cn } from "@/lib/utils";
 import { CRM_STAGE_LABELS, CRM_STAGES, CRM_TEMPERATURE_LABELS, type CrmLead, type CrmStage } from "../../../../shared/crm";
 
-export const CRM_STAGE_STYLES: Record<CrmStage, { column: string; dot: string }> = {
-  lead_not_responded: { column: "border-zinc-500/25 bg-zinc-400/[.05]", dot: "bg-zinc-400" },
-  lead_responded: { column: "border-sky-400/25 bg-sky-400/[.06]", dot: "bg-sky-400" },
-  follow_up: { column: "border-amber-400/25 bg-amber-400/[.06]", dot: "bg-amber-400" },
-  lead_replied: { column: "border-violet-400/25 bg-violet-400/[.06]", dot: "bg-violet-400" },
-  negotiation: { column: "border-indigo-400/25 bg-indigo-400/[.06]", dot: "bg-indigo-400" },
-  closed_won: { column: "border-emerald-400/25 bg-emerald-400/[.06]", dot: "bg-emerald-400" },
-  closed_lost: { column: "border-rose-400/25 bg-rose-400/[.06]", dot: "bg-rose-400" },
+// Cor só no ponto da etapa; colunas e cartões ficam neutros.
+export const CRM_STAGE_DOT: Record<CrmStage, string> = {
+  lead_not_responded: "bg-zinc-400",
+  lead_responded: "bg-sky-400",
+  follow_up: "bg-amber-400",
+  lead_replied: "bg-violet-400",
+  negotiation: "bg-indigo-400",
+  closed_won: "bg-emerald-400",
+  closed_lost: "bg-rose-400",
 };
 
 export const CRM_STAGE_OPTIONS = CRM_STAGES.map((stage) => ({ value: stage, label: CRM_STAGE_LABELS[stage] }));
 
-const TEMPERATURE_STYLES = {
-  HOT: "border-rose-400/25 bg-rose-400/10 text-rose-300",
-  WARM: "border-amber-400/25 bg-amber-400/10 text-amber-300",
-  COLD: "border-sky-400/25 bg-sky-400/10 text-sky-300",
-} as const;
+const TEMPERATURE_TEXT = { HOT: "text-rose-300", WARM: "text-amber-300", COLD: "text-sky-300" } as const;
 
-export function CrmTemperatureBadge({ lead, className }: { lead: Pick<CrmLead, "temperature" | "leadScore">; className?: string }) {
-  if (!lead.temperature) {
-    return <span className={cn("rounded-full border border-white/10 bg-white/[.03] px-2 py-0.5 text-[10px] font-medium text-zinc-400", className)}>Não avaliado</span>;
-  }
-  return (
-    <span
-      title={lead.leadScore != null ? `Interesse de compra: ${lead.leadScore}/100` : undefined}
-      className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", TEMPERATURE_STYLES[lead.temperature], className)}
-    >
+/** Temperatura como texto com ponto (sem pílula). Ausência de avaliação nunca vira "Frio". */
+export function CrmTemperature({ lead, className }: { lead: Pick<CrmLead, "temperature" | "leadScore">; className?: string }) {
+  if (!lead.temperature) return <span className={cn("whitespace-nowrap text-zinc-500", className)}>Não avaliado</span>;
+  const label = (
+    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap font-medium", TEMPERATURE_TEXT[lead.temperature], className)}>
+      <span className="size-1.5 rounded-full bg-current" aria-hidden />
       {CRM_TEMPERATURE_LABELS[lead.temperature]}
     </span>
   );
+  return lead.leadScore != null ? <Tooltip content={`Interesse de compra: ${lead.leadScore}/100`}>{label}</Tooltip> : label;
 }
 
 export function relativeTime(value: string | null): string {
@@ -49,39 +45,34 @@ export function dateTimeLabel(value: string | null): string {
 }
 
 /**
- * Indicador do modo da etapa. Em modo manual vira botão: um clique devolve o lead à automação,
- * e a Laya volta a poder mover o cartão na próxima varredura.
+ * Modo da etapa. Automático é só uma indicação discreta; manual vira botão: um clique devolve
+ * o lead à automação e a Laya volta a poder movê-lo na próxima varredura.
  */
-export function CrmModeIndicator({
-  lead, saving, onResume, size = "sm",
-}: {
-  lead: CrmLead;
-  saving: boolean;
-  onResume: (leadId: string) => void;
-  size?: "sm" | "md";
-}) {
-  const base = cn("inline-flex items-center gap-1 rounded-full border font-medium", size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs");
+export function CrmModeIndicator({ lead, saving, onResume }: { lead: CrmLead; saving: boolean; onResume: (leadId: string) => void }) {
   if (lead.crmStageMode === "automatic") {
     return (
-      <span className={cn(base, "border-violet-400/20 bg-violet-400/[.08] text-violet-300")} title="A etapa deste lead é atualizada automaticamente pela Laya e pelas regras de texto.">
-        <Bot className="size-3" /> Atualizado automaticamente
-      </span>
+      <Tooltip content="A etapa é atualizada automaticamente pela Laya conforme a conversa avança.">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap text-zinc-500">
+          <Sparkles className="size-3 text-violet-300/80" aria-hidden /> Atualizado automaticamente
+        </span>
+      </Tooltip>
     );
   }
   return (
-    <button
-      type="button"
-      disabled={saving}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => {
-        event.stopPropagation();
-        onResume(lead.id);
-      }}
-      title="Etapa definida manualmente. A automação não move este lead. Clique para reativar a atualização automática."
-      className={cn(base, "border-amber-400/25 bg-amber-400/[.08] text-amber-200 transition hover:border-amber-300/50 hover:bg-amber-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/60 disabled:opacity-60")}
-    >
-      {saving ? <Loader2 className="size-3 animate-spin" /> : <Hand className="size-3" />}
-      Manual · reativar automático
-    </button>
+    <Tooltip content="Etapa definida manualmente; a automação não move este lead. Clique para reativar.">
+      <button
+        type="button"
+        disabled={saving}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onResume(lead.id);
+        }}
+        className="-mx-1.5 inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-amber-200/90 outline-none transition-colors hover:bg-amber-400/10 hover:text-amber-100 focus-visible:ring-2 focus-visible:ring-amber-300/50 disabled:opacity-60"
+      >
+        {saving ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <Hand className="size-3" aria-hidden />}
+        Manual · Reativar automático
+      </button>
+    </Tooltip>
   );
 }

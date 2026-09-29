@@ -1,17 +1,20 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowRightLeft, Ellipsis, Loader2, Phone, Smartphone } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Loader2, MoreHorizontal } from "lucide-react";
+import { Avatar, Button, Menu, type MenuItem } from "@/components/ds";
 import { cn } from "@/lib/utils";
-import { formatCrmPhone, type CrmLead, type CrmStage } from "../../../../shared/crm";
-import { CRM_STAGE_OPTIONS, CRM_STAGE_STYLES, CrmModeIndicator, CrmTemperatureBadge, relativeTime } from "./crmUi";
+import {
+  formatCrmPhone,
+  type CrmLead,
+  type CrmStage,
+} from "../../../../shared/crm";
+import {
+  CRM_STAGE_DOT,
+  CRM_STAGE_OPTIONS,
+  CrmModeIndicator,
+  CrmTemperature,
+  relativeTime,
+} from "./crmUi";
 
 type CardProps = {
   lead: CrmLead;
@@ -22,65 +25,129 @@ type CardProps = {
   onResume: (leadId: string) => void;
 };
 
-export function CrmMoveMenu({ lead, disabled, onMove }: { lead: CrmLead; disabled: boolean; onMove: (lead: CrmLead, stage: CrmStage) => void }) {
+function moveItems(
+  lead: CrmLead,
+  onMove: (lead: CrmLead, stage: CrmStage) => void
+): MenuItem[] {
+  return [
+    { type: "label", label: "Mover para" },
+    ...CRM_STAGE_OPTIONS.map(
+      (option): MenuItem => ({
+        label: option.label,
+        icon: (
+          <span
+            className={cn(
+              "m-[5px] size-1.5 rounded-full",
+              CRM_STAGE_DOT[option.value]
+            )}
+          />
+        ),
+        disabled: option.value === lead.crmStage,
+        hint: option.value === lead.crmStage ? "Etapa atual" : undefined,
+        onSelect: () => onMove(lead, option.value),
+      })
+    ),
+  ];
+}
+
+/** Menu "Mover para…": alternativa ao arrastar para teclado, toque e celular. */
+export function CrmMoveMenu({
+  lead,
+  disabled,
+  onMove,
+  className,
+}: {
+  lead: CrmLead;
+  disabled: boolean;
+  onMove: (lead: CrmLead, stage: CrmStage) => void;
+  className?: string;
+}) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          disabled={disabled}
-          aria-label={`Mover ${lead.contactName || "contato"} para outra etapa`}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
-          className="flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/[.06] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 disabled:opacity-40"
-        >
-          <Ellipsis className="size-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52 border-white/10 bg-[#151417] text-zinc-100" onClick={(event) => event.stopPropagation()}>
-        <DropdownMenuLabel className="flex items-center gap-1.5 text-xs text-zinc-400"><ArrowRightLeft className="size-3.5" /> Mover para…</DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-white/10" />
-        {CRM_STAGE_OPTIONS.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            disabled={option.value === lead.crmStage}
-            onSelect={() => onMove(lead, option.value)}
-            className="gap-2 text-sm"
+    <div
+      onPointerDown={event => event.stopPropagation()}
+      onClick={event => event.stopPropagation()}
+      onKeyDown={event => event.stopPropagation()}
+      className={className}
+    >
+      <Menu
+        items={moveItems(lead, onMove)}
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={disabled}
+            aria-label={`Mover ${lead.contactName || "contato"} para outra etapa`}
+            className="-mr-1 -mt-0.5 size-7"
           >
-            <span className={cn("size-2 rounded-full", CRM_STAGE_STYLES[option.value].dot)} />
-            {option.label}
-            {option.value === lead.crmStage && <span className="ml-auto text-[10px] text-zinc-500">atual</span>}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <MoreHorizontal />
+          </Button>
+        }
+      />
+    </div>
   );
 }
 
-export function CrmCardBody({ lead }: { lead: CrmLead }) {
+export function CrmCardIdentity({ lead }: { lead: CrmLead }) {
+  const name = lead.contactName || "Contato sem nome";
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <Avatar name={name} size="sm" />
+      <div className="min-w-0 flex-1">
+        <p
+          className={cn(
+            "truncate text-[13px] font-medium leading-5",
+            lead.contactName ? "text-zinc-100" : "text-zinc-400"
+          )}
+        >
+          {name}
+        </p>
+        <p className="truncate text-xs leading-4 text-zinc-500">
+          {lead.instanceDisplayName || lead.instanceName}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function CrmCardDetails({ lead }: { lead: CrmLead }) {
   const phone = formatCrmPhone(lead);
   return (
+    <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+      <span
+        className={cn(
+          "truncate tabular-nums",
+          phone.partial ? "text-zinc-500" : "text-zinc-300"
+        )}
+      >
+        {phone.label}
+      </span>
+      <CrmTemperature lead={lead} className="shrink-0" />
+    </div>
+  );
+}
+
+export function CrmCardSummary({ lead }: { lead: CrmLead }) {
+  return (
     <>
-      <p className="truncate text-sm font-semibold text-zinc-100">{lead.contactName || "Contato sem nome"}</p>
-      <p className="mt-1 flex items-center gap-1.5 truncate text-[11px] text-zinc-400">
-        <Smartphone className="size-3 shrink-0 text-zinc-500" />
-        <span className="truncate">{lead.instanceDisplayName || lead.instanceName}</span>
-      </p>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <CrmTemperatureBadge lead={lead} />
-        <span className={cn("flex items-center gap-1 truncate font-mono text-[11px]", phone.partial ? "text-zinc-500" : "text-zinc-300")} title={phone.partial ? "Número completo indisponível" : undefined}>
-          <Phone className="size-3 shrink-0 text-zinc-500" />
-          {phone.label}
-        </span>
-      </div>
+      <CrmCardIdentity lead={lead} />
+      <CrmCardDetails lead={lead} />
     </>
   );
 }
 
-export function CrmLeadCard({ lead, saving, draggable, onOpen, onMove, onResume }: CardProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id, disabled: !draggable || saving });
-  const style = isDragging ? undefined : { transform: CSS.Translate.toString(transform) };
+export function CrmLeadCard({
+  lead,
+  saving,
+  draggable,
+  onOpen,
+  onMove,
+  onResume,
+}: CardProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({ id: lead.id, disabled: !draggable || saving });
+  const style = isDragging
+    ? undefined
+    : { transform: CSS.Translate.toString(transform) };
 
   return (
     <div
@@ -92,32 +159,46 @@ export function CrmLeadCard({ lead, saving, draggable, onOpen, onMove, onResume 
       tabIndex={0}
       aria-label={`Abrir ${lead.contactName || "contato sem nome"}`}
       onClick={() => onOpen(lead.id)}
-      onKeyDown={(event) => {
+      onKeyDown={event => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onOpen(lead.id);
         }
       }}
       className={cn(
-        "group relative w-full select-none rounded-xl border p-3 text-left shadow-sm transition-all duration-150",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#090a0b]",
-        draggable && !saving ? "cursor-grab" : "cursor-pointer",
+        "group relative select-none rounded-xl border bg-zinc-900 p-3 text-left outline-none",
+        "shadow-[0_1px_2px_rgba(0,0,0,0.35)] transition-[border-color,background-color,box-shadow,opacity] duration-150",
+        "focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
         isDragging
-          ? "scale-95 border-dashed border-emerald-400/40 bg-emerald-950/20 opacity-30"
-          : "border-white/10 bg-[#101214] hover:border-emerald-300/30 hover:bg-[#14181a]",
-        saving && "opacity-80",
+          ? "border-dashed border-white/15 opacity-40"
+          : "border-white/[0.07] hover:border-white/[0.14] hover:bg-zinc-800/70",
+        draggable && !saving
+          ? "cursor-grab active:cursor-grabbing"
+          : "cursor-pointer"
       )}
     >
       <div className="flex items-start gap-1">
-        <div className="min-w-0 flex-1"><CrmCardBody lead={lead} /></div>
-        <CrmMoveMenu lead={lead} disabled={saving} onMove={onMove} />
+        <div className="min-w-0 flex-1">
+          <CrmCardIdentity lead={lead} />
+        </div>
+        <CrmMoveMenu
+          lead={lead}
+          disabled={saving}
+          onMove={onMove}
+          className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+        />
       </div>
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1.5 border-t border-white/[.06] pt-2">
+      <CrmCardDetails lead={lead} />
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/[0.05] pt-2.5 text-[11px] leading-4">
         <CrmModeIndicator lead={lead} saving={saving} onResume={onResume} />
         {saving ? (
-          <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-300"><Loader2 className="size-3 animate-spin" /> Salvando…</span>
+          <span className="flex items-center gap-1 text-zinc-400">
+            <Loader2 className="size-3 animate-spin" aria-hidden /> Salvando
+          </span>
         ) : (
-          <span className="text-[10px] text-zinc-500">{relativeTime(lead.crmStageUpdatedAt)}</span>
+          <span className="whitespace-nowrap text-zinc-600">
+            {relativeTime(lead.crmStageUpdatedAt)}
+          </span>
         )}
       </div>
     </div>

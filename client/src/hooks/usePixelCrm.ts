@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ds";
 import type { CrmBoard, CrmFilters, CrmLead, CrmStage } from "../../../shared/crm";
 import { appendCrmPage, findCrmLead, optimisticCrmMove, placeCrmLead } from "@/lib/crmBoardState";
 import {

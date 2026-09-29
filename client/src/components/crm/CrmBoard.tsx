@@ -8,13 +8,12 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { SegmentedControl } from "@/components/ds";
 import { useIsMobile } from "@/hooks/useMobile";
-import { cn } from "@/lib/utils";
 import { findCrmLead } from "@/lib/crmBoardState";
 import { CRM_STAGE_LABELS, CRM_STAGES, resolveCrmDrop, type CrmBoard as CrmBoardData, type CrmLead, type CrmStage } from "../../../../shared/crm";
 import { CrmColumnView } from "./CrmColumn";
-import { CrmCardBody } from "./CrmLeadCard";
-import { CRM_STAGE_STYLES } from "./crmUi";
+import { CrmCardSummary } from "./CrmLeadCard";
 
 type BoardProps = {
   board: CrmBoardData;
@@ -27,7 +26,7 @@ type BoardProps = {
 };
 
 // Desktop: sete colunas com rolagem horizontal e arrastar-e-soltar. Celular: seletor de etapa e
-// lista vertical; o movimento é pelo menu "Mover para…" de cada cartão.
+// lista vertical; o movimento é pelo menu "Mover para" de cada cartão.
 export function CrmBoard({ board, savingIds, loadingMore, onOpen, onMove, onResume, onLoadMore }: BoardProps) {
   const isMobile = useIsMobile();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -51,32 +50,19 @@ export function CrmBoard({ board, savingIds, loadingMore, onOpen, onMove, onResu
   if (isMobile) {
     return (
       <div className="space-y-3">
-        <div className="-mx-4 overflow-x-auto px-4 pb-1" role="tablist" aria-label="Etapas do CRM">
-          <div className="flex w-max gap-2">
-            {CRM_STAGES.map((stage) => (
-              <button
-                key={stage}
-                type="button"
-                role="tab"
-                aria-selected={mobileStage === stage}
-                onClick={() => setMobileStage(stage)}
-                className={cn(
-                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                  mobileStage === stage ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200" : "border-white/10 bg-white/[.03] text-zinc-300",
-                )}
-              >
-                <span className={cn("size-1.5 rounded-full", CRM_STAGE_STYLES[stage].dot)} />
-                {CRM_STAGE_LABELS[stage]}
-                <span className="tabular-nums text-zinc-500">{board.columns[stage].total}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <SegmentedControl
+          aria-label="Etapa"
+          value={mobileStage}
+          onValueChange={setMobileStage}
+          className="w-full"
+          options={CRM_STAGES.map((stage) => ({ value: stage, label: CRM_STAGE_LABELS[stage], count: board.columns[stage].total }))}
+        />
         <CrmColumnView
           stage={mobileStage}
           column={board.columns[mobileStage]}
           loadingMore={loadingMore.has(mobileStage)}
           draggable={false}
+          showHeader={false}
           {...columnProps}
         />
       </div>
@@ -90,7 +76,7 @@ export function CrmBoard({ board, savingIds, loadingMore, onOpen, onMove, onResu
       onDragCancel={() => setActiveId(null)}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-3 overflow-x-auto pb-4 pt-1">
+      <div className="-mx-4 flex items-start gap-4 overflow-x-auto px-4 pb-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         {CRM_STAGES.map((stage) => (
           <CrmColumnView
             key={stage}
@@ -98,15 +84,15 @@ export function CrmBoard({ board, savingIds, loadingMore, onOpen, onMove, onResu
             column={board.columns[stage]}
             loadingMore={loadingMore.has(stage)}
             draggable
-            className="w-[272px] shrink-0"
+            className="w-[280px] shrink-0"
             {...columnProps}
           />
         ))}
       </div>
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
         {activeLead ? (
-          <div className="pointer-events-none w-[250px] cursor-grabbing rounded-xl border border-emerald-300/50 bg-[#151a1c] p-3 shadow-2xl shadow-black/50">
-            <CrmCardBody lead={activeLead} />
+          <div className="w-[268px] rotate-[1.5deg] cursor-grabbing rounded-xl border border-white/[0.14] bg-zinc-800 p-3 shadow-2xl shadow-black/60">
+            <CrmCardSummary lead={activeLead} />
           </div>
         ) : null}
       </DragOverlay>

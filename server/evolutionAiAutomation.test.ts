@@ -7,6 +7,7 @@ const lead: EvolutionLead = {
   classification: "lead", funnelStage: "novo", classificationNote: null, firstContactAt: "2026-08-15T10:00:00.000Z", lastMessageAt: "2026-08-15T12:00:00.000Z",
   messagesReceived: 1, messagesSent: 1, classifiedByEmail: null, classifiedAt: null, originPlatform: "unknown", originEvidence: "none", metaCtwaClid: null, googleClickId: null,
   originDetectedAt: null, crmStage: "lead_responded", crmStageUpdatedAt: null, crmStageUpdatedBy: null,
+  crmStageMode: "automatic", crmVersion: 5, isQuarantine: false, leadScore: null, temperature: null, leadScoreUpdatedAt: null,
 };
 const messages: EvolutionMessage[] = [{ id: "m1", leadId: lead.id, instanceName: lead.instanceName, direction: "incoming", messageType: "conversation", bodyText: "Quero contratar", sentAt: lead.lastMessageAt }];
 
@@ -17,7 +18,7 @@ function createDeps(overrides: Record<string, unknown> = {}) {
     listLeads: vi.fn().mockResolvedValue([lead]),
     listMessages: vi.fn().mockResolvedValue(messages),
     classify: vi.fn().mockResolvedValue({ proposedStage: "negotiation", confidence: 0.91, rationale: "O contato confirmou interesse e pediu condições." }),
-    moveStage: vi.fn().mockResolvedValue({}),
+    moveStage: vi.fn().mockResolvedValue({ applied: true }),
     recordRun: vi.fn().mockResolvedValue(undefined),
     updateStatus: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -29,7 +30,7 @@ describe("automação diária do CRM Evolution", () => {
     const deps = createDeps();
     const result = await runDailyEvolutionAiAutomation({ now: new Date("2026-08-16T02:55:00.000Z"), deps });
     expect(result).toMatchObject({ total: 1, applied: 1, review: 0 });
-    expect(deps.moveStage).toHaveBeenCalledWith(expect.objectContaining({ toStage: "negotiation", changedBy: "automacao-ia-openai" }));
+    expect(deps.moveStage).toHaveBeenCalledWith(expect.objectContaining({ toStage: "negotiation", changedBy: "automacao-ia-openai", expectedVersion: 5 }));
     expect(deps.recordRun).toHaveBeenCalledWith(expect.objectContaining({ status: "applied", appliedStage: "negotiation" }));
   });
 
@@ -39,6 +40,21 @@ describe("automação diária do CRM Evolution", () => {
     expect(result).toMatchObject({ applied: 0, review: 1 });
     expect(deps.moveStage).not.toHaveBeenCalled();
     expect(deps.recordRun).toHaveBeenCalledWith(expect.objectContaining({ status: "review" }));
+  });
+
+  it("respeita a decisão manual do usuário sem classificar o lead", async () => {
+    const deps = createDeps({ listLeads: vi.fn().mockResolvedValue([{ ...lead, crmStageMode: "manual" }]) });
+    const result = await runDailyEvolutionAiAutomation({ deps });
+    expect(result).toMatchObject({ applied: 0, skipped: 1 });
+    expect(deps.classify).not.toHaveBeenCalled();
+    expect(deps.moveStage).not.toHaveBeenCalled();
+  });
+
+  it("descarta a proposta quando o lead mudou desde a leitura", async () => {
+    const deps = createDeps({ moveStage: vi.fn().mockResolvedValue({ applied: false }) });
+    const result = await runDailyEvolutionAiAutomation({ deps });
+    expect(result).toMatchObject({ applied: 0, skipped: 1 });
+    expect(deps.recordRun).toHaveBeenCalledWith(expect.objectContaining({ status: "skipped", appliedStage: null }));
   });
 
   it("não reprocessa a mesma versão da conversa após uma execução bem-sucedida", async () => {

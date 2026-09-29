@@ -34,6 +34,7 @@ import { authRouter } from "./routes/authRoutes.js";
 import { metricsRouter } from "./routes/metricsRoutes.js";
 import { talentRouter } from "./routes/talentRoutes.js";
 import { evolutionRouter } from "./routes/evolutionRoutes.js";
+import { pixelCrmRouter } from "./routes/pixelCrmRoutes.js";
 import { socialRouter } from "./routes/socialRoutes.js";
 import { externalAiRouter } from "./routes/externalAiRoutes.js";
 import { feedbackRouter } from "./routes/feedbackRoutes.js";
@@ -139,6 +140,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.use("/api", metricsRouter);
   app.use("/api", talentRouter);
   app.use("/api", evolutionRouter);
+  app.use("/api", pixelCrmRouter);
   app.use("/api", socialRouter);
   app.use("/api", externalAiRouter);
   app.use("/api", feedbackRouter);

@@ -30,7 +30,7 @@ vi.mock("./evolutionLeadStageBuffer.js", () => ({
 }));
 
 const baseLead = {
-  id: "lead-1", instanceName: "unidade-1", crmStage: "lead_replied", lastMessageAt: "2026-09-22T12:00:00.000Z", messagesSent: 2, isQuarantine: false,
+  id: "lead-1", instanceName: "unidade-1", crmStage: "lead_replied", crmStageMode: "automatic", crmVersion: 3, lastMessageAt: "2026-09-22T12:00:00.000Z", messagesSent: 2, isQuarantine: false,
 };
 const messages = [
   { direction: "incoming", bodyText: "Oi, vi o anúncio", sentAt: "2026-09-22T11:00:00.000Z" },
@@ -59,7 +59,19 @@ describe("Laya no Pixel de Mensagens (modelo do SDR Flow)", () => {
   it("regra de texto move para negociação na hora", async () => {
     const { classifyLeadStageLive } = await import("./evolutionLiveClassification.js");
     await classifyLeadStageLive("lead-1", "Quanto custa?");
-    expect(bufferStageUpdate).toHaveBeenCalledWith(expect.objectContaining({ toStage: "negotiation", changedBy: "automacao-regra-texto" }));
+    expect(bufferStageUpdate).toHaveBeenCalledWith(expect.objectContaining({ toStage: "negotiation", changedBy: "automacao-regra-texto", expectedVersion: 3 }));
+  });
+
+  it("não propõe etapa para lead em modo manual, mas continua atualizando a temperatura", async () => {
+    getLead.mockResolvedValue({ ...baseLead, crmStageMode: "manual" });
+    predict.mockResolvedValue({ interest: { type: "score", score: 0.3, confidence: 0.8 } });
+    const { classifyLeadStageLive, classifyLeadWithLaya } = await import("./evolutionLiveClassification.js");
+    await classifyLeadStageLive("lead-1", "Quanto custa?");
+    const result = await classifyLeadWithLaya("lead-1", { laya });
+
+    expect(bufferStageUpdate).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ status: "classified", temperature: "COLD", movedTo: null });
+    expect(bufferLeadScore).toHaveBeenCalledWith(expect.objectContaining({ temperature: "COLD" }));
   });
 
   it("ignora leads que a equipe ainda não respondeu", async () => {
@@ -75,7 +87,7 @@ describe("Laya no Pixel de Mensagens (modelo do SDR Flow)", () => {
     const result = await classifyLeadWithLaya("lead-1", { laya });
 
     expect(result).toMatchObject({ status: "classified", score: 8, temperature: "COLD", movedTo: "closed_lost" });
-    expect(bufferLeadScore).toHaveBeenCalledWith({ leadId: "lead-1", instanceName: "unidade-1", score: 8, temperature: "COLD" });
+    expect(bufferLeadScore).toHaveBeenCalledWith({ leadId: "lead-1", instanceName: "unidade-1", score: 8, temperature: "COLD", sourceAt: "2026-09-22T12:00:00.000Z" });
     expect(bufferStageUpdate).toHaveBeenCalledWith(expect.objectContaining({ toStage: "closed_lost", changedBy: "automacao-ia-laya" }));
   });
 

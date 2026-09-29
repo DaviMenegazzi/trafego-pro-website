@@ -19,7 +19,7 @@ describe("buffer em memória de classificação ao vivo do CRM", () => {
 
   it("acumula atualizações por lead (última vence) e grava tudo de uma vez no flush", async () => {
     const { bufferStageUpdate, bufferClassificationRun, flushPendingEvolutionAiState, pendingCountsForTest } = await import("./evolutionLeadStageBuffer.js");
-    moveBatch.mockResolvedValue([{ leadId: "lead-1", crmStage: "negotiation", crmStageUpdatedAt: "2026-09-22T12:00:00.000Z" }]);
+    moveBatch.mockResolvedValue([{ leadId: "lead-1", crmStage: "negotiation", crmStageUpdatedAt: "2026-09-22T12:00:00.000Z", applied: true }]);
     recordRunsBatch.mockResolvedValue(undefined);
 
     bufferStageUpdate({ leadId: "lead-1", instanceName: "unidade-1", toStage: "lead_replied", changedBy: "automacao-ia-laya", note: "primeira" });
@@ -37,7 +37,7 @@ describe("buffer em memória de classificação ao vivo do CRM", () => {
     expect(moveBatch).toHaveBeenCalledTimes(1);
     expect(moveBatch.mock.calls[0][0]).toEqual([{ leadId: "lead-1", instanceName: "unidade-1", toStage: "negotiation", changedBy: "automacao-ia-laya", note: "mais recente" }]);
     expect(recordRunsBatch).toHaveBeenCalledTimes(1);
-    expect(summary).toEqual({ stageUpdates: 1, runs: 1, applied: 1, scores: 0 });
+    expect(summary).toEqual({ stageUpdates: 1, runs: 1, applied: 1, ignored: 0, scores: 0 });
     expect(pendingCountsForTest()).toEqual({ stageUpdates: 0, runs: 0, scores: 0 });
   });
 
@@ -52,10 +52,22 @@ describe("buffer em memória de classificação ao vivo do CRM", () => {
     expect(pendingCountsForTest().stageUpdates).toBe(1);
   });
 
+  it("conta como ignoradas as propostas que o banco recusou (modo manual ou versão mudou)", async () => {
+    const { bufferStageUpdate, flushPendingEvolutionAiState, pendingCountsForTest } = await import("./evolutionLeadStageBuffer.js");
+    moveBatch.mockResolvedValue([{ leadId: "lead-3", crmStage: "negotiation", crmStageUpdatedAt: "2026-09-22T12:00:00.000Z", applied: false }]);
+
+    bufferStageUpdate({ leadId: "lead-3", instanceName: "unidade-1", toStage: "closed_lost", changedBy: "automacao-ia-laya", note: "x", expectedVersion: 4 });
+    const summary = await flushPendingEvolutionAiState();
+
+    expect(moveBatch.mock.calls[0][0][0]).toMatchObject({ expectedVersion: 4 });
+    expect(summary).toMatchObject({ applied: 0, ignored: 1 });
+    expect(pendingCountsForTest().stageUpdates).toBe(0);
+  });
+
   it("não chama o Supabase quando não há nada pendente", async () => {
     const { flushPendingEvolutionAiState } = await import("./evolutionLeadStageBuffer.js");
     const summary = await flushPendingEvolutionAiState();
-    expect(summary).toEqual({ stageUpdates: 0, runs: 0, applied: 0, scores: 0 });
+    expect(summary).toEqual({ stageUpdates: 0, runs: 0, applied: 0, ignored: 0, scores: 0 });
     expect(moveBatch).not.toHaveBeenCalled();
     expect(recordRunsBatch).not.toHaveBeenCalled();
   });

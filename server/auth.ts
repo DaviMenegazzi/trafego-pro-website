@@ -367,6 +367,51 @@ export async function requirePixelAccess(req: express.Request, res: express.Resp
   next();
 }
 
+function isAuthServiceUnavailable(error: { status?: number; name?: string }): boolean {
+  return !error.status || error.status >= 500 || error.name === "AuthRetryableFetchError";
+}
+
+// Sessão Supabase validada no servidor em qualquer ambiente (requireAuth só revalida em produção).
+// Usar depois de requireAuth. Confere que o usuário do Supabase é o mesmo do JWT da plataforma,
+// relê o perfil (ativo + Pixel) e substitui role/unidades do JWT pelos valores atuais, para que a
+// revogação de acesso valha na próxima requisição. Admin também precisa de sessão válida.
+// Indisponibilidade do Supabase vira 503, nunca acesso concedido.
+export async function requireVerifiedPixelSession(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const claims = req.claims;
+  const accessToken = readCookie(req, SUPABASE_ACCESS_COOKIE);
+  const sb = getSupabaseForAccessToken(accessToken);
+  if (!claims || !accessToken || !sb) {
+    res.status(401).json({ error: "Sessão Supabase expirada. Faça login novamente." });
+    return;
+  }
+  try {
+    const { data, error } = await sb.auth.getUser(accessToken);
+    if (error) {
+      const unavailable = isAuthServiceUnavailable(error);
+      res.status(unavailable ? 503 : 401).json({ error: unavailable ? "Não foi possível validar a sessão." : "Sessão Supabase expirada. Faça login novamente." });
+      return;
+    }
+    if (!data.user || data.user.id !== claims.id) {
+      res.status(401).json({ error: "Sessão Supabase expirada. Faça login novamente." });
+      return;
+    }
+    const current = await fetchUserAccess(claims.id, accessToken, sb, claims.email);
+    if (current.status === "access_error") {
+      res.status(503).json({ error: "Não foi possível validar as permissões." });
+      return;
+    }
+    if (current.status !== "active" || !current.pixelAccess) {
+      res.status(403).json({ error: "O Pixel não está liberado para este usuário." });
+      return;
+    }
+    req.claims = { ...claims, role: current.role, allowedClientIds: current.allowedClientIds, pixelAccess: true };
+    next();
+  } catch (error) {
+    console.error("[auth] Falha ao validar sessão do Pixel:", error);
+    res.status(503).json({ error: "Não foi possível validar a sessão." });
+  }
+}
+
 export async function requireSupabaseAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (!req.claims || !isAdminRole(req.claims.role)) {
     res.status(403).json({ error: "Acesso restrito a administradores" });

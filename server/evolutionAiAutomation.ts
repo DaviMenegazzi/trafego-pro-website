@@ -4,7 +4,7 @@ import {
   listEvolutionAiCompletedSourceKeysSupabase,
   listEvolutionLeadsForAiClassificationSupabase,
   listEvolutionMessagesSupabase,
-  moveEvolutionLeadCrmStageSupabase,
+  moveEvolutionLeadCrmStageBatchSupabase,
   recordEvolutionAiClassificationRunSupabase,
   updateEvolutionAiAutomationStatusSupabase,
   type EvolutionAiAutomationSettings,
@@ -34,7 +34,7 @@ type AutomationDeps = {
   listLeads: () => Promise<EvolutionLead[]>;
   listMessages: (leadId: string) => Promise<EvolutionMessage[]>;
   classify: (input: { currentStage: EvolutionCrmStage; messages: Pick<EvolutionMessage, "direction" | "bodyText" | "sentAt">[] }) => Promise<AiCrmClassification>;
-  moveStage: (input: { leadId: string; instanceName: string; toStage: EvolutionCrmStage; changedBy: string; note?: string }) => Promise<unknown>;
+  moveStage: (input: { leadId: string; instanceName: string; toStage: EvolutionCrmStage; changedBy: string; note?: string; expectedVersion?: number }) => Promise<{ applied: boolean }>;
   recordRun: (input: EvolutionAiClassificationRunInput) => Promise<void>;
   updateStatus: (input: { status: string; summary?: Record<string, number | string | boolean>; startedAt?: string; completedAt?: string }) => Promise<void>;
 };
@@ -45,7 +45,7 @@ const productionDeps: AutomationDeps = {
   listLeads: listEvolutionLeadsForAiClassificationSupabase,
   listMessages: listEvolutionMessagesSupabase,
   classify: classifyEvolutionConversation,
-  moveStage: moveEvolutionLeadCrmStageSupabase,
+  moveStage: async (input) => ({ applied: (await moveEvolutionLeadCrmStageBatchSupabase([input]))[0]?.applied === true }),
   recordRun: recordEvolutionAiClassificationRunSupabase,
   updateStatus: updateEvolutionAiAutomationStatusSupabase,
 };
@@ -83,6 +83,12 @@ async function processLead(
     previousStage: lead.crmStage,
     executionKey: key,
   };
+  // Decisão manual do usuário tem prioridade: nem chega a gastar uma classificação.
+  if (lead.crmStageMode === "manual") {
+    await deps.recordRun({ ...base, proposedStage: null, appliedStage: null, confidence: null, rationale: null, status: "skipped", errorMessage: "Etapa em modo manual" });
+    summary.skipped += 1;
+    return;
+  }
   if (!messages.length) {
     await deps.recordRun({ ...base, proposedStage: null, appliedStage: null, confidence: null, rationale: null, status: "skipped", errorMessage: "Sem mensagens de texto disponíveis" });
     summary.skipped += 1;
@@ -101,7 +107,16 @@ async function processLead(
       summary.review += 1;
       return;
     }
-    await deps.moveStage({ leadId: lead.id, instanceName: lead.instanceName, toStage: classification.proposedStage, changedBy: AUTOMATION_ACTOR, note: aiNote(classification) });
+    const moved = await deps.moveStage({
+      leadId: lead.id, instanceName: lead.instanceName, toStage: classification.proposedStage,
+      changedBy: AUTOMATION_ACTOR, note: aiNote(classification), expectedVersion: lead.crmVersion,
+    });
+    if (!moved.applied) {
+      // O lead mudou (movimento manual ou outra automação) desde a leitura: a proposta é descartada.
+      await deps.recordRun({ ...base, proposedStage: classification.proposedStage, appliedStage: null, confidence: classification.confidence, rationale: classification.rationale, status: "skipped", errorMessage: "Lead alterado desde a leitura" });
+      summary.skipped += 1;
+      return;
+    }
     await deps.recordRun({ ...base, proposedStage: classification.proposedStage, appliedStage: classification.proposedStage, confidence: classification.confidence, rationale: classification.rationale, status: "applied" });
     summary.applied += 1;
   } catch (error) {

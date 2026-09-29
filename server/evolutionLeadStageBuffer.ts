@@ -4,8 +4,8 @@ import {
   recordEvolutionAiClassificationRunsBatchSupabase,
   setEvolutionLeadScoresBatchSupabase,
   type EvolutionAiClassificationRunInput,
-  type EvolutionCrmStage,
   type EvolutionLeadScoreUpdate,
+  type EvolutionStageUpdate,
 } from "./evolutionSupabaseStore.js";
 
 // Classificacao ao vivo (Laya) acumula aqui em memoria em vez de gravar no
@@ -14,13 +14,9 @@ import {
 // persistente, nao serverless), atualizacoes pendentes se perdem num restart —
 // aceitavel porque a proxima mensagem do lead reclassifica do zero.
 
-type PendingStageUpdate = {
-  leadId: string;
-  instanceName: string;
-  toStage: EvolutionCrmStage;
-  changedBy: string;
-  note: string;
-};
+// expectedVersion é a crm_version lida junto com o lead: se um usuário mover o cartão (ou o
+// devolver à automação) antes do flush, o banco descarta a proposta em vez de sobrescrever.
+type PendingStageUpdate = EvolutionStageUpdate & { note: string };
 
 const pendingStageUpdates = new Map<string, PendingStageUpdate>();
 const pendingRuns: EvolutionAiClassificationRunInput[] = [];
@@ -30,7 +26,7 @@ export function bufferStageUpdate(update: PendingStageUpdate): void {
   pendingStageUpdates.set(update.leadId, update);
 }
 
-export function pendingStageFor(leadId: string): EvolutionCrmStage | null {
+export function pendingStageFor(leadId: string): EvolutionStageUpdate["toStage"] | null {
   return pendingStageUpdates.get(leadId)?.toStage ?? null;
 }
 
@@ -43,7 +39,7 @@ export function bufferClassificationRun(run: EvolutionAiClassificationRunInput):
   if (pendingRuns.length > 5000) pendingRuns.shift();
 }
 
-export type FlushSummary = { stageUpdates: number; runs: number; applied: number; scores: number };
+export type FlushSummary = { stageUpdates: number; runs: number; applied: number; ignored: number; scores: number };
 
 export async function flushPendingEvolutionAiState(): Promise<FlushSummary> {
   const stageUpdates = Array.from(pendingStageUpdates.values());
@@ -53,10 +49,12 @@ export async function flushPendingEvolutionAiState(): Promise<FlushSummary> {
   pendingScores.clear();
 
   let applied = 0;
+  let ignored = 0;
   if (stageUpdates.length) {
     try {
       const results = await moveEvolutionLeadCrmStageBatchSupabase(stageUpdates);
-      applied = results.length;
+      applied = results.filter((result) => result.applied).length;
+      ignored = results.length - applied;
     } catch (error) {
       logger.error(`[evolution-live-ai] Falha ao gravar lote de estágios (${stageUpdates.length} leads)`, { error: error instanceof Error ? error.message : String(error) });
       for (const update of stageUpdates) if (!pendingStageUpdates.has(update.leadId)) bufferStageUpdate(update);
@@ -77,7 +75,7 @@ export async function flushPendingEvolutionAiState(): Promise<FlushSummary> {
       for (const score of scores) if (!pendingScores.has(score.leadId)) bufferLeadScore(score);
     }
   }
-  return { stageUpdates: stageUpdates.length, runs: runs.length, applied, scores: scores.length };
+  return { stageUpdates: stageUpdates.length, runs: runs.length, applied, ignored, scores: scores.length };
 }
 
 let flushTimer: ReturnType<typeof setInterval> | null = null;
@@ -87,7 +85,7 @@ export function startEvolutionLiveAiFlushLoop(intervalMs: number): void {
   flushTimer = setInterval(() => {
     flushPendingEvolutionAiState().then((summary) => {
       if (summary.stageUpdates || summary.runs || summary.scores) {
-        logger.info(`[evolution-live-ai] Flush: ${summary.applied}/${summary.stageUpdates} estágios aplicados, ${summary.scores} scores, ${summary.runs} execuções registradas`);
+        logger.info(`[evolution-live-ai] Flush: ${summary.applied}/${summary.stageUpdates} estágios aplicados (${summary.ignored} ignorados por decisão manual ou versão), ${summary.scores} scores, ${summary.runs} execuções registradas`);
       }
     }).catch((error) => logger.error("[evolution-live-ai] Erro inesperado no flush periódico", { error: error instanceof Error ? error.message : String(error) }));
   }, intervalMs);

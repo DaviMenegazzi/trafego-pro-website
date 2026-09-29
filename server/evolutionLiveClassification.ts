@@ -67,11 +67,16 @@ function runBase(lead: EvolutionLead, messageCount: number, previousStage: Evolu
 
 /** Aplica o sinal mais forte ao buffer, se ele move o funil. Retorna a etapa aplicada. */
 function applyFunnelSignals(lead: EvolutionLead, signals: FunnelSignal[], messageCount: number): EvolutionCrmStage | null {
+  // Decisão manual do usuário tem prioridade até ele devolver o lead à automação.
+  if (lead.crmStageMode === "manual") return null;
   const signal = strongestSignal(signals);
   if (!signal) return null;
   const from = effectiveStage(lead);
   if (!canAdvanceFunnel(from, signal.stage)) return null;
-  bufferStageUpdate({ leadId: lead.id, instanceName: lead.instanceName, toStage: signal.stage, changedBy: actorFor(signal), note: noteFor(signal) });
+  bufferStageUpdate({
+    leadId: lead.id, instanceName: lead.instanceName, toStage: signal.stage,
+    changedBy: actorFor(signal), note: noteFor(signal), expectedVersion: lead.crmVersion,
+  });
   bufferClassificationRun({
     ...runBase(lead, messageCount, from, signal.source === "laya" ? LAYA_MODEL_NAME : "regra-de-texto"),
     proposedStage: signal.stage, appliedStage: signal.stage, confidence: signal.confidence ?? null,
@@ -113,7 +118,7 @@ export async function classifyLeadWithLaya(
   const confidence = answers.interest!.confidence;
   const score = Math.round((interest / INTEREST_LEVELS) * 100);
   const temperature = temperatureFor(score);
-  bufferLeadScore({ leadId: lead.id, instanceName: lead.instanceName, score, temperature });
+  bufferLeadScore({ leadId: lead.id, instanceName: lead.instanceName, score, temperature, sourceAt: lead.lastMessageAt });
 
   const lostThreshold = deps.lostThreshold ?? 0.8;
   const movedTo = interest < lostThreshold

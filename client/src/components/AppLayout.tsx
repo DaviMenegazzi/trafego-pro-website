@@ -20,6 +20,7 @@ import {
   Check,
   Search,
   ScanLine,
+  SquareKanban,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
@@ -58,8 +59,11 @@ const NAV_BASE: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
   { to: "/dashboard/pixel", label: "Pixel", icon: ScanLine },
+  { to: "/dashboard/crm", label: "CRM", icon: SquareKanban },
   { to: "/dashboard/banco-talentos", label: "Banco de Talentos", icon: UsersRound },
 ];
+
+const PIXEL_NAV_ITEMS = new Set(["/dashboard/pixel", "/dashboard/crm"]);
 
 const NAV_ADMIN_ONLY: NavItem[] = [
   { to: "/admin/metricas", label: "Métricas da Rede", icon: BarChart3 },
@@ -415,7 +419,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const visibleNavBase = useMemo(
     () => {
-      const base = NAV_BASE.filter((item) => item.to !== "/dashboard/pixel" || pixelAllowed);
+      // CRM segue a mesma permissão do Pixel.
+      const base = NAV_BASE.filter((item) => !PIXEL_NAV_ITEMS.has(item.to) || pixelAllowed);
       return !admin && clientFormsVisible ? [...base, CLIENT_FORMS_RESULTS_ITEM] : base;
     },
     [admin, clientFormsVisible, pixelAllowed],

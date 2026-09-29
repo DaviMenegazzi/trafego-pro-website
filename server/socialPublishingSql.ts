@@ -174,8 +174,15 @@ async function attachConnections(posts: PostRow[], onlyActive: boolean): Promise
   });
 }
 
-export async function getSocialPostForProcessingSql(id: string): Promise<DueSocialPost | null> {
-  const post = unwrap(await db().from("social_posts").select(POST_COLUMNS).eq("id", id).maybeSingle()) as PostRow | null;
+export async function getSocialPostForProcessingSql(
+  id: string,
+  ownerUserId?: string,
+  editableOnly = false,
+): Promise<DueSocialPost | null> {
+  let query = db().from("social_posts").select(POST_COLUMNS).eq("id", id);
+  if (ownerUserId) query = query.eq("owner_user_id", ownerUserId);
+  if (editableOnly) query = query.in("status", EDITABLE_STATUSES);
+  const post = unwrap(await query.maybeSingle()) as PostRow | null;
   if (!post) return null;
   return (await attachConnections([post], false))[0] ?? null;
 }

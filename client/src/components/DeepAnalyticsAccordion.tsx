@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, Lightbulb, Sigma, Stethoscope, Target, TrendingUp } from "lucide-react";
+import { Activity, AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, Lightbulb, LineChart, Sigma, Stethoscope, Target, TrendingUp } from "lucide-react";
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Button, EmptyState, Meter, StatusBadge, Surface, SurfaceHeader, type BadgeTone } from "@/components/ds";
+import { Button, EmptyState, Input, Meter, StatusBadge, Surface, SurfaceHeader, type BadgeTone } from "@/components/ds";
 import { CHART, CHART_CHROME, chartAxisTick, chartTooltipStyle } from "@/lib/chartPalette";
 import { formatCurrency, formatNumber, formatRatio, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { projectMonth, type LeadProjectionPayload } from "@shared/leadProjection";
 
 export interface Sma7Point {
   date: string;
@@ -84,6 +85,8 @@ export interface PredictiveUnitProfile {
   };
   statusFlag: "CRITICO" | "ATENCAO" | "NORMAL";
   sma7Series: Sma7Point[];
+  /** Só vem na análise de uma unidade (não no consolidado da rede). */
+  projection?: LeadProjectionPayload | null;
 }
 
 function isUserAdmin(): boolean {
@@ -223,6 +226,89 @@ function Stat({ label, value, hint, className }: { label: string; value: React.R
   );
 }
 
+/** Projeção do mês por regressão, com cenário "e se eu investir R$ X/dia". */
+function ProjectionPanel({ projection }: { projection: LeadProjectionPayload }) {
+  const { model, input, baselineDailySpend, requiredDailySpend: required, backtest, beatsBaseline } = projection;
+  const [spendText, setSpendText] = useState(() => String(Math.round(baselineDailySpend)));
+  const spend = Math.max(0, Number(spendText.replace(",", ".")) || 0);
+  const result = useMemo(() => projectMonth(model, input, spend), [model, input, spend]);
+  const remainingDays = input.futureDates.length;
+  const hitsGoal = result.expectedLeads >= input.target;
+
+  const setSpend = (v: number) => setSpendText(String(Math.round(v)));
+
+  return (
+    <Surface>
+      <SurfaceHeader
+        icon={<LineChart />}
+        accent="aqua"
+        title="Projeção do mês"
+        description={`Regressão sobre ${model.sampleDays} dias com investimento · considera investimento, fim de semana e tendência`}
+        actions={!beatsBaseline && <StatusBadge tone="warning">Leitura aproximada</StatusBadge>}
+      />
+      <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,18rem)_1fr]">
+        <div className="space-y-3">
+          <label htmlFor="projection-spend" className="text-sm font-medium text-zinc-200">E se eu investir por dia…</label>
+          <Input
+            id="projection-spend"
+            inputMode="decimal"
+            leading={<span className="text-xs">R$</span>}
+            value={spendText}
+            onChange={(e) => setSpendText(e.target.value.replace(/[^\d.,]/g, ""))}
+            aria-describedby="projection-spend-hint"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setSpend(baselineDailySpend)}>Ritmo atual ({formatCurrency(baselineDailySpend)})</Button>
+            {required !== null && required > 0 && (
+              <Button size="sm" variant="ghost" onClick={() => setSpend(required)}>Para bater a meta ({formatCurrency(required)})</Button>
+            )}
+          </div>
+          <p id="projection-spend-hint" className="text-xs leading-5 text-zinc-500">
+            {remainingDays === 0
+              ? "O mês termina hoje; não há dias para projetar."
+              : required === null
+                ? "Nem com 3× o maior investimento já feito a projeção alcança a meta."
+                : required === 0
+                  ? "A meta do mês já foi atingida."
+                  : `Investimento diário estimado para fechar a meta: ${formatCurrency(required)} nos ${remainingDays} dias restantes.`}
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat
+              label="Leads no fim do mês"
+              value={formatNumber(Math.round(result.expectedLeads))}
+              hint={`entre ${formatNumber(Math.round(result.lowLeads))} e ${formatNumber(Math.round(result.highLeads))}`}
+            />
+            <Stat label="Meta" value={formatNumber(input.target)} hint={hitsGoal ? "projeção alcança" : `faltariam ${formatNumber(Math.round(input.target - result.expectedLeads))}`} />
+            <Stat label="Custo por conversa" value={result.expectedCpl !== null ? formatCurrency(result.expectedCpl) : "—"} hint="nos dias restantes" />
+            <Stat label="Investimento restante" value={formatCurrency(result.futureSpend)} hint={`${remainingDays} dias`} />
+          </div>
+          <div>
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="text-zinc-300">Chance de bater a meta neste cenário</span>
+              <span className="font-semibold tabular-nums text-white">{formatRatio(result.probability)}</span>
+            </div>
+            <Meter className="mt-2 h-2" value={result.probability} tone={result.probability >= 0.75 ? "good" : result.probability >= 0.4 ? "warning" : "critical"} label="Chance de bater a meta neste cenário" />
+          </div>
+          {result.extrapolating && (
+            <p className="text-xs leading-5 text-amber-200/80">
+              Esse valor passa do maior investimento diário já feito ({formatCurrency(model.maxObservedSpend)}); a projeção fica menos confiável.
+            </p>
+          )}
+          <p className="text-xs leading-5 text-zinc-500">
+            {backtest
+              ? `Validação nos últimos meses: erro médio de ${formatNumber(backtest.modelMae, 1)} leads por semana, contra ${formatNumber(backtest.baselineMae, 1)} do ritmo dos últimos 7 dias.`
+              : "Ainda não há histórico suficiente para validar a projeção."}
+            {` R² ajustado ${formatNumber(model.r2Adjusted, 2)}.`}
+          </p>
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
 /** Análise completa (aba "Análise" da Dashboard e detalhe em Métricas da Rede). */
 export function PredictiveAnalysis({ data, loading, failed }: { data: PredictiveUnitProfile | null; loading?: boolean; failed?: boolean }) {
   const chartData = useMemo(
@@ -315,6 +401,8 @@ export function PredictiveAnalysis({ data, loading, failed }: { data: Predictive
           </div>
         </Surface>
       </div>
+
+      {data.projection && <ProjectionPanel projection={data.projection} />}
 
       <Surface>
         <SurfaceHeader

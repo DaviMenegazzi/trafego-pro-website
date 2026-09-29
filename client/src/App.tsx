@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { AdminRoute } from "./components/AdminRoute";
 import { PixelRoute } from "./components/PixelRoute";
+import { CookieConsent } from "./components/CookieConsent";
 
 // Home, login e cadastro vão no pacote inicial (são a porta de entrada).
 // As demais telas carregam sob demanda: quem abre a home não baixa o
@@ -62,11 +63,13 @@ const DashboardUsuarios = page(() => import("./pages/DashboardUsuarios"));
 const DashboardExternalAiTokens = page(() => import("./pages/DashboardExternalAiTokens"));
 const DashboardFormularios = page(() => import("./pages/DashboardFormularios"));
 const DashboardPixel = page(() => import("./pages/DashboardPixel"));
+const DashboardCrm = page(() => import("./pages/DashboardCrm"));
 const AdminMetricsOverview = page(() => import("./pages/AdminMetricsOverview"));
 const TalentPublicForm = page(() => import("./pages/TalentPublicForm"));
 const TalentBankAdmin = page(() => import("./pages/TalentBankAdmin"));
 const EvolutionAdmin = page(() => import("./pages/EvolutionAdmin"));
 const SocialPublishingAdmin = page(() => import("./pages/SocialPublishingAdmin"));
+const PrivacyPolicy = page(() => import("./pages/PrivacyPolicy"));
 const AdminFinanceiro = page(() => import("./pages/admin/financeiro"));
 
 // Vitrine do design system: só em desenvolvimento, fora do bundle de produção.
@@ -102,6 +105,8 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/formularios/"} component={DashboardFormularios} />
       <PixelRoute path={"/dashboard/pixel"} component={DashboardPixel} />
       <PixelRoute path={"/dashboard/pixel/"} component={DashboardPixel} />
+      <PixelRoute path={"/dashboard/crm"} component={DashboardCrm} />
+      <PixelRoute path={"/dashboard/crm/"} component={DashboardCrm} />
       <AdminRoute path={"/admin/metricas"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/metricas/"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/financeiro"} component={AdminFinanceiro} />
@@ -152,6 +157,7 @@ function App() {
         <TooltipProvider delayDuration={400} skipDelayDuration={300}>
           <ConfirmProvider>
           <Toaster />
+          <CookieConsent />
           <Switch>
             <Route path={"/"} component={TrafegoProHome} />
             <Route path={"/pixel"} component={EvolutionAdmin} />
@@ -160,6 +166,8 @@ function App() {
             <Route path={"/evolution/"} component={EvolutionAdmin} />
             <Route path={"/publicacoes"} component={SocialPublishingAdmin} />
             <Route path={"/publicacoes/"} component={SocialPublishingAdmin} />
+            <Route path={"/privacidade"} component={PrivacyPolicy} />
+            <Route path={"/privacidade/"} component={PrivacyPolicy} />
             <Route path={"/trabalhe-conosco/:slug"} component={TalentPublicForm} />
             <Route component={ExistingSiteWithClientProvider} />
           </Switch>

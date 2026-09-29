@@ -266,7 +266,8 @@ formRouter.get("/forms/submissions/export", requireAuth, async (req: Request, re
     // Cabeçalhos
     const headers = ["ID", "Formulário", "Unidade (clientId)", "Data", ...fieldKeysArray, "utm_source", "utm_medium", "utm_campaign", "source_url"];
     const escCsv = (val: unknown) => {
-      const str = val == null ? "" : String(val);
+      const raw = val == null ? "" : String(val);
+      const str = /^[\u0000-\u0020]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
       return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str.replace(/"/g, '""')}"` : str;
     };
 

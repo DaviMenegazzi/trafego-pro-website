@@ -4,6 +4,7 @@ import {
   listDashboardClientsFromSupabase,
   requireAuth,
   requirePixelAccess,
+  requireVerifiedPixelSession,
   requireSupabaseAdmin,
 } from "../auth.js";
 import { authenticateScheduledTask } from "../manusScheduleAuth.js";
@@ -63,7 +64,7 @@ import { isVisiblePixelLead } from "../evolutionPixelPolicy.js";
 
 export const evolutionRouter = Router();
 
-class PixelRouteError extends Error {
+export class PixelRouteError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
   }
@@ -77,7 +78,7 @@ function isUuid(value: string | undefined): value is string {
   return typeof value === "string" && UUID_PATTERN.test(value);
 }
 
-async function resolvePixelUnit(req: Request, rawUnitId: unknown) {
+export async function resolvePixelUnit(req: Request, rawUnitId: unknown) {
   const unitId = typeof rawUnitId === "string" ? rawUnitId.trim() : "";
   if (!unitId || unitId.length > 160) throw new PixelRouteError(400, "Selecione uma unidade válida.");
   const sb = getSupabaseForRequest(req);
@@ -323,7 +324,7 @@ evolutionRouter.post("/evolution/webhook", async (req, res) => {
         try {
           const leadId = await findEvolutionLeadIdSupabase(event.instanceName, event.contactKey);
           if (leadId) {
-            classifyLeadStageLive(leadId).catch((liveClassificationError) => {
+            classifyLeadStageLive(leadId, event.messageBody).catch((liveClassificationError) => {
               console.warn("[evolution] Falha ao classificar lead ao vivo:", liveClassificationError);
             });
           }
@@ -662,7 +663,7 @@ evolutionRouter.post("/evolution/pixel/instances/:instanceName/sync-webhook", re
   }
 });
 
-evolutionRouter.get("/evolution/pixel/leads/:id/messages", requireAuth, requirePixelAccess, async (req, res) => {
+evolutionRouter.get("/evolution/pixel/leads/:id/messages", requireAuth, requireVerifiedPixelSession, async (req, res) => {
   try {
     const leadId = req.params.id;
     if (!/^[0-9a-f-]{36}$/i.test(leadId)) throw new PixelRouteError(400, "Lead inválido.");
@@ -682,7 +683,7 @@ evolutionRouter.get("/evolution/pixel/leads/:id/messages", requireAuth, requireP
 
 // ─── GET /api/evolution/pixel/leads/:id/attribution ─────────────────────────
 // Qual campanha/conjunto/anúncio/criativo Meta gerou essa conversa (quando disponível).
-evolutionRouter.get("/evolution/pixel/leads/:id/attribution", requireAuth, requirePixelAccess, async (req, res) => {
+evolutionRouter.get("/evolution/pixel/leads/:id/attribution", requireAuth, requireVerifiedPixelSession, async (req, res) => {
   try {
     const leadId = req.params.id;
     if (!/^[0-9a-f-]{36}$/i.test(leadId)) throw new PixelRouteError(400, "Lead inválido.");

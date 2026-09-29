@@ -105,11 +105,11 @@ export async function listTalentFormsForClient(clientId: string): Promise<Talent
 export async function getTalentFormForClient(clientId: string, formId?: string): Promise<TalentForm | null> {
   const sb = getTalentSupabase();
   const uuid = toTalentClientUuid(clientId);
-  let query = sb.from("talent_forms").select("*, talent_form_fields(*)");
+  let query = sb.from("talent_forms").select("*, talent_form_fields(*)").eq("client_id", uuid);
   if (formId) {
     query = query.eq("id", formId);
   } else {
-    query = query.eq("client_id", uuid).order("created_at", { ascending: false }).limit(1);
+    query = query.order("created_at", { ascending: false }).limit(1);
   }
   const { data, error } = await query.maybeSingle();
   if (error) throw new Error(error.message);
@@ -151,7 +151,7 @@ export async function saveTalentForm(input: {
 }): Promise<TalentForm> {
   const sb = getTalentSupabase();
   const uuid = toTalentClientUuid(input.clientId);
-  const { error: formError } = await sb
+  const { data: updatedForm, error: formError } = await sb
     .from("talent_forms")
     .update({
       ...(input.publicSlug ? { public_slug: input.publicSlug } : {}),
@@ -164,8 +164,10 @@ export async function saveTalentForm(input: {
       is_published: input.isPublished,
     })
     .eq("id", input.formId)
-    .eq("client_id", uuid);
+    .eq("client_id", uuid)
+    .select("id").maybeSingle();
   if (formError) throw new Error(formError.message);
+  if (!updatedForm) throw new Error("Formulário não encontrado nesta unidade");
   const { error: deleteError } = await sb.from("talent_form_fields").delete().eq("form_id", input.formId);
   if (deleteError) throw new Error(deleteError.message);
   if (input.fields.length) {
@@ -290,11 +292,88 @@ export async function createTalentAttachmentUrl(storageKey: string): Promise<str
 
 export async function deleteTalentFormForClient(clientId: string, formId: string): Promise<boolean> {
   const sb = getTalentSupabase();
-  await sb.from("talent_submissions").delete().eq("form_id", formId);
-  await sb.from("talent_form_fields").delete().eq("form_id", formId);
-  const { error } = await sb.from("talent_forms").delete().eq("id", formId);
+  const uuid = toTalentClientUuid(clientId);
+  const { data: form, error: readError } = await sb.from("talent_forms")
+    .select("id").eq("id", formId).eq("client_id", uuid).maybeSingle();
+  if (readError) throw new Error(readError.message);
+  if (!form) return false;
+
+  // A FK do schema remove candidaturas e campos em cascata. Remova os arquivos
+  // antes para que a exclusão do formulário não deixe currículos órfãos.
+  for (let offset = 0; ; offset += 100) {
+    const { data: submissions, error: submissionsError } = await sb.from("talent_submissions")
+      .select("file_attachments").eq("form_id", formId).eq("client_id", uuid)
+      .order("id").range(offset, offset + 99);
+    if (submissionsError) throw new Error(submissionsError.message);
+    const keys = (submissions ?? []).flatMap((row) => attachmentKeys(row.file_attachments));
+    await removeTalentAttachments(keys);
+    if (!submissions || submissions.length < 100) break;
+  }
+  const { data, error } = await sb.from("talent_forms")
+    .delete().eq("id", formId).eq("client_id", uuid).select("id");
   if (error) throw new Error(error.message);
-  return true;
+  return (data ?? []).length > 0;
+}
+
+function attachmentKeys(value: unknown): string[] {
+  return asArray(value).map(attachment).filter((item): item is TalentAttachment => Boolean(item))
+    .map((item) => item.storageKey);
+}
+
+async function removeTalentAttachments(keys: string[]): Promise<void> {
+  if (!keys.length) return;
+  const { error } = await getTalentSupabase().storage.from("talent-resumes").remove(keys);
+  if (error) throw new Error(`Não foi possível remover os anexos: ${error.message}`);
+}
+
+export async function anonymizeTalentSubmissionForClient(id: string, clientId: string): Promise<boolean> {
+  const sb = getTalentSupabase();
+  const uuid = toTalentClientUuid(clientId);
+  const { data: current, error: readError } = await sb.from("talent_submissions")
+    .select("id, file_attachments").eq("id", id).eq("client_id", uuid).maybeSingle();
+  if (readError) throw new Error(readError.message);
+  if (!current) return false;
+  await removeTalentAttachments(attachmentKeys(current.file_attachments));
+  const { data, error } = await sb.from("talent_submissions").update({
+    candidate_name: null,
+    candidate_email: null,
+    candidate_phone: null,
+    answers: { _anonymized: true, _anonymized_at: new Date().toISOString() },
+    file_attachments: [],
+    notes: null,
+    ip_hash: null,
+    user_agent: null,
+    status: "reprovado",
+  }).eq("id", id).eq("client_id", uuid).select("id").maybeSingle();
+  if (error) throw new Error(error.message);
+  return Boolean(data);
+}
+
+export async function cleanupExpiredTalentSubmissions(input: {
+  clientId?: string;
+  retentionDays: number;
+}): Promise<{ deleted: number; hasMore: boolean }> {
+  const sb = getTalentSupabase();
+  const cutoff = new Date(Date.now() - input.retentionDays * 86_400_000).toISOString();
+  const uuid = input.clientId ? toTalentClientUuid(input.clientId) : undefined;
+  let deleted = 0;
+  for (let batch = 0; batch < 10; batch++) {
+    let query = sb.from("talent_submissions").select("id, client_id, file_attachments")
+      .lt("created_at", cutoff).order("created_at", { ascending: true }).limit(100);
+    if (uuid) query = query.eq("client_id", uuid);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    if (!data?.length) return { deleted, hasMore: false };
+    for (const row of data) {
+      await removeTalentAttachments(attachmentKeys(row.file_attachments));
+      const { data: removed, error: deleteError } = await sb.from("talent_submissions")
+        .delete().eq("id", row.id).eq("client_id", row.client_id).lt("created_at", cutoff)
+        .select("id").maybeSingle();
+      if (deleteError) throw new Error(deleteError.message);
+      if (removed) deleted++;
+    }
+  }
+  return { deleted, hasMore: true };
 }
 
 export async function uploadTalentLogo(input: {
@@ -305,8 +384,8 @@ export async function uploadTalentLogo(input: {
   mimeType: string;
 }): Promise<string> {
   const sb = getTalentSupabase();
-  const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
-  const storageKey = `logos/${input.clientId}/${input.formId}-${Date.now()}-${safeName}`;
+  const extension = input.mimeType === "image/png" ? "png" : input.mimeType === "image/jpeg" ? "jpg" : "webp";
+  const storageKey = `logos/${input.clientId}/${input.formId}-${crypto.randomUUID()}.${extension}`;
 
   // 1. Try dedicated public bucket `talent-logos`
   try {
@@ -315,7 +394,7 @@ export async function uploadTalentLogo(input: {
     if (!hasLogosBucket) {
       await sb.storage.createBucket("talent-logos", {
         public: true,
-        allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"],
+        allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
         fileSizeLimit: 5 * 1024 * 1024,
       });
     }
@@ -330,33 +409,6 @@ export async function uploadTalentLogo(input: {
     console.warn("[talent] Falha ao tentar bucket talent-logos:", err);
   }
 
-  // 2. Try updating `talent-resumes` allowed mime types
-  try {
-    await sb.storage.updateBucket("talent-resumes", {
-      public: true,
-      allowedMimeTypes: [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "image/png",
-        "image/jpeg",
-        "image/webp",
-        "image/svg+xml",
-        "image/gif",
-      ],
-    });
-    const { error } = await sb.storage
-      .from("talent-resumes")
-      .upload(storageKey, input.file, { contentType: input.mimeType, upsert: true });
-    if (!error) {
-      const { data } = sb.storage.from("talent-resumes").getPublicUrl(storageKey);
-      if (data?.publicUrl) return data.publicUrl;
-    }
-  } catch (err) {
-    console.warn("[talent] Falha ao tentar bucket talent-resumes:", err);
-  }
-
-  // 3. Ultra-safe Fallback: Base64 data URL
-  const base64 = input.file.toString("base64");
-  return `data:${input.mimeType};base64,${base64}`;
+  throw new Error("Bucket público de logos indisponível; nenhum currículo foi exposto");
 }
 

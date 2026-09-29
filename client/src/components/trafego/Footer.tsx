@@ -1,4 +1,6 @@
+import { Link } from "wouter";
 import { LOGO_SRC, WA_URL } from "./Nav";
+import { openConsentPreferences } from "@/lib/consent";
 
 export function Footer() {
   return (
@@ -8,6 +10,13 @@ export function Footer() {
         <p className="text-xs text-muted-foreground">
           © {new Date().getFullYear()} Tráfego Pro. Todos os direitos reservados.
         </p>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <Link href="/privacidade" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          Privacidade
+        </Link>
+        <button type="button" onClick={openConsentPreferences} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          Cookies
+        </button>
         <a
           href={WA_URL}
           target="_blank"
@@ -16,6 +25,7 @@ export function Footer() {
         >
           WhatsApp →
         </a>
+        </div>
       </div>
     </footer>
   );

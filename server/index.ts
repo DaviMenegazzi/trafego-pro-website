@@ -34,6 +34,7 @@ import { authRouter } from "./routes/authRoutes.js";
 import { metricsRouter } from "./routes/metricsRoutes.js";
 import { talentRouter } from "./routes/talentRoutes.js";
 import { evolutionRouter } from "./routes/evolutionRoutes.js";
+import { pixelCrmRouter } from "./routes/pixelCrmRoutes.js";
 import { socialRouter } from "./routes/socialRoutes.js";
 import { externalAiRouter } from "./routes/externalAiRoutes.js";
 import { feedbackRouter } from "./routes/feedbackRoutes.js";
@@ -43,6 +44,7 @@ import { healthRouter } from "./routes/healthRoutes.js";
 import { financialRouter } from "./routes/financialRoutes.js";
 import { startDailyMetricsBackupScheduler } from "./dailyMetricsBackupService.js";
 import { startEvolutionLiveAiFlushLoop } from "./evolutionLeadStageBuffer.js";
+import { startLeadClassificationLoop } from "./evolutionLiveClassification.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -138,6 +140,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
   app.use("/api", metricsRouter);
   app.use("/api", talentRouter);
   app.use("/api", evolutionRouter);
+  app.use("/api", pixelCrmRouter);
   app.use("/api", socialRouter);
   app.use("/api", externalAiRouter);
   app.use("/api", feedbackRouter);
@@ -162,6 +165,8 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       startDailyMetricsBackupScheduler();
       const flushIntervalMinutes = Number(process.env.EVOLUTION_AI_LIVE_FLUSH_INTERVAL_MINUTES) || 15;
       startEvolutionLiveAiFlushLoop(flushIntervalMinutes * 60_000);
+      const layaIntervalMinutes = Number(process.env.LAYA_CLASSIFY_INTERVAL_MINUTES) || 15;
+      startLeadClassificationLoop(layaIntervalMinutes * 60_000);
     });
   }
 

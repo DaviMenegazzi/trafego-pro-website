@@ -28,5 +28,8 @@ as $$
   );
 $$;
 
+revoke execute on function public.verify_lead_unit_access(uuid, text) from public, anon, authenticated;
+grant execute on function public.verify_lead_unit_access(uuid, text) to service_role;
+
 comment on function public.verify_lead_unit_access(uuid, text) is
   'Verificacao O(1) de posse+visibilidade de um lead do Pixel, usada pela rota de mensagens antes de expor a conversa.';

@@ -251,12 +251,24 @@ export function getSupabaseForRequest(req: express.Request) {
 export async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   // 1. Tenta obter o token do cookie HttpOnly seguro primeiro
   let token = readCookie(req, APP_TOKEN_COOKIE);
+  const cookieAuthenticated = Boolean(token);
 
   // 2. Fallback para header Authorization: Bearer <token> (compatibilidade durante transição)
   if (!token) {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
       token = authHeader.slice(7);
+    }
+  }
+
+  if (process.env.NODE_ENV === "production" && cookieAuthenticated &&
+      !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    const origin = req.get("origin");
+    const site = req.get("sec-fetch-site");
+    const expectedOrigin = `${req.protocol}://${req.get("host")}`;
+    if (site === "cross-site" || (origin && origin !== expectedOrigin)) {
+      res.status(403).json({ error: "Origem não autorizada" });
+      return;
     }
   }
 
@@ -353,6 +365,51 @@ export async function requirePixelAccess(req: express.Request, res: express.Resp
     return;
   }
   next();
+}
+
+function isAuthServiceUnavailable(error: { status?: number; name?: string }): boolean {
+  return !error.status || error.status >= 500 || error.name === "AuthRetryableFetchError";
+}
+
+// Sessão Supabase validada no servidor em qualquer ambiente (requireAuth só revalida em produção).
+// Usar depois de requireAuth. Confere que o usuário do Supabase é o mesmo do JWT da plataforma,
+// relê o perfil (ativo + Pixel) e substitui role/unidades do JWT pelos valores atuais, para que a
+// revogação de acesso valha na próxima requisição. Admin também precisa de sessão válida.
+// Indisponibilidade do Supabase vira 503, nunca acesso concedido.
+export async function requireVerifiedPixelSession(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const claims = req.claims;
+  const accessToken = readCookie(req, SUPABASE_ACCESS_COOKIE);
+  const sb = getSupabaseForAccessToken(accessToken);
+  if (!claims || !accessToken || !sb) {
+    res.status(401).json({ error: "Sessão Supabase expirada. Faça login novamente." });
+    return;
+  }
+  try {
+    const { data, error } = await sb.auth.getUser(accessToken);
+    if (error) {
+      const unavailable = isAuthServiceUnavailable(error);
+      res.status(unavailable ? 503 : 401).json({ error: unavailable ? "Não foi possível validar a sessão." : "Sessão Supabase expirada. Faça login novamente." });
+      return;
+    }
+    if (!data.user || data.user.id !== claims.id) {
+      res.status(401).json({ error: "Sessão Supabase expirada. Faça login novamente." });
+      return;
+    }
+    const current = await fetchUserAccess(claims.id, accessToken, sb, claims.email);
+    if (current.status === "access_error") {
+      res.status(503).json({ error: "Não foi possível validar as permissões." });
+      return;
+    }
+    if (current.status !== "active" || !current.pixelAccess) {
+      res.status(403).json({ error: "O Pixel não está liberado para este usuário." });
+      return;
+    }
+    req.claims = { ...claims, role: current.role, allowedClientIds: current.allowedClientIds, pixelAccess: true };
+    next();
+  } catch (error) {
+    console.error("[auth] Falha ao validar sessão do Pixel:", error);
+    res.status(503).json({ error: "Não foi possível validar a sessão." });
+  }
 }
 
 export async function requireSupabaseAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {

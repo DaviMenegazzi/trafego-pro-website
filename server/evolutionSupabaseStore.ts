@@ -5,6 +5,27 @@ export type EvolutionLeadClassification = "pendente" | "lead" | "nao_lead";
 export type EvolutionLeadStage = "novo" | "qualificado" | "negociacao" | "perdido" | "fechado";
 export type EvolutionCrmStage = "lead_not_responded" | "lead_responded" | "follow_up" | "lead_replied" | "negotiation" | "closed_won" | "closed_lost";
 
+export type EvolutionLeadTemperature = "HOT" | "WARM" | "COLD";
+
+export type EvolutionLeadScoreUpdate = {
+  leadId: string;
+  instanceName: string;
+  score: number;
+  temperature: EvolutionLeadTemperature;
+  /** last_message_at observado na classificação; avaliações mais antigas que a aplicada são descartadas. */
+  sourceAt?: string;
+};
+
+export type EvolutionStageUpdate = {
+  leadId: string;
+  instanceName: string;
+  toStage: EvolutionCrmStage;
+  changedBy: string;
+  note?: string;
+  /** crm_version observada pela automação; o banco ignora a proposta se a versão mudou. */
+  expectedVersion?: number;
+};
+
 export type EvolutionLead = {
   id: string;
   instanceName: string;
@@ -29,7 +50,12 @@ export type EvolutionLead = {
   crmStage: EvolutionCrmStage;
   crmStageUpdatedAt: string | null;
   crmStageUpdatedBy: string | null;
+  crmStageMode: "automatic" | "manual";
+  crmVersion: number;
   isQuarantine: boolean;
+  leadScore: number | null;
+  temperature: EvolutionLeadTemperature | null;
+  leadScoreUpdatedAt: string | null;
 };
 
 export type EvolutionCrmStageHistory = {
@@ -179,11 +205,16 @@ function asLead(row: Row): EvolutionLead {
     metaCtwaClid: text(row.meta_ctwa_clid), googleClickId: text(row.google_click_id), originDetectedAt: iso(row.origin_detected_at),
     crmStage: (text(row.crm_stage) as EvolutionCrmStage | null) ?? "lead_not_responded",
     crmStageUpdatedAt: iso(row.crm_stage_updated_at), crmStageUpdatedBy: text(row.crm_stage_updated_by),
+    crmStageMode: row.crm_stage_mode === "manual" ? "manual" : "automatic",
+    crmVersion: number(row.crm_version),
     isQuarantine: row.is_quarantine === true,
+    leadScore: row.lead_score === null || row.lead_score === undefined ? null : number(row.lead_score),
+    temperature: row.temperature === "HOT" || row.temperature === "WARM" || row.temperature === "COLD" ? row.temperature : null,
+    leadScoreUpdatedAt: iso(row.lead_score_updated_at),
   };
 }
 
-const EVOLUTION_LEAD_SELECT = "id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by, is_quarantine";
+const EVOLUTION_LEAD_SELECT = "id, instance_name, contact_key, contact_phone, phone_last4, contact_name, classification, funnel_stage, classification_note, first_contact_at, last_message_at, messages_received, messages_sent, classified_by_email, classified_at, origin_platform, origin_evidence, meta_ctwa_clid, google_click_id, origin_detected_at, crm_stage, crm_stage_updated_at, crm_stage_updated_by, crm_stage_mode, crm_version, is_quarantine, lead_score, temperature, lead_score_updated_at";
 
 function asCrmHistory(row: Row): EvolutionCrmStageHistory {
   return {
@@ -504,20 +535,34 @@ export async function moveEvolutionLeadCrmStageSupabase(input: { leadId: string;
   return { leadId: String(row.lead_id), crmStage: String(row.crm_stage) as EvolutionCrmStage, crmStageUpdatedAt: iso(row.crm_stage_updated_at)! };
 }
 
+// Caminho único das automações: o banco ignora (applied = false) propostas para leads em modo
+// manual, com versão diferente da observada ou que não mudam a etapa.
 export async function moveEvolutionLeadCrmStageBatchSupabase(
-  updates: { leadId: string; instanceName: string; toStage: EvolutionCrmStage; changedBy: string; note?: string }[],
-): Promise<{ leadId: string; crmStage: EvolutionCrmStage; crmStageUpdatedAt: string }[]> {
+  updates: EvolutionStageUpdate[],
+): Promise<{ leadId: string; crmStage: EvolutionCrmStage; crmStageUpdatedAt: string; applied: boolean }[]> {
   if (!updates.length) return [];
   const { data, error } = await getEvolutionSupabase().rpc("move_evolution_lead_stage_batch", {
     p_updates: updates.map((update) => ({
       lead_id: update.leadId, instance_name: update.instanceName, to_stage: update.toStage,
-      changed_by: update.changedBy, note: update.note ?? null,
+      changed_by: update.changedBy, note: update.note ?? null, expected_version: update.expectedVersion ?? null,
     })),
   });
   if (error) throw new Error(error.message);
   return ((data ?? []) as Row[]).map((row) => ({
     leadId: String(row.lead_id), crmStage: String(row.crm_stage) as EvolutionCrmStage, crmStageUpdatedAt: iso(row.crm_stage_updated_at)!,
+    applied: row.applied === true,
   }));
+}
+
+export async function setEvolutionLeadScoresBatchSupabase(updates: EvolutionLeadScoreUpdate[]): Promise<void> {
+  if (!updates.length) return;
+  const { error } = await getEvolutionSupabase().rpc("set_evolution_lead_scores_batch", {
+    p_updates: updates.map((update) => ({
+      lead_id: update.leadId, instance_name: update.instanceName, lead_score: update.score, temperature: update.temperature,
+      source_at: update.sourceAt ?? null,
+    })),
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function listEvolutionMessagesSupabase(leadId: string): Promise<EvolutionMessage[]> {
@@ -645,6 +690,63 @@ export async function deleteEvolutionSupabaseTestRows(input: { instanceName: str
   if (input.contactKey) await sb.from("evolution_leads").delete().eq("instance_name", input.instanceName).eq("contact_key", input.contactKey);
   await sb.from("evolution_events").delete().eq("event_fingerprint", input.fingerprint);
   await sb.from("evolution_instances").delete().eq("instance_name", input.instanceName);
+}
+
+// ─── CRM Kanban do Pixel ────────────────────────────────────────────────────
+// As funções crm_* recebem a unidade já autorizada pelo servidor e repetem a checagem de vínculo
+// instância → unidade e de visibilidade no próprio SQL. Retornam jsonb; pixelCrmService valida.
+
+export type CrmRpcFilters = { instanceName?: string; temperature?: string; classification?: string; q?: string; qDigits?: string };
+export type CrmMutationResult = { status: string; replayed?: boolean; lead?: unknown };
+
+async function crmRpc(name: string, params: Record<string, unknown>): Promise<unknown> {
+  const { data, error } = await getEvolutionSupabase().rpc(name, params);
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getCrmBoardSupabase(unitId: string, filters: CrmRpcFilters, limit: number): Promise<unknown> {
+  return crmRpc("crm_board", { p_unit_id: unitId, p_filters: filters, p_limit: limit });
+}
+
+export async function listCrmLeadsSupabase(input: {
+  unitId: string; stage: string; filters: CrmRpcFilters; afterAt: string | null; afterId: string | null; limit: number;
+}): Promise<unknown> {
+  return crmRpc("crm_list_leads", {
+    p_unit_id: input.unitId, p_stage: input.stage, p_filters: input.filters,
+    p_after_at: input.afterAt, p_after_id: input.afterId, p_limit: input.limit,
+  });
+}
+
+export async function getCrmLeadSupabase(leadId: string, unitId: string): Promise<unknown> {
+  return crmRpc("crm_get_lead", { p_lead_id: leadId, p_unit_id: unitId });
+}
+
+export async function listCrmLeadHistorySupabase(input: {
+  leadId: string; unitId: string; afterAt: string | null; afterId: string | null; limit: number;
+}): Promise<unknown> {
+  return crmRpc("crm_lead_history", {
+    p_lead_id: input.leadId, p_unit_id: input.unitId, p_after_at: input.afterAt, p_after_id: input.afterId, p_limit: input.limit,
+  });
+}
+
+export async function moveCrmLeadStageSupabase(input: {
+  leadId: string; unitId: string; toStage: EvolutionCrmStage; expectedVersion: number;
+  actorId: string; actorLabel: string; requestId: string; note: string | null;
+}): Promise<CrmMutationResult> {
+  return await crmRpc("crm_move_lead_stage", {
+    p_lead_id: input.leadId, p_unit_id: input.unitId, p_to_stage: input.toStage, p_expected_version: input.expectedVersion,
+    p_actor_id: input.actorId, p_actor_label: input.actorLabel, p_request_id: input.requestId, p_note: input.note,
+  }) as CrmMutationResult;
+}
+
+export async function setCrmLeadAutomaticSupabase(input: {
+  leadId: string; unitId: string; expectedVersion: number; actorId: string; actorLabel: string; requestId: string;
+}): Promise<CrmMutationResult> {
+  return await crmRpc("crm_set_lead_automatic", {
+    p_lead_id: input.leadId, p_unit_id: input.unitId, p_expected_version: input.expectedVersion,
+    p_actor_id: input.actorId, p_actor_label: input.actorLabel, p_request_id: input.requestId,
+  }) as CrmMutationResult;
 }
 
 export function resetEvolutionSupabaseForTests(): void { client = null; }

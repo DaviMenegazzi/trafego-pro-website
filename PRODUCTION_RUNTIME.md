@@ -21,7 +21,7 @@ O servidor utiliza `process.env.PORT` quando fornecido pelo ambiente gerido. Se 
 
 As variáveis de produção, incluindo `DATABASE_URL`, `JWT_SECRET`, credenciais de autenticação e configurações externas, devem ser mantidas no gestor de Secrets do projeto. Nenhum valor secreto deve ser escrito neste documento, no código-fonte ou em ficheiros versionados.
 
-O módulo financeiro usa o Firebase Admin apenas no servidor. Configure `FIREBASE_SERVICE_ACCOUNT_JSON` ou `GOOGLE_APPLICATION_CREDENTIALS` e valide `/api/finance` com uma sessão administrativa antes de publicar `firebase.database.rules.json`. Em seguida, publique as regras do Realtime Database com o Firebase CLI (`firebase deploy --only database --project trafegopro-5206e`). As regras bloqueiam todo acesso direto do navegador; o Admin SDK mantém a API operacional. O banco continua publicamente legível até essas regras serem publicadas no projeto Firebase.
+O módulo financeiro usa o Firebase Admin apenas no servidor e exige `FIREBASE_SERVICE_ACCOUNT_JSON`. Sem essa credencial, `/api/finance` falha de forma fechada. Valide a rota com uma sessão administrativa e depois publique `firebase.database.rules.json` com o Firebase CLI (`firebase deploy --only database --project trafegopro-5206e`). As regras bloqueiam acesso direto do navegador; o Admin SDK mantém a API operacional. Confirme as regras ativas no painel antes de considerar o banco protegido.
 
 A migração `supabase/migrations/20260923210945_restrict_meta_daily_summary.sql` restringe as métricas às unidades autorizadas. Valide-a no projeto Supabase e mantenha `SUPABASE_SERVICE_KEY` no servidor para a rotina de backup, pois clientes comuns não recebem mais permissão de escrita na tabela.
 
@@ -33,7 +33,7 @@ O site também roda na VPS da Evolution, em `/opt/trafego-pro`, no container `tr
 - As mídias das publicações vão para o bucket público `social-media` e os currículos para o bucket `talent-resumes`.
 - As rotas `/api/scheduled/*` aceitam o header `X-Cron-Secret` (`CRON_SECRET`); o cron fica em `/etc/cron.d/trafego-pro`.
 - Deploy: `pnpm build` local → enviar `dist`, `package.json`, `pnpm-lock.yaml`, `patches` e `deploy/vps/*` para `/opt/trafego-pro` → `docker compose build && docker compose up -d`. Nunca rode o `vite build` na VPS.
-- Financeiro: sem conta de serviço do Firebase (não temos acesso de dono ao projeto `trafegopro-5206e`), o servidor usa a API REST do Realtime Database. O site só libera `/api/finance` para admin ativo no Supabase, mas o banco do Firebase continua aberto na internet até o dono publicar `firebase.database.rules.json`. Se `FIREBASE_SERVICE_ACCOUNT_JSON` for configurada, o servidor volta a usar o Admin SDK automaticamente.
+- Financeiro: configure `FIREBASE_SERVICE_ACCOUNT_JSON` no servidor e publique `firebase.database.rules.json` no projeto Firebase. Enquanto faltar a credencial, a API financeira ficará indisponível. A restrição no servidor não substitui as regras do Realtime Database.
 - Dados antigos do MySQL do Manus: `scripts/migrate-manus-mysql-to-supabase.mjs`.
 
 ## Verificação

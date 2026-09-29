@@ -34,6 +34,8 @@ import {
   recordClientAccess,
   runDailyMetricsBackupRoutine,
 } from "../dailyMetricsBackupService.js";
+import { buildLeadProjection } from "../../shared/leadProjection.js";
+import { allowedImageProxyUrl, imageProxyHostResolvesPublicly } from "../imageProxyPolicy.js";
 
 export const metricsRouter = Router();
 
@@ -738,12 +740,14 @@ metricsRouter.get("/analytics/predictive", requireAuth, requireAdmin, async (req
     const end = now.toISOString().slice(0, 10);
     const startDate = new Date(now.getTime() - 30 * 86_400_000);
     const start = startDate.toISOString().slice(0, 10);
+    // A regressão da projeção precisa de mais histórico que os indicadores de 30 dias.
+    const projectionStart = new Date(now.getTime() - 90 * 86_400_000).toISOString().slice(0, 10);
 
     let dailyMetrics: DailyMetric[] = [];
 
     if (isMetaDirectActive()) {
       try {
-        const metaDaily = await getMetaDirectDaily(unitId, start, end);
+        const metaDaily = await getMetaDirectDaily(unitId, projectionStart, end);
         dailyMetrics = metaDaily.map((d) => ({
           date: d.date_start,
           spend: d.total_spend,
@@ -767,7 +771,7 @@ metricsRouter.get("/analytics/predictive", requireAuth, requireAdmin, async (req
           .from("vw_meta_ads_daily_summary")
           .select("date_start,total_spend,total_conversas_iniciadas,total_leads_meta,total_impressions,total_clicks")
           .eq("client_id", unitId)
-          .gte("date_start", start)
+          .gte("date_start", projectionStart)
           .lte("date_start", end)
           .order("date_start", { ascending: true });
 
@@ -789,8 +793,15 @@ metricsRouter.get("/analytics/predictive", requireAuth, requireAdmin, async (req
     }
 
     const customTarget = typeof req.query.target === "string" ? Number(req.query.target) : undefined;
-    const profile = buildPredictiveUnitProfile(unitId, unitName, dailyMetrics, customTarget, now);
-    res.json(profile);
+    const recentMetrics = dailyMetrics.filter((d) => d.date >= start);
+    const profile = buildPredictiveUnitProfile(unitId, unitName, recentMetrics, customTarget, now);
+    const projection = buildLeadProjection(
+      dailyMetrics,
+      profile.goalProbability.currentLeads,
+      profile.goalProbability.totalTarget,
+      profile.date,
+    );
+    res.json({ ...profile, projection });
   } catch (error) {
     console.error("[analytics] Falha ao processar análise preditiva:", error);
     res.status(500).json({ error: "Não foi possível gerar a análise preditiva" });
@@ -895,13 +906,18 @@ metricsRouter.get("/metrics/image-proxy", async (req, res) => {
 
   try {
     const rawUrl = req.query.url;
-    if (typeof rawUrl !== "string" || !rawUrl.startsWith("http")) {
+    const url = typeof rawUrl === "string"
+      ? allowedImageProxyUrl(rawUrl, [process.env.SUPABASE_URL, process.env.EVOLUTION_SUPABASE_URL])
+      : null;
+    if (!url || !(await imageProxyHostResolvesPublicly(url.hostname))) {
       res.setHeader("Content-Type", "image/png");
       res.status(200).send(TRANSPARENT_1PX_PNG);
       return;
     }
 
-    const response = await fetch(rawUrl, {
+    const response = await fetch(url, {
+      redirect: "error",
+      signal: AbortSignal.timeout(8_000),
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -909,19 +925,35 @@ metricsRouter.get("/metrics/image-proxy", async (req, res) => {
       },
     });
 
-    if (!response.ok) {
-      console.warn(`[image-proxy] Imagem externa indisponível (${response.status}):`, rawUrl);
+    const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+    const maxBytes = 5 * 1024 * 1024;
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (!response.ok || !["image/jpeg", "image/png", "image/webp", "image/avif"].includes(contentType ?? "") ||
+        contentLength > maxBytes || !response.body) {
       res.setHeader("Content-Type", "image/png");
       res.status(200).send(TRANSPARENT_1PX_PNG);
       return;
     }
 
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    res.setHeader("Content-Type", contentType);
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        res.setHeader("Content-Type", "image/png");
+        res.status(200).send(TRANSPARENT_1PX_PNG);
+        return;
+      }
+      chunks.push(value);
+    }
+    res.setHeader("Content-Type", contentType!);
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24h
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    res.send(buffer);
+    res.send(Buffer.concat(chunks, size));
   } catch (error: any) {
     console.warn("[image-proxy] Erro ao carregar imagem externa:", error?.message || error);
     res.setHeader("Content-Type", "image/png");

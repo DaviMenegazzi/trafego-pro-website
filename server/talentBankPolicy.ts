@@ -3,6 +3,19 @@ import type { TalentField } from "./talentBankSupabaseStore.js";
 export const TALENT_ALLOWED_MIME_TYPES = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] as const;
 export const TALENT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
+export function validateTalentLogoUpload(file: { mimetype: string; size: number; buffer: Buffer } | undefined): string | null {
+  if (!file || file.size <= 0 || file.size > TALENT_MAX_UPLOAD_BYTES) return "Envie uma imagem de até 5 MB";
+  const bytes = file.buffer;
+  const valid = file.mimetype === "image/png"
+    ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    : file.mimetype === "image/jpeg"
+      ? bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+      : file.mimetype === "image/webp"
+        ? bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP"
+        : false;
+  return valid ? null : "Envie uma imagem PNG, JPG ou WebP válida";
+}
+
 export function validateTalentUpload(input: { fieldKey: string; mimeType: string; size: number; allowedFieldKeys: string[] }): string | null {
   if (!input.allowedFieldKeys.includes(input.fieldKey)) return "Anexo não permitido";
   if (!TALENT_ALLOWED_MIME_TYPES.includes(input.mimeType as (typeof TALENT_ALLOWED_MIME_TYPES)[number])) return "Envie somente arquivos PDF ou DOCX";

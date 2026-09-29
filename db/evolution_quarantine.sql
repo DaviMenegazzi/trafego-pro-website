@@ -123,3 +123,18 @@ $$;
 
 comment on function public.cleanup_expired_quarantine_leads(integer) is
   'Job diario de expurgo de leads em quarentena expirada (padrao 48h), mantendo o banco enxuto.';
+
+-- As RPCs deste arquivo são internas e chamadas somente pela service_role do backend.
+do $$
+declare fn regprocedure;
+begin
+  for fn in
+    select p.oid::regprocedure
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('record_evolution_event', 'verify_lead_unit_access', 'cleanup_expired_quarantine_leads')
+  loop
+    execute format('revoke execute on function %s from public, anon, authenticated', fn);
+    execute format('grant execute on function %s to service_role', fn);
+  end loop;
+end $$;

@@ -456,7 +456,11 @@ socialRouter.delete("/social/posts/:id", requireAuth, requireSupabaseAdmin, asyn
     res.status(400).json({ error: "Publicação inválida" });
     return;
   }
-  const post = await getSocialPostForProcessingSql(req.params.id);
+  const post = await getSocialPostForProcessingSql(req.params.id, req.claims!.id, true);
+  if (!post) {
+    res.status(404).json({ error: "Publicação não encontrada ou não editável" });
+    return;
+  }
   if (post?.facebookPostId) {
     try {
       await cancelFacebookNativeSchedule(post);

@@ -88,22 +88,7 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
     if (authError) {
       console.warn("[auth-register] Erro no Supabase Auth signUp:", authError.message);
       if (authError.message.toLowerCase().includes("already registered")) {
-        // Consulta status do cadastro existente para responder com mensagem precisa
-        const { data: existingProfile } = await supabase
-          .from("user_profiles")
-          .select("status")
-          .eq("email", registerEmail)
-          .maybeSingle();
-
-        if (existingProfile?.status === "pending") {
-          res.status(409).json({
-            error: "Já existe uma solicitação de cadastro pendente de aprovação para este e-mail.",
-            status: "pending",
-          });
-          return;
-        }
-
-        res.status(409).json({ error: "Este e-mail já possui uma conta no sistema." });
+        res.status(202).json({ ok: true, message: "Se o endereço for elegível, a solicitação será analisada." });
         return;
       }
       res.status(400).json({ error: authError.message });
@@ -152,11 +137,9 @@ authRouter.post("/register", registerRateLimiter, async (req, res) => {
       reason,
     }).catch((err) => console.error("[auth-register] Falha ao notificar admin:", err));
 
-    res.status(201).json({
+    res.status(202).json({
       ok: true,
-      message:
-        "Cadastro realizado com sucesso! Sua solicitação foi enviada e está aguardando aprovação de um administrador.",
-      status: "pending",
+      message: "Se o endereço for elegível, a solicitação será analisada.",
     });
   } catch (err) {
     console.error("[auth-register] Falha no processo de cadastro:", err);
@@ -266,9 +249,8 @@ authRouter.post("/login", authRateLimiter, async (req, res) => {
         path: "/",
       });
 
-      // Retorna token no payload para compatibilidade de transição e dados públicos de exibição
+      // A sessão da API fica exclusivamente nos cookies HttpOnly.
       res.json({
-        token,
         user: {
           email: loginEmail,
           name: userName,
@@ -362,7 +344,7 @@ authRouter.patch("/profile", requireAuth, async (req, res) => {
       maxAge: remainingSeconds * 1000,
       path: "/",
     });
-    res.json({ token, user });
+    res.json({ user });
   } catch (err) {
     console.error("[auth-profile] Falha ao atualizar perfil:", err);
     res.status(500).json({ error: "Não foi possível salvar o nome agora. Tente novamente." });

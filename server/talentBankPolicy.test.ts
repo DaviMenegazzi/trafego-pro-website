@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TALENT_MAX_UPLOAD_BYTES, validateTalentSubmission, validateTalentUpload } from "./talentBankPolicy.js";
+import { TALENT_MAX_UPLOAD_BYTES, validateTalentLogoUpload, validateTalentSubmission, validateTalentUpload } from "./talentBankPolicy.js";
 import type { TalentField } from "./talentBankSupabaseStore.js";
 
 const fields: TalentField[] = [
@@ -23,5 +23,11 @@ describe("validação pública de candidatura", () => {
     expect(validateTalentUpload({ fieldKey: "curriculo", mimeType: "application/pdf", size: TALENT_MAX_UPLOAD_BYTES, allowedFieldKeys: ["curriculo"] })).toBeNull();
     expect(validateTalentUpload({ fieldKey: "curriculo", mimeType: "image/png", size: 100, allowedFieldKeys: ["curriculo"] })).toBe("Envie somente arquivos PDF ou DOCX");
     expect(validateTalentUpload({ fieldKey: "curriculo", mimeType: "application/pdf", size: TALENT_MAX_UPLOAD_BYTES + 1, allowedFieldKeys: ["curriculo"] })).toBe("O anexo deve ter até 5 MB");
+  });
+  it("rejeita SVG e MIME de logo que não corresponde ao conteúdo", () => {
+    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+    expect(validateTalentLogoUpload({ mimetype: "image/png", size: png.length, buffer: png })).toBeNull();
+    expect(validateTalentLogoUpload({ mimetype: "image/svg+xml", size: 6, buffer: Buffer.from("<svg/>") })).toContain("PNG");
+    expect(validateTalentLogoUpload({ mimetype: "image/png", size: 6, buffer: Buffer.from("<svg/>") })).toContain("PNG");
   });
 });

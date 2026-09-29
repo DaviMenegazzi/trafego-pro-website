@@ -1,11 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const moveBatch = vi.fn();
+const setScoresBatch = vi.fn();
 const recordRunsBatch = vi.fn();
 
 vi.mock("./evolutionSupabaseStore.js", () => ({
   moveEvolutionLeadCrmStageBatchSupabase: (...args: unknown[]) => moveBatch(...args),
   recordEvolutionAiClassificationRunsBatchSupabase: (...args: unknown[]) => recordRunsBatch(...args),
+  setEvolutionLeadScoresBatchSupabase: (...args: unknown[]) => setScoresBatch(...args),
 }));
 
 describe("buffer em memória de classificação ao vivo do CRM", () => {
@@ -28,15 +30,15 @@ describe("buffer em memória de classificação ao vivo do CRM", () => {
       confidence: 0.91, rationale: "IA laya (confiança 0.91)", status: "applied", executionKey: "live-lead-stage:2026-09-22T12",
     });
 
-    expect(pendingCountsForTest()).toEqual({ stageUpdates: 1, runs: 1 });
+    expect(pendingCountsForTest()).toEqual({ stageUpdates: 1, runs: 1, scores: 0 });
 
     const summary = await flushPendingEvolutionAiState();
 
     expect(moveBatch).toHaveBeenCalledTimes(1);
     expect(moveBatch.mock.calls[0][0]).toEqual([{ leadId: "lead-1", instanceName: "unidade-1", toStage: "negotiation", changedBy: "automacao-ia-laya", note: "mais recente" }]);
     expect(recordRunsBatch).toHaveBeenCalledTimes(1);
-    expect(summary).toEqual({ stageUpdates: 1, runs: 1, applied: 1 });
-    expect(pendingCountsForTest()).toEqual({ stageUpdates: 0, runs: 0 });
+    expect(summary).toEqual({ stageUpdates: 1, runs: 1, applied: 1, scores: 0 });
+    expect(pendingCountsForTest()).toEqual({ stageUpdates: 0, runs: 0, scores: 0 });
   });
 
   it("recoloca no buffer as atualizações de estágio quando a gravação em lote falha", async () => {
@@ -53,8 +55,22 @@ describe("buffer em memória de classificação ao vivo do CRM", () => {
   it("não chama o Supabase quando não há nada pendente", async () => {
     const { flushPendingEvolutionAiState } = await import("./evolutionLeadStageBuffer.js");
     const summary = await flushPendingEvolutionAiState();
-    expect(summary).toEqual({ stageUpdates: 0, runs: 0, applied: 0 });
+    expect(summary).toEqual({ stageUpdates: 0, runs: 0, applied: 0, scores: 0 });
     expect(moveBatch).not.toHaveBeenCalled();
     expect(recordRunsBatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("buffer de score Laya", () => {
+  it("grava o score mais recente de cada lead no flush", async () => {
+    const buffer = await import("./evolutionLeadStageBuffer.js");
+    await buffer.flushPendingEvolutionAiState();
+    setScoresBatch.mockReset();
+    setScoresBatch.mockResolvedValue(undefined);
+    buffer.bufferLeadScore({ leadId: "lead-9", instanceName: "u", score: 10, temperature: "COLD" });
+    buffer.bufferLeadScore({ leadId: "lead-9", instanceName: "u", score: 80, temperature: "HOT" });
+    const summary = await buffer.flushPendingEvolutionAiState();
+    expect(summary.scores).toBe(1);
+    expect(setScoresBatch).toHaveBeenCalledWith([{ leadId: "lead-9", instanceName: "u", score: 80, temperature: "HOT" }]);
   });
 });

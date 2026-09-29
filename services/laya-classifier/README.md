@@ -23,6 +23,12 @@ estourar o `mem_limit`, o payload é validado: `state` até 12.000 caracteres, a
 tipos `choice` (2–10 opções), `score` (2–10 níveis) ou `noul`, instruções até 800 caracteres e
 cada critério até 300.
 
+O Pixel de Mensagens (app Node) também usa só o `/predict`, no mesmo modelo do SDR Flow
+(`server/evolutionLiveClassification.ts`): uma pergunta `score` de interesse de compra (0–4) vira
+`lead_score`/`temperature` e, abaixo de `LAYA_LOST_INTEREST_THRESHOLD`, move o lead para
+`closed_lost`. As outras etapas vêm de regras de texto (`server/evolutionFunnelRules.ts`). O
+`/classify` fica só por compatibilidade.
+
 ## Passo 0 — descobrir o proxy HTTPS já existente na VPS
 
 Antes de expor este serviço em `laya.147.93.10.249.sslip.io`, é preciso saber como

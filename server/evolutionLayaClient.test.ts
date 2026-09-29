@@ -1,45 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
-import { classifyLeadStageWithLaya } from "./evolutionLayaClient.js";
+import { layaConfigFromEnv, layaPredict, type LayaQuestion } from "./evolutionLayaClient.js";
 
-describe("classificação de estágio via serviço Laya (self-hosted)", () => {
-  it("envia o histórico e a etapa atual, e retorna a classificação tipada", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ proposedStage: "lead_replied", confidence: 0.87 }), { status: 200 }));
-    const result = await classifyLeadStageWithLaya({
-      leadId: "lead-1",
-      instanceName: "unidade-1",
-      currentStage: "lead_responded",
-      messages: [{ direction: "incoming", bodyText: "Tenho interesse", sentAt: "2026-09-01T12:00:00.000Z" }],
-    }, { serviceUrl: "https://laya.test", serviceSecret: "secret-token", fetcher });
+const interest: LayaQuestion = { type: "score", instructions: "Interesse?", criteria: ["nenhum", "alto"] };
 
-    expect(result).toEqual({ proposedStage: "lead_replied", confidence: 0.87 });
-    expect(fetcher).toHaveBeenCalledWith("https://laya.test/classify", expect.objectContaining({
+describe("cliente do serviço Laya (/predict, igual ao SDR Flow)", () => {
+  it("envia state e perguntas e devolve as respostas tipadas", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ answers: { interest: { type: "score", score: 1.2, confidence: 0.7 } } }), { status: 200 }));
+    const answers = await layaPredict({ url: "https://laya.test/", secret: "secret-token", fetcher }, ["CONTATO: oi"], { interest });
+
+    expect(answers.interest).toEqual({ type: "score", score: 1.2, confidence: 0.7 });
+    expect(fetcher).toHaveBeenCalledWith("https://laya.test/predict", expect.objectContaining({
       method: "POST",
       headers: expect.objectContaining({ Authorization: "Bearer secret-token" }),
     }));
-    const body = JSON.parse(String((fetcher.mock.calls[0][1] as RequestInit).body));
-    expect(body).toMatchObject({ leadId: "lead-1", instanceName: "unidade-1", currentStage: "lead_responded" });
+    expect(JSON.parse(String((fetcher.mock.calls[0][1] as RequestInit).body))).toEqual({ state: ["CONTATO: oi"], questions: { interest } });
   });
 
-  it("rejeita etapa que não existe no pipeline", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ proposedStage: "unknown", confidence: 0.9 }), { status: 200 }));
-    await expect(classifyLeadStageWithLaya(
-      { leadId: "lead-1", instanceName: "unidade-1", currentStage: "lead_responded", messages: [] },
-      { serviceUrl: "https://laya.test", serviceSecret: "secret-token", fetcher },
-    )).rejects.toThrow("etapa de CRM inválida");
+  it("rejeita resposta de tipo diferente do perguntado", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ answers: { interest: { type: "choice", choice: "x", confidence: 0.9 } } }), { status: 200 }));
+    await expect(layaPredict({ url: "https://laya.test", secret: "s", fetcher }, ["x"], { interest })).rejects.toThrow("resposta inválida");
   });
 
-  it("propaga o erro retornado pelo serviço quando o HTTP falha", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "modelo ainda carregando" }), { status: 503 }));
-    await expect(classifyLeadStageWithLaya(
-      { leadId: "lead-1", instanceName: "unidade-1", currentStage: "lead_responded", messages: [] },
-      { serviceUrl: "https://laya.test", serviceSecret: "secret-token", fetcher },
-    )).rejects.toThrow("modelo ainda carregando");
+  it("propaga HTTP de erro", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response("{}", { status: 503 }));
+    await expect(layaPredict({ url: "https://laya.test", secret: "s", fetcher }, ["x"], { interest })).rejects.toThrow("HTTP 503");
   });
 
-  it("exige LAYA_SERVICE_URL e LAYA_SERVICE_SECRET configuradas", async () => {
-    await expect(classifyLeadStageWithLaya(
-      { leadId: "lead-1", instanceName: "unidade-1", currentStage: "lead_responded", messages: [] },
-      { serviceUrl: undefined, serviceSecret: undefined, fetcher: vi.fn() },
-    )).rejects.toThrow("LAYA_SERVICE_URL não configurada");
+  it("só configura quando URL e segredo existem", () => {
+    expect(layaConfigFromEnv({} as NodeJS.ProcessEnv)).toBeNull();
+    expect(layaConfigFromEnv({ LAYA_SERVICE_URL: "https://l", LAYA_SERVICE_SECRET: "s" } as NodeJS.ProcessEnv)).toMatchObject({ url: "https://l", secret: "s", timeoutMs: 45000 });
   });
 });

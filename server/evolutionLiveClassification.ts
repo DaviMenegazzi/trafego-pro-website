@@ -1,7 +1,7 @@
 import { AI_AUTOMATION_ACTOR_LAYA, AI_AUTOMATION_ACTOR_TEXT_RULE } from "../shared/evolutionAiPolicy.js";
 import { canAdvanceFunnel, signalsFromLeadText, strongestSignal, type FunnelSignal } from "./evolutionFunnelRules.js";
 import { layaConfigFromEnv, layaPredict, LAYA_MODEL_NAME, type LayaConfig, type LayaQuestion } from "./evolutionLayaClient.js";
-import { bufferClassificationRun, bufferLeadScore, bufferStageUpdate, pendingStageFor } from "./evolutionLeadStageBuffer.js";
+import { bufferClassificationRun, bufferLeadScore, bufferStageUpdate, flushPendingEvolutionAiState, pendingStageFor } from "./evolutionLeadStageBuffer.js";
 import {
   getEvolutionAiLiveSettingsSupabase,
   getEvolutionLeadByIdSupabase,
@@ -126,55 +126,65 @@ export async function classifyLeadWithLaya(
   return { status: "classified", interest, confidence, score, temperature, movedTo };
 }
 
-// Fila em memória com debounce por lead e uma inferência por vez (o serviço Laya já é serial e
-// compartilhado com o SDR Flow). Cada nova mensagem empurra o job do lead para frente, então uma
-// rajada de mensagens custa uma inferência só, quando a conversa assenta. Um restart perde os jobs
-// pendentes — aceitável porque a próxima mensagem do lead agenda de novo.
-const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const readyQueue: string[] = [];
-let draining = false;
+// Em vez de inferir a cada mensagem, o webhook só marca o lead como "com novidade". Num intervalo
+// fixo (LAYA_CLASSIFY_INTERVAL_MINUTES), um varredor classifica os leads marcados, uma inferência
+// por vez (o serviço Laya é serial e compartilhado com o SDR Flow), e grava o resultado. Uma rajada
+// de mensagens entre duas varreduras custa uma inferência só. Um restart perde as marcas pendentes
+// — aceitável porque a próxima mensagem do lead marca de novo.
+const dirtyLeads = new Set<string>();
+let sweeping = false;
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
-function debounceMs(): number {
-  const value = Number(process.env.LAYA_DEBOUNCE_MS);
-  return Number.isFinite(value) && value >= 0 && process.env.LAYA_DEBOUNCE_MS ? value : 60_000;
+export function scheduleLeadClassification(leadId: string): void {
+  dirtyLeads.add(leadId);
 }
 
-async function drainQueue(): Promise<void> {
-  if (draining) return;
-  draining = true;
+export async function runLeadClassificationSweep(): Promise<{ classified: number; skipped: number; failed: number }> {
+  const summary = { classified: 0, skipped: 0, failed: 0 };
+  if (sweeping) return summary;
+  const laya = layaConfigFromEnv();
+  if (!laya || !dirtyLeads.size) return summary;
+  sweeping = true;
   try {
-    while (readyQueue.length) {
-      const leadId = readyQueue.shift()!;
-      const laya = layaConfigFromEnv();
-      if (!laya) return;
+    const leadIds = Array.from(dirtyLeads);
+    dirtyLeads.clear();
+    const lostThreshold = Number(process.env.LAYA_LOST_INTEREST_THRESHOLD) || 0.8;
+    for (const leadId of leadIds) {
       try {
-        const result = await classifyLeadWithLaya(leadId, { laya, lostThreshold: Number(process.env.LAYA_LOST_INTEREST_THRESHOLD) || 0.8 });
+        const result = await classifyLeadWithLaya(leadId, { laya, lostThreshold });
+        if (result.status === "classified") summary.classified += 1;
+        else summary.skipped += 1;
         logger.info("[evolution-live-ai] Classificação Laya do lead", { leadId, ...result });
       } catch (error) {
-        // Best effort: o lead mantém etapa e score atuais.
+        // Best effort: o lead mantém etapa e score atuais até a próxima mensagem.
+        summary.failed += 1;
         logger.warn("[evolution-live-ai] Falha na classificação Laya do lead", { leadId, error: error instanceof Error ? error.message : String(error) });
       }
     }
+    if (summary.classified) await flushPendingEvolutionAiState();
   } finally {
-    draining = false;
+    sweeping = false;
   }
+  return summary;
 }
 
-export function scheduleLeadClassification(leadId: string): void {
-  const existing = debounceTimers.get(leadId);
-  if (existing) clearTimeout(existing);
-  const timer = setTimeout(() => {
-    debounceTimers.delete(leadId);
-    if (!readyQueue.includes(leadId)) readyQueue.push(leadId);
-    void drainQueue();
-  }, debounceMs());
-  timer.unref?.();
-  debounceTimers.set(leadId, timer);
+export function startLeadClassificationLoop(intervalMs: number): void {
+  if (sweepTimer) clearInterval(sweepTimer);
+  sweepTimer = setInterval(() => {
+    runLeadClassificationSweep().catch((error) =>
+      logger.error("[evolution-live-ai] Erro inesperado na varredura da Laya", { error: error instanceof Error ? error.message : String(error) }));
+  }, intervalMs);
+  sweepTimer.unref?.();
+}
+
+export function stopLeadClassificationLoop(): void {
+  if (sweepTimer) clearInterval(sweepTimer);
+  sweepTimer = null;
 }
 
 // Chamado a partir do webhook a cada mensagem recebida. Nunca deve derrubar o webhook: qualquer
-// erro fica só em log. Regras de texto aplicam na hora (custo zero); a Laya roda depois, com
-// debounce. Quem grava no Supabase é o flush periódico (server/evolutionLeadStageBuffer.ts).
+// erro fica só em log. Regras de texto aplicam na hora (custo zero); a Laya roda na próxima
+// varredura do intervalo. Quem grava no Supabase é o flush periódico (server/evolutionLeadStageBuffer.ts).
 export async function classifyLeadStageLive(leadId: string, incomingText?: string | null): Promise<void> {
   const settings = await getEvolutionAiLiveSettingsSupabase();
   if (!settings.enabled) return;
@@ -187,5 +197,5 @@ export async function classifyLeadStageLive(leadId: string, incomingText?: strin
 }
 
 export function pendingClassificationCountForTest(): number {
-  return debounceTimers.size + readyQueue.length;
+  return dirtyLeads.size;
 }

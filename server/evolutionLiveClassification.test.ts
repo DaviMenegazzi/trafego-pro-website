@@ -8,6 +8,8 @@ const bufferStageUpdate = vi.fn();
 const bufferClassificationRun = vi.fn();
 const bufferLeadScore = vi.fn();
 const pendingStageFor = vi.fn();
+const flushPending = vi.fn();
+const layaEnv = vi.fn();
 
 vi.mock("./evolutionSupabaseStore.js", () => ({
   getEvolutionAiLiveSettingsSupabase: (...args: unknown[]) => getSettings(...args),
@@ -16,7 +18,7 @@ vi.mock("./evolutionSupabaseStore.js", () => ({
 }));
 vi.mock("./evolutionLayaClient.js", () => ({
   layaPredict: (...args: unknown[]) => predict(...args),
-  layaConfigFromEnv: () => null,
+  layaConfigFromEnv: () => layaEnv(),
   LAYA_MODEL_NAME: "laya",
 }));
 vi.mock("./evolutionLeadStageBuffer.js", () => ({
@@ -24,6 +26,7 @@ vi.mock("./evolutionLeadStageBuffer.js", () => ({
   bufferClassificationRun: (...args: unknown[]) => bufferClassificationRun(...args),
   bufferLeadScore: (...args: unknown[]) => bufferLeadScore(...args),
   pendingStageFor: (...args: unknown[]) => pendingStageFor(...args),
+  flushPendingEvolutionAiState: (...args: unknown[]) => flushPending(...args),
 }));
 
 const baseLead = {
@@ -43,6 +46,7 @@ describe("Laya no Pixel de Mensagens (modelo do SDR Flow)", () => {
     getLead.mockResolvedValue(baseLead);
     listMessages.mockResolvedValue(messages);
     pendingStageFor.mockReturnValue(null);
+    layaEnv.mockReturnValue(null);
   });
 
   it("não faz nada quando a automação ao vivo está desabilitada", async () => {
@@ -96,5 +100,22 @@ describe("Laya no Pixel de Mensagens (modelo do SDR Flow)", () => {
     predict.mockResolvedValue({ interest: { type: "score", score: 0.1, confidence: 0.9 } });
     const { classifyLeadWithLaya } = await import("./evolutionLiveClassification.js");
     expect(await classifyLeadWithLaya("lead-1", { laya })).toMatchObject({ movedTo: null });
+  });
+
+  it("marca o lead ao receber mensagem e só infere na varredura do intervalo", async () => {
+    layaEnv.mockReturnValue(laya);
+    predict.mockResolvedValue({ interest: { type: "score", score: 3.2, confidence: 0.6 } });
+    const { classifyLeadStageLive, runLeadClassificationSweep, pendingClassificationCountForTest } = await import("./evolutionLiveClassification.js");
+
+    await classifyLeadStageLive("lead-1", "oi");
+    await classifyLeadStageLive("lead-1", "tem desconto?");
+    expect(predict).not.toHaveBeenCalled();
+    expect(pendingClassificationCountForTest()).toBe(1);
+
+    const summary = await runLeadClassificationSweep();
+    expect(summary).toEqual({ classified: 1, skipped: 0, failed: 0 });
+    expect(predict).toHaveBeenCalledTimes(1);
+    expect(flushPending).toHaveBeenCalledTimes(1);
+    expect(pendingClassificationCountForTest()).toBe(0);
   });
 });

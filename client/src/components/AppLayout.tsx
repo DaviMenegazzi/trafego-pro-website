@@ -319,12 +319,11 @@ function NavLink({ item, active, collapsed, onNavigate, dense = false }: { item:
         "group relative flex items-center gap-3 overflow-hidden rounded-lg text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-emerald-400/60",
         collapsed ? "size-10 justify-center" : cn("px-3", dense ? "h-9" : "h-10"),
         active
-          ? "bg-gradient-to-r from-emerald-500/15 to-emerald-500/[0.03] font-medium text-white ring-1 ring-inset ring-emerald-400/15"
+          ? "bg-white/[0.07] font-medium text-white"
           : "text-zinc-400 hover:bg-white/[0.045] hover:text-zinc-100",
       )}
     >
-      {active && <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-emerald-400" />}
-      <Icon className={cn("size-4 shrink-0 transition-colors", active ? "text-emerald-300" : "text-zinc-500 group-hover:text-zinc-300")} />
+      <Icon className={cn("size-4 shrink-0 transition-colors", active ? "text-zinc-200" : "text-zinc-500 group-hover:text-zinc-300")} />
       {!collapsed && <span className="truncate">{item.label}</span>}
       {isNew && !collapsed && (
         <span className="ml-auto shrink-0 text-[10px] font-semibold tracking-[0.08em] text-emerald-300">
@@ -611,7 +610,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 active ? "bg-white/[0.07] font-medium text-white" : "text-zinc-400 hover:text-zinc-200",
               )}
             >
-              <Icon className={cn("size-5", active && "text-emerald-400")} />
+              <Icon className="size-5" />
               <span>{item.label}</span>
             </Link>
           );

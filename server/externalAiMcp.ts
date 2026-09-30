@@ -61,6 +61,8 @@ export function fechamentosPayload(rows: SqlFeedbackLead[]) {
       submittedAt: row.submittedAt,
       isLatestForWeek,
       leadsReceived: row.totalLeads,
+      leadsReceivedSource: row.totalLeadsSource,
+      leadsReceivedSuggested: row.totalLeadsSuggested,
       leadsClosed: row.leadsConverted,
       leadsInNegotiation: row.leadsInNegotiation,
       leadsLost: row.leadsLost,
@@ -231,6 +233,7 @@ export function createExternalAiMcpServer(
         title: "Fechamentos semanais",
         description:
           "Fechamentos que a própria unidade envia toda semana na aba Fechamentos do painel: leads recebidos, fechados, em negociação e perdidos, motivo principal das perdas, nota da qualidade dos leads (1 a 5), satisfação com a Tráfego Pro (1 a 5, null se pulou) e comentário. " +
+          "leadsReceivedSource diz se os recebidos vieram da sugestão da Dashboard (\"dashboard\", conversas iniciadas + leads Meta da semana) ou foram digitados (\"manual\"); null nos envios antigos. leadsReceivedSuggested é o número que a Dashboard sugeriu. " +
           "As semanas seguem a regra do mês (sábado a sexta, com as pontas do mês cortadas), então weekStart/weekEnd podem ter menos de 7 dias. " +
           "Traz as semanas que tocam o período, da mais recente para a mais antiga; lista vazia significa que a unidade não enviou. Os totais contam só o envio mais recente de cada semana.",
         inputSchema: periodShape,

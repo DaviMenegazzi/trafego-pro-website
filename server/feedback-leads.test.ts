@@ -19,6 +19,8 @@ const validFeedback = {
   weekStart: "2026-08-10",
   weekEnd: "2026-08-16",
   totalLeads: 24,
+  totalLeadsSource: "dashboard",
+  totalLeadsSuggested: 24,
   leadsContacted: 20,
   leadsResponded: 16,
   leadsConverted: 4,
@@ -149,6 +151,10 @@ describe("Protected weekly feedback endpoints", () => {
     const missingReason = await post({ ...slim, lossReason: "" });
     expect(missingReason.status).toBe(400);
     await expect(missingReason.json()).resolves.toEqual({ error: "Motivo de perda inválido" });
+    const badSource = await post({ ...slim, totalLeadsSource: "planilha" });
+    expect(badSource.status).toBe(400);
+    const notTheSuggestion = await post({ ...slim, totalLeadsSource: "dashboard", totalLeadsSuggested: 30 });
+    expect(notTheSuggestion.status).toBe(400);
   });
 
   it("returns 403 when a restricted user submits an unassigned unit", async () => {
@@ -163,7 +169,7 @@ describe("Protected weekly feedback endpoints", () => {
     expect(response.status).toBe(201);
     const created = await response.json() as { id: number; leadsConverted: number; agencySatisfaction: number; weekEnd: string };
     createdIds.push(created.id);
-    expect(created).toMatchObject({ leadsConverted: 4, agencySatisfaction: 5, weekEnd: "2026-08-16" });
+    expect(created).toMatchObject({ leadsConverted: 4, agencySatisfaction: 5, weekEnd: "2026-08-16", totalLeadsSource: "dashboard", totalLeadsSuggested: 24 });
     const listResponse = await fetch(`${baseUrl}/api/feedback-leads?unit=Ijuí`, { headers: { Authorization: `Bearer ${adminToken()}` } });
     expect(listResponse.status).toBe(200);
     expect((await listResponse.json() as Array<{ id: number }>).some((item) => item.id === created.id)).toBe(true);

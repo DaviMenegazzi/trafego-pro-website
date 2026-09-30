@@ -54,7 +54,7 @@ describe("servidor MCP da API externa", () => {
   it("entrega os fechamentos da unidade com o escopo de resumo de leads, sem quem enviou", async () => {
     const data = fakeData();
     const row = (weekStart: string, weekEnd: string, submittedAt: string, received: number, closed: number) => ({
-      id: 1, unit: "Unidade", responsible: "Fulano", weekStart, weekEnd, totalLeads: received, leadsContacted: 0, leadsResponded: 0,
+      id: 1, unit: "Unidade", responsible: "Fulano", weekStart, weekEnd, totalLeads: received, totalLeadsSource: "dashboard", totalLeadsSuggested: received, leadsContacted: 0, leadsResponded: 0,
       leadsConverted: closed, leadsLost: 2, leadsInNegotiation: 1, lossReason: "Preço", leadQuality: 4, observations: "Semana boa",
       agencySatisfaction: 0, communicationClarity: "", agencyAdjustment: "", submittedAt, submittedByUserId: "9", submittedByEmail: "fulano@x.com", createdAt: submittedAt,
     });
@@ -69,7 +69,7 @@ describe("servidor MCP da API externa", () => {
     expect(data.getFechamentos).toHaveBeenCalledWith("Unidade", "2026-09-19", "2026-09-30");
     const body = text(result);
     expect(body.totals).toEqual({ weeksReported: 2, leadsReceived: 50, leadsClosed: 8, leadsInNegotiation: 2, leadsLost: 4, conversionRate: 0.16 });
-    expect(body.fechamentos[0]).toMatchObject({ isLatestForWeek: true, leadsClosed: 5, agencySatisfaction: null, comment: "Semana boa", lossReason: "Preço" });
+    expect(body.fechamentos[0]).toMatchObject({ isLatestForWeek: true, leadsClosed: 5, leadsReceivedSource: "dashboard", leadsReceivedSuggested: 20, agencySatisfaction: null, comment: "Semana boa", lossReason: "Preço" });
     expect(body.fechamentos[1].isLatestForWeek).toBe(false);
     expect(JSON.stringify(body)).not.toMatch(/Fulano|fulano@x\.com/);
   });

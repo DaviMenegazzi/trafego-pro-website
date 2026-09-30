@@ -4,10 +4,11 @@ import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { useClientContext } from "@/contexts/ClientContext";
 import { toast } from "sonner";
-import { ArrowLeft, Check, CheckCircle2, Send } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Hash, Send, Star, TrendingUp } from "lucide-react";
 import { useAdminAuth, getToken } from "@/hooks/useAdminAuth";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
+import { hasSeenNavItem, markNavItemSeen } from "@/lib/navNewBadge";
 import {
   LOSS_REASONS,
   RATING_OPTIONS,
@@ -37,6 +38,46 @@ const emptyForm: FormData = {
   weekChoice: "current", customDate: "", totalLeads: "", leadsConverted: "", leadsInNegotiation: "", leadsLost: "",
   lossReason: "", leadQuality: "", agencySatisfaction: "", comment: "",
 };
+
+const INTRO_KEY = "fechamentos-intro";
+
+const INTRO_POINTS = [
+  { icon: <Hash />, title: "Os números da semana", text: "Quantos leads chegaram, quantos fecharam, quantos seguem em negociação e quantos foram perdidos." },
+  { icon: <Star />, title: "Sua avaliação", text: "Uma nota para a qualidade dos leads e, se quiser, outra para a Tráfego Pro." },
+  { icon: <TrendingUp />, title: "Para que serve", text: "Com isso a gente ajusta campanhas e públicos para trazer leads que fecham." },
+];
+
+function FeedbackIntro({ onStart, onExit }: { onStart: () => void; onExit: () => void }) {
+  return (
+    <div className="mx-auto w-full max-w-lg px-4 py-8 sm:py-14">
+      <div className="mb-4">
+        <IconButton label="Sair" icon={<ArrowLeft />} variant="ghost" onClick={onExit} />
+      </div>
+      <Surface className="p-6 animate-in fade-in-0 duration-300 sm:p-8">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">Fechamentos</p>
+        <h1 className="mt-2 font-display text-2xl font-semibold tracking-[-0.02em] text-white sm:text-[28px]">Como foram os leads da semana?</h1>
+        <p className="mt-2 text-sm leading-6 text-zinc-400">
+          Uma vez por semana, você conta o que aconteceu com os leads que chegaram para a sua unidade.
+        </p>
+        <ul className="mt-6 space-y-4">
+          {INTRO_POINTS.map((point) => (
+            <li key={point.title} className="flex gap-3">
+              <span aria-hidden className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-zinc-300 [&_svg]:size-4">{point.icon}</span>
+              <div>
+                <p className="text-sm font-medium text-zinc-100">{point.title}</p>
+                <p className="mt-0.5 text-sm leading-6 text-zinc-400">{point.text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-8 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-center text-xs text-zinc-500 sm:text-left">Leva menos de 1 minuto.</p>
+          <Button variant="primary" size="lg" onClick={onStart} autoFocus>Começar</Button>
+        </div>
+      </Surface>
+    </div>
+  );
+}
 
 type LastFeedback = { submittedAt: string; weekStart: string; weekEnd: string; responsible: string };
 
@@ -126,6 +167,8 @@ export default function DashboardFeedbackLeads() {
   const [stepError, setStepError] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  // Apresentação da aba: aparece uma única vez por pessoa (guardado no navegador, como o selo "Novo").
+  const [showIntro, setShowIntro] = useState(() => !hasSeenNavItem(INTRO_KEY));
   const advanceTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => () => window.clearTimeout(advanceTimer.current), []);
@@ -387,7 +430,14 @@ export default function DashboardFeedbackLeads() {
   const skippable = stepId === "agencySatisfaction" || stepId === "comment";
   const showContinue = !isChoiceStep || Boolean(formData[stepId as keyof FormData]);
 
-  const content = sent ? (
+  const startFromIntro = () => {
+    markNavItemSeen(INTRO_KEY);
+    setShowIntro(false);
+  };
+
+  const content = showIntro ? (
+    <FeedbackIntro onStart={startFromIntro} onExit={exit} />
+  ) : sent ? (
     <div className="mx-auto w-full max-w-lg px-4 py-10 sm:py-16">
       <Surface className="flex flex-col items-center px-6 py-10 text-center animate-in fade-in-0 zoom-in-95 duration-300">
         <CheckCircle2 className="size-10 text-emerald-400" />

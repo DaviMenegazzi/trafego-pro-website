@@ -3,7 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfirmProvider } from "@/components/ds";
 import NotFound from "@/pages/NotFound";
 import { lazy, Suspense, useEffect } from "react";
-import { Route, Switch, useLocation } from "wouter";
+import { Redirect, Route, Switch, useLocation } from "wouter";
 import { AppShell, useInsideAppShell } from "./components/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -57,7 +57,6 @@ const Dashboard = page(() => import("./pages/Dashboard"));
 const DashboardConfiguracoes = page(() => import("./pages/DashboardConfiguracoes"));
 const DashboardAnuncios = page(() => import("./pages/DashboardAnuncios"));
 const DashboardFeedbackLeads = page(() => import("./pages/DashboardFeedbackLeads"));
-const StandaloneFeedbackLeads = page(() => import("./pages/DashboardFeedbackLeads").then((m) => ({ default: m.StandaloneFeedbackLeads })));
 const DashboardFeedbackLeadsList = page(() => import("./pages/DashboardFeedbackLeadsList"));
 const DashboardUsuarios = page(() => import("./pages/DashboardUsuarios"));
 const DashboardExternalAiTokens = page(() => import("./pages/DashboardExternalAiTokens"));
@@ -83,14 +82,17 @@ function ExistingSiteRoutes() {
       <Route path={"/cadastro/"} component={Register} />
       <Route path={"/signup"} component={Register} />
       <Route path={"/signup/"} component={Register} />
-      <Route path={"/feedback-leads"} component={StandaloneFeedbackLeads} />
-      <Route path={"/feedback-leads/"} component={StandaloneFeedbackLeads} />
+      {/* Endereços antigos do feedback semanal: a tela agora é Fechamentos. */}
+      <Route path={"/feedback-leads"}><Redirect to="/dashboard/fechamentos" replace /></Route>
+      <Route path={"/feedback-leads/"}><Redirect to="/dashboard/fechamentos" replace /></Route>
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/dashboard/"} component={Dashboard} />
       <Route path={"/dashboard/configuracoes"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/configuracoes/"} component={DashboardConfiguracoes} />
-      <Route path={"/dashboard/feedback-leads"} component={DashboardFeedbackLeads} />
-      <Route path={"/dashboard/feedback-leads/"} component={DashboardFeedbackLeads} />
+      <Route path={"/dashboard/feedback-leads"}><Redirect to="/dashboard/fechamentos" replace /></Route>
+      <Route path={"/dashboard/feedback-leads/"}><Redirect to="/dashboard/fechamentos" replace /></Route>
+      <Route path={"/dashboard/fechamentos"} component={DashboardFeedbackLeads} />
+      <Route path={"/dashboard/fechamentos/"} component={DashboardFeedbackLeads} />
       <AdminRoute path={"/dashboard/feedback-leads/list"} component={DashboardFeedbackLeadsList} />
       <AdminRoute path={"/dashboard/feedback-leads/list/"} component={DashboardFeedbackLeadsList} />
       <Route path={"/dashboard/anuncios"} component={DashboardAnuncios} />

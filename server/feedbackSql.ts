@@ -144,6 +144,14 @@ export async function listFeedbackLeadsSql(filters: { unit?: string; weekStart?:
   return (rows as FeedbackRow[]).map(mapRow);
 }
 
+/** Último feedback enviado pela unidade (pela data de envio), ou null. */
+export async function getLastFeedbackLeadSql(unit: string): Promise<SqlFeedbackLead | null> {
+  const rows = unwrap(await getSiteSupabase().from("feedback_leads").select(SELECT_COLUMNS).eq("unit", unit)
+    .order("submitted_at", { ascending: false }).limit(1));
+  const row = (rows as FeedbackRow[])[0];
+  return row ? mapRow(row) : null;
+}
+
 export async function listAllFeedbackLeadsForExportSql(): Promise<SqlFeedbackLead[]> {
   const all: FeedbackRow[] = [];
   for (let from = 0; ; from += 1000) {

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import {
   getSupabaseForRequest,
@@ -17,6 +18,7 @@ import {
   getExternalAiUnit,
   listExternalAiUnits,
 } from "../externalAiApiData.js";
+import { createExternalAiMcpServer } from "../externalAiMcp.js";
 import {
   createExternalAiApiToken,
   EXTERNAL_AI_API_RATE_LIMIT_PER_MINUTE,
@@ -368,4 +370,35 @@ externalAiRouter.get("/external/v1/leads", requireExternalAiToken("leads:read"),
     sourceStatus: "pending_provider_integration",
     unit_id: unitId,
   });
+});
+
+// ─── POST /api/mcp ──────────────────────────────────────────────────────────
+// Servidor MCP (Streamable HTTP, sem sessão) sobre os mesmos dados da API v1.
+// Cada requisição passa pelo token, rate limit e auditoria, e as ferramentas
+// expostas dependem dos escopos do token.
+externalAiRouter.post("/mcp", requireExternalAiToken(), async (req, res) => {
+  const server = createExternalAiMcpServer(req.externalAiToken!, {
+    onOutcome: (outcome) => {
+      req.externalAiOutcome = outcome;
+    },
+  });
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  res.on("close", () => {
+    void transport.close();
+    void server.close();
+  });
+  try {
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (error) {
+    console.error("[external-ai-mcp] Falha no transporte:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: "Erro interno" }, id: null });
+    }
+  }
+});
+
+externalAiRouter.all("/mcp", (_req, res) => {
+  res.setHeader("Allow", "POST");
+  res.status(405).json({ jsonrpc: "2.0", error: { code: -32000, message: "Método não permitido" }, id: null });
 });

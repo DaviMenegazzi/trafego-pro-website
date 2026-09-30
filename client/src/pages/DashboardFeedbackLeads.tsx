@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { useClientContext } from "@/contexts/ClientContext";
 import { toast } from "sonner";
-import { ArrowLeft, Check, CheckCircle2, Hash, Send, Star, TrendingUp } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Hash, Send, Sparkles, Star, TrendingUp } from "lucide-react";
 import { useAdminAuth, getToken } from "@/hooks/useAdminAuth";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
@@ -388,9 +388,13 @@ export default function DashboardFeedbackLeads() {
       const q = COUNT_QUESTIONS[key];
       const hint = key === "totalLeads" ? q.hint : `${q.hint} Restam ${remaining(key)} dos ${total} recebidos.`;
       const suggestionNote = key === "totalLeads" && suggestion ? (
-        <p className="mt-3 text-center text-xs text-zinc-500" aria-live="polite">
+        <p className="mt-3 text-center text-sm text-zinc-500" aria-live="polite">
           {usedSuggestion ? (
-            <>Valor da Dashboard: {describeSuggestion(suggestion)}. Ajuste se for diferente.</>
+            <>
+              <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-300"><Sparkles className="size-4" aria-hidden />Sugerido pela plataforma com base na Dashboard</span>
+              <br />
+              <span className="text-xs">Ajuste se for diferente.</span>
+            </>
           ) : (
             <>
               A Dashboard mostra {suggestion.total} na semana.{" "}
@@ -559,7 +563,7 @@ export default function DashboardFeedbackLeads() {
   return <AppLayout>{content}</AppLayout>;
 }
 
-type LeadsSuggestion = { total: number; conversations: number; metaLeads: number };
+type LeadsSuggestion = { total: number };
 
 /** Soma, no período, o que a Dashboard mostra como entrada de leads: conversas iniciadas + leads Meta. */
 async function fetchLeadsSuggestion(clientId: string, start: string, end: string, token: string): Promise<LeadsSuggestion | null> {
@@ -570,14 +574,7 @@ async function fetchLeadsSuggestion(clientId: string, start: string, end: string
   const data = (await response.json()) as { configured?: boolean; rows?: Record<string, unknown>[] };
   if (data.configured === false || !Array.isArray(data.rows) || data.rows.length === 0) return null;
   const sum = (key: string) => data.rows!.reduce((total, row) => total + (Number(row[key]) || 0), 0);
-  const conversations = Math.round(sum("total_conversas_iniciadas"));
-  const metaLeads = Math.round(sum("total_leads_meta"));
-  return { total: conversations + metaLeads, conversations, metaLeads };
-}
-
-function describeSuggestion(s: LeadsSuggestion) {
-  const conv = `${s.conversations} ${s.conversations === 1 ? "conversa iniciada" : "conversas iniciadas"}`;
-  return s.metaLeads > 0 ? `${conv} + ${s.metaLeads} ${s.metaLeads === 1 ? "lead Meta" : "leads Meta"}` : conv;
+  return { total: Math.round(sum("total_conversas_iniciadas") + sum("total_leads_meta")) };
 }
 
 /** "19 a 25/09" a partir de datas AAAA-MM-DD. */

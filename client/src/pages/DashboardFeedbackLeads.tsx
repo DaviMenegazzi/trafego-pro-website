@@ -396,12 +396,7 @@ export default function DashboardFeedbackLeads() {
               <span className="text-xs">Ajuste se for diferente.</span>
             </>
           ) : (
-            <>
-              A Dashboard mostra {suggestion.total} na semana.{" "}
-              <button type="button" onClick={() => set("totalLeads", String(suggestion.total))} className="rounded font-medium text-emerald-300 outline-none hover:text-emerald-200 focus-visible:ring-2 focus-visible:ring-emerald-400/60">
-                Usar esse valor
-              </button>
-            </>
+            <>A Dashboard mostra {suggestion.total} na semana.</>
           )}
         </p>
       ) : null;

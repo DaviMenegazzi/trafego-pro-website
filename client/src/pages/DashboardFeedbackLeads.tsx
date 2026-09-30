@@ -546,7 +546,7 @@ export default function DashboardFeedbackLeads() {
         </form>
       </Surface>
       {stepId === "week" && lastSent && (
-        <p className={cn("mt-3 px-1 text-center text-xs leading-5", lastSent.weekStart === week.start ? "text-amber-300" : "text-zinc-500")} aria-live="polite">
+        <p className="mt-3 px-1 text-center text-xs leading-5 text-zinc-500" aria-live="polite">
           {lastSent.weekStart === week.start
             ? `Essa semana já tem feedback, enviado em ${formatDateTime(lastSent.submittedAt)} por ${lastSent.responsible}.`
             : `Último feedback enviado em ${formatDateTime(lastSent.submittedAt)} por ${lastSent.responsible}, semana de ${shortRange(lastSent.weekStart, lastSent.weekEnd)}.`}

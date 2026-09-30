@@ -74,13 +74,12 @@ const NAV_ADMIN_ONLY: NavItem[] = [
   { to: "/admin/financeiro", label: "Financeiro", icon: DollarSign },
   { to: "/dashboard/feedback-leads/list", label: "Feedbacks enviados", icon: Inbox },
   { to: "/dashboard/usuarios", label: "Usuários", icon: ShieldCheck },
-  { to: "/dashboard/formularios", label: "Formulários", icon: FileSpreadsheet },
 ];
 
-// Item exibido para clientes (não-admin) — só quando a unidade já tem ao
-// menos 1 endpoint de formulário ativo. Endpoints em si nunca aparecem aqui,
-// só os resultados recebidos.
-const CLIENT_FORMS_RESULTS_ITEM: NavItem = {
+// Formulários fica no menu principal, abaixo do Banco de Talentos. Admin sempre
+// vê; cliente só quando a unidade já tem ao menos 1 endpoint de formulário ativo
+// (endpoints em si nunca aparecem, só os resultados recebidos).
+const FORMS_ITEM: NavItem = {
   to: "/dashboard/formularios",
   label: "Formulários",
   icon: FileSpreadsheet,
@@ -211,7 +210,7 @@ function ClientSelector({ variant = "sidebar" }: { variant?: "sidebar" | "compac
 }
 
 // ─── Menu da conta ──────────────────────────────────────────────────────────
-function AccountMenu({ collapsed }: { collapsed: boolean }) {
+function AccountMenu({ collapsed, admin }: { collapsed: boolean; admin: boolean }) {
   const user = getStoredUser();
   const [, setLocation] = useLocation();
 
@@ -274,6 +273,15 @@ function AccountMenu({ collapsed }: { collapsed: boolean }) {
       items={[
         { type: "label", label: <span className="block truncate text-zinc-300">{user?.email ?? name}</span> },
         { type: "separator" },
+        ...(admin
+          ? [
+              ...NAV_ADMIN_ONLY.map((item) => {
+                const Icon = item.icon;
+                return { label: item.label, icon: <Icon />, onSelect: () => setLocation(item.to) };
+              }),
+              { type: "separator" as const },
+            ]
+          : []),
         { label: "Configurações", icon: <Settings />, onSelect: () => setLocation("/dashboard/configuracoes") },
         { label: "Sair", icon: <LogOut />, onSelect: handleLogout },
       ]}
@@ -435,7 +443,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     () => {
       // CRM segue a mesma permissão do Pixel.
       const base = NAV_BASE.filter((item) => !PIXEL_NAV_ITEMS.has(item.to) || pixelAllowed);
-      return !admin && clientFormsVisible ? [...base, CLIENT_FORMS_RESULTS_ITEM] : base;
+      return admin || clientFormsVisible ? [...base, FORMS_ITEM] : base;
     },
     [admin, clientFormsVisible, pixelAllowed],
   );
@@ -487,21 +495,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         {visibleNavBase.map((item) => (
           <NavLink key={item.to} item={item} active={activeTo === item.to} collapsed={isCollapsed} onNavigate={closeMobile} />
         ))}
-        {admin && (
-          <div className={cn("pt-4", isCollapsed && "flex flex-col items-center gap-0.5 border-t border-white/[0.06]")} role="group" aria-label="Administração">
-            {!isCollapsed && <p className="px-3 pb-1.5 text-xs font-medium text-zinc-500">Administração</p>}
-            <div className={cn("space-y-0.5", isCollapsed && "flex flex-col items-center")}>
-              {NAV_ADMIN_ONLY.map((item) => (
-                <NavLink key={item.to} item={item} active={activeTo === item.to} collapsed={isCollapsed} onNavigate={closeMobile} dense />
-              ))}
-            </div>
-          </div>
-        )}
       </nav>
 
       {/* Conta */}
       <div className={cn("mt-auto border-t border-white/[0.06] p-2", isCollapsed && "flex justify-center")}>
-        <AccountMenu collapsed={isCollapsed} />
+        <AccountMenu collapsed={isCollapsed} admin={admin} />
       </div>
     </>
   );

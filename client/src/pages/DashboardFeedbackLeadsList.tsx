@@ -65,7 +65,7 @@ export default function DashboardFeedbackLeadsList() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
-  useEffect(() => { document.title = "Tráfego Pro — Feedbacks de Leads"; }, []);
+  useEffect(() => { document.title = "Tráfego Pro — Feedbacks enviados"; }, []);
   const units = useMemo(() => Array.from(new Set(feedbacks.map((item) => item.unit))).sort((a, b) => a.localeCompare(b, "pt-BR")), [feedbacks]);
 
   const fetchFeedbacks = useCallback(async () => {
@@ -137,7 +137,7 @@ export default function DashboardFeedbackLeadsList() {
                 disabled={exporting}
                 items={[{ label: exporting ? "Preparando planilha…" : "Planilha com todos os feedbacks", hint: "Todas as unidades e semanas", icon: <FileSpreadsheet />, onSelect: () => void exportAll() }]}
               />
-              <Button variant="primary" onClick={() => setLocation("/dashboard/feedback-leads")}>
+              <Button variant="primary" onClick={() => setLocation("/dashboard/fechamentos")}>
                 <Plus />
                 Novo feedback
               </Button>
@@ -235,24 +235,27 @@ export default function DashboardFeedbackLeadsList() {
 }
 
 function FeedbackDetail({ feedback }: { feedback: Feedback }) {
+  // Contatados, responderam e comunicação só existem nos envios do formulário antigo.
   const funnel = [
     { label: "Recebidos", value: feedback.totalLeads },
-    { label: "Contatados", value: feedback.leadsContacted },
-    { label: "Responderam", value: feedback.leadsResponded },
+    ...(feedback.leadsContacted > 0 ? [{ label: "Contatados", value: feedback.leadsContacted }] : []),
+    ...(feedback.leadsResponded > 0 ? [{ label: "Responderam", value: feedback.leadsResponded }] : []),
     { label: "Fecharam", value: feedback.leadsConverted },
+    { label: "Em negociação", value: feedback.leadsInNegotiation },
+    { label: "Perdidos", value: feedback.leadsLost },
   ];
   const max = Math.max(1, feedback.totalLeads);
-  const texts: [string, string][] = [
-    ["Motivo principal de perda", feedback.lossReason || "Não informado"],
-    ["Qualidade dos leads", feedback.leadQuality ? `${feedback.leadQuality}/5` : "Não informado"],
-    ["Satisfação com a agência", feedback.agencySatisfaction ? `${feedback.agencySatisfaction}/5` : "Não informado"],
-    ["Comunicação clara", feedback.communicationClarity || "Não informado"],
-    ["Observações", feedback.observations || "—"],
-    ["Ajustes para a próxima semana", feedback.agencyAdjustment || "—"],
-  ];
+  const texts = ([
+    ["Motivo principal de perda", feedback.lossReason],
+    ["Qualidade dos leads", feedback.leadQuality ? `${feedback.leadQuality}/5` : ""],
+    ["Satisfação com a agência", feedback.agencySatisfaction ? `${feedback.agencySatisfaction}/5` : ""],
+    ["Comunicação clara", feedback.communicationClarity],
+    ["Comentário", feedback.observations],
+    ["Ajustes para a próxima semana", feedback.agencyAdjustment],
+  ] as [string, string][]).filter(([, value]) => value);
   return (
     <div className="space-y-6">
-      <section aria-label="Funil da semana" className="space-y-2.5">
+      <section aria-label="Leads da semana" className="space-y-2.5">
         {funnel.map((step) => (
           <div key={step.label} className="grid grid-cols-[7rem_1fr_3rem] items-center gap-3 text-sm">
             <span className="text-zinc-400">{step.label}</span>
@@ -262,9 +265,6 @@ function FeedbackDetail({ feedback }: { feedback: Feedback }) {
             <span className="text-right font-medium tabular-nums text-white">{formatNumber(step.value)}</span>
           </div>
         ))}
-        <p className="pt-1 text-xs text-zinc-500">
-          Perdidos: {formatNumber(feedback.leadsLost)} · Em negociação: {formatNumber(feedback.leadsInNegotiation)}
-        </p>
       </section>
       <dl className="space-y-4 border-t border-white/[0.06] pt-5">
         {texts.map(([label, value]) => (

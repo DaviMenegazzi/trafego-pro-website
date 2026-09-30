@@ -1,13 +1,47 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import * as XLSX from "xlsx";
 import { getSupabaseForRequest, hasUnitAccess, isAdmin, requireAdmin, requireAuth } from "../auth.js";
 import {
   createFeedbackLeadSql,
+  getLastFeedbackLeadSql,
   listAllFeedbackLeadsForExportSql,
   listFeedbackLeadsSql,
 } from "../feedbackSql.js";
 
 export const feedbackRouter = Router();
+
+/** Admin acessa tudo; os demais só as unidades liberadas na sessão. Devolve o status de erro, ou null se pode. */
+async function unitAccessError(req: Request, unit: string): Promise<{ status: number; error: string } | null> {
+  if (isAdmin(req.claims!)) return null;
+  const sb = getSupabaseForRequest(req);
+  if (!sb) return { status: 403, error: "Sem acesso a essa unidade" };
+  const { data: client, error } = await sb.from("clients").select("id").eq("name", unit).maybeSingle();
+  if (error) return { status: 502, error: "Não foi possível validar a unidade autorizada" };
+  if (!client || !hasUnitAccess(client.id, req.claims!)) return { status: 403, error: "Sem acesso a essa unidade" };
+  return null;
+}
+
+// ─── GET /api/feedback-leads/last?unit= ─────────────────────────────────────
+// Último envio da unidade, para o aviso no formulário. Liberado para quem tem acesso à unidade.
+feedbackRouter.get("/feedback-leads/last", requireAuth, async (req, res) => {
+  const unit = typeof req.query.unit === "string" ? req.query.unit.trim() : "";
+  if (!unit) {
+    res.status(400).json({ error: "Unidade obrigatória" });
+    return;
+  }
+  const denied = await unitAccessError(req, unit);
+  if (denied) {
+    res.status(denied.status).json({ error: denied.error });
+    return;
+  }
+  try {
+    const last = await getLastFeedbackLeadSql(unit);
+    res.json(last ? { submittedAt: last.submittedAt, weekStart: last.weekStart, weekEnd: last.weekEnd, responsible: last.responsible } : null);
+  } catch (error) {
+    console.error("[feedback-leads] Falha ao buscar último feedback:", error);
+    res.status(503).json({ error: "Não foi possível carregar o último feedback" });
+  }
+});
 
 // ─── GET /api/feedback-leads/export ─────────────────────────────────────────
 feedbackRouter.get("/feedback-leads/export", requireAuth, requireAdmin, async (_req, res) => {
@@ -78,56 +112,49 @@ feedbackRouter.post("/feedback-leads", requireAuth, async (req, res) => {
     return;
   }
 
-  const countKeys = [
-    "totalLeads",
-    "leadsContacted",
-    "leadsResponded",
-    "leadsConverted",
-    "leadsLost",
-    "leadsInNegotiation",
-  ] as const;
-  const counts = {} as Record<(typeof countKeys)[number], number>;
-  for (const key of countKeys) {
-    const value = Number(body[key]);
+  // Contatados e responderam saíram do formulário enxuto; seguem aceitos
+  // (e gravados como 0 quando ausentes) para não quebrar envios antigos.
+  const countKeys = ["totalLeads", "leadsConverted", "leadsLost", "leadsInNegotiation"] as const;
+  const optionalCountKeys = ["leadsContacted", "leadsResponded"] as const;
+  const counts = {} as Record<(typeof countKeys)[number] | (typeof optionalCountKeys)[number], number>;
+  for (const key of [...countKeys, ...optionalCountKeys]) {
+    const optional = (optionalCountKeys as readonly string[]).includes(key);
+    const raw = body[key];
+    const value = optional && (raw === undefined || raw === null || raw === "") ? 0 : Number(raw);
     if (!Number.isInteger(value) || value < 0) {
       res.status(400).json({ error: "Os volumes de leads devem ser números inteiros não negativos" });
       return;
     }
     counts[key] = value;
   }
+  if (counts.leadsConverted + counts.leadsLost + counts.leadsInNegotiation > counts.totalLeads) {
+    res.status(400).json({ error: "Fecharam + perdidos + em negociação não podem passar dos leads recebidos" });
+    return;
+  }
 
   const lossReason = typeof body.lossReason === "string" ? body.lossReason : "";
   const communicationClarity = typeof body.communicationClarity === "string" ? body.communicationClarity : "";
   const leadQuality = Number(body.leadQuality);
-  const agencySatisfaction = Number(body.agencySatisfaction);
-  if (!["Preço", "Não respondeu", "Não tinha interesse", "Fora do perfil", "Outro"].includes(lossReason)) {
+  // Satisfação pode ser pulada no formulário: ausente vira 0 ("não respondeu").
+  const agencySatisfaction = body.agencySatisfaction === undefined || body.agencySatisfaction === null || body.agencySatisfaction === "" ? 0 : Number(body.agencySatisfaction);
+  const lossReasonAllowed = ["Preço", "Não respondeu", "Não tinha interesse", "Fora do perfil", "Outro"].includes(lossReason);
+  if (counts.leadsLost > 0 ? !lossReasonAllowed : lossReason !== "" && !lossReasonAllowed) {
     res.status(400).json({ error: "Motivo de perda inválido" });
     return;
   }
-  if (!["Sim", "Parcialmente", "Não"].includes(communicationClarity)) {
+  if (!["", "Sim", "Parcialmente", "Não"].includes(communicationClarity)) {
     res.status(400).json({ error: "Resposta de comunicação inválida" });
     return;
   }
-  if (![1, 2, 3, 4, 5].includes(leadQuality) || ![1, 2, 3, 4, 5].includes(agencySatisfaction)) {
+  if (![1, 2, 3, 4, 5].includes(leadQuality) || ![0, 1, 2, 3, 4, 5].includes(agencySatisfaction)) {
     res.status(400).json({ error: "As avaliações devem estar entre 1 e 5" });
     return;
   }
 
-  if (!isAdmin(req.claims!)) {
-    const sb = getSupabaseForRequest(req);
-    if (!sb) {
-      res.status(403).json({ error: "Sem acesso a essa unidade" });
-      return;
-    }
-    const { data: client, error } = await sb.from("clients").select("id").eq("name", unit).maybeSingle();
-    if (error) {
-      res.status(502).json({ error: "Não foi possível validar a unidade autorizada" });
-      return;
-    }
-    if (!client || !hasUnitAccess(client.id, req.claims!)) {
-      res.status(403).json({ error: "Sem acesso a essa unidade" });
-      return;
-    }
+  const denied = await unitAccessError(req, unit);
+  if (denied) {
+    res.status(denied.status).json({ error: denied.error });
+    return;
   }
 
   const submittedAt = typeof body.submittedAt === "string" ? new Date(body.submittedAt) : new Date();

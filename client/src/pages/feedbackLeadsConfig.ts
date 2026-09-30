@@ -60,47 +60,92 @@ export function getAuthorizedUnitNames(
 
 export type FeedbackCounts = {
   totalLeads: string;
-  leadsContacted: string;
-  leadsResponded: string;
   leadsConverted: string;
   leadsLost: string;
   leadsInNegotiation: string;
 };
 
 /**
- * Coerência do funil semanal: ninguém é contatado sem ter chegado, ninguém
- * responde sem ter sido contatado, e o desfecho (fechou, perdeu, negociando)
- * não passa de quem respondeu. Campos vazios não geram erro aqui (o
- * obrigatório é tratado à parte).
+ * Coerência da semana: fecharam + perdidos + em negociação não passam dos
+ * leads recebidos. Campos vazios não geram erro aqui (o obrigatório é
+ * tratado à parte).
  */
 export function validateFeedbackCounts(counts: FeedbackCounts): Partial<Record<keyof FeedbackCounts, string>> {
   const value = (key: keyof FeedbackCounts) => (counts[key] === "" ? null : Number(counts[key]));
   const errors: Partial<Record<keyof FeedbackCounts, string>> = {};
-  const total = value("totalLeads");
-  const contacted = value("leadsContacted");
-  const responded = value("leadsResponded");
-  const converted = value("leadsConverted");
-  const lost = value("leadsLost");
-  const negotiating = value("leadsInNegotiation");
-
-  (Object.keys(counts) as (keyof FeedbackCounts)[]).forEach((key) => {
+  // Lista fixa: o formulário passa o objeto inteiro, com unidade e semana junto.
+  (["totalLeads", "leadsConverted", "leadsLost", "leadsInNegotiation"] as const).forEach((key) => {
     const v = value(key);
     if (v !== null && (!Number.isInteger(v) || v < 0)) errors[key] = "Use um número inteiro, zero ou maior.";
   });
+  if (Object.keys(errors).length > 0) return errors;
 
-  if (total !== null && contacted !== null && contacted > total && !errors.leadsContacted) {
-    errors.leadsContacted = `Não pode passar dos ${total} recebidos.`;
-  }
-  if (contacted !== null && responded !== null && responded > contacted && !errors.leadsResponded) {
-    errors.leadsResponded = `Não pode passar dos ${contacted} contatados.`;
-  }
-  if (responded !== null && converted !== null && lost !== null && negotiating !== null) {
-    const outcome = converted + lost + negotiating;
-    if (outcome > responded && !errors.leadsConverted && !errors.leadsLost && !errors.leadsInNegotiation) {
-      errors.leadsInNegotiation = `Fecharam + perdidos + em negociação somam ${outcome}, mais que os ${responded} que responderam.`;
-    }
-  } else if (responded !== null && converted !== null && converted > responded && !errors.leadsConverted) {
-    errors.leadsConverted = `Não pode passar dos ${responded} que responderam.`;
+  const total = value("totalLeads");
+  const outcomes = (["leadsConverted", "leadsLost", "leadsInNegotiation"] as const).map(value);
+  if (total === null) return errors;
+  const filled = outcomes.filter((v): v is number => v !== null);
+  const sum = filled.reduce((a, b) => a + b, 0);
+  if (sum > total) {
+    errors.leadsInNegotiation = filled.length === 3
+      ? `Fecharam + perdidos + em negociação somam ${sum}, mais que os ${total} recebidos.`
+      : `Já passa dos ${total} recebidos.`;
   }
   return errors;
+}
+
+export type FeedbackWeek = {
+  /** Início e fim no formato AAAA-MM-DD. */
+  start: string;
+  end: string;
+  /** Posição da semana no mês (1 a 5), a mesma das colunas S1–S5 da aba Tráfego. */
+  number: number;
+  /** Ex.: "26 a 30/09". */
+  label: string;
+};
+
+const FRIDAY = 5;
+const pad = (n: number) => String(n).padStart(2, "0");
+const isoOf = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
+
+/**
+ * Semanas de um mês (m de 0 a 11), na regra da aba Tráfego: semanas de sábado
+ * a sexta; a primeira vai do dia 1 até a primeira sexta e a última do sábado
+ * seguinte à última sexta até o fim do mês. Um pedaço de ponta com 3 dias ou
+ * menos se junta à semana vizinha; com 4 ou mais vale como semana própria.
+ */
+export function monthWeeks(year: number, month: number): FeedbackWeek[] {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const ranges: [number, number][] = [];
+  let start = 1;
+  for (let day = 1; day <= lastDay; day += 1) {
+    if (new Date(year, month, day).getDay() === FRIDAY) {
+      ranges.push([start, day]);
+      start = day + 1;
+    }
+  }
+  if (start <= lastDay) ranges.push([start, lastDay]);
+
+  const days = ([a, b]: [number, number]) => b - a + 1;
+  if (ranges.length > 1 && days(ranges[0]) <= 3) ranges.splice(0, 2, [ranges[0][0], ranges[1][1]]);
+  const n = ranges.length;
+  if (n > 1 && days(ranges[n - 1]) <= 3) ranges.splice(n - 2, 2, [ranges[n - 2][0], ranges[n - 1][1]]);
+
+  return ranges.map(([a, b], index) => ({
+    start: isoOf(year, month, a),
+    end: isoOf(year, month, b),
+    number: index + 1,
+    label: `${pad(a)} a ${pad(b)}/${pad(month + 1)}`,
+  }));
+}
+
+/** Semana (na regra do mês) que contém a data. */
+export function feedbackWeekFor(date: Date): FeedbackWeek {
+  const iso = isoOf(date.getFullYear(), date.getMonth(), date.getDate());
+  return monthWeeks(date.getFullYear(), date.getMonth()).find((w) => w.start <= iso && iso <= w.end)!;
+}
+
+/** Semana imediatamente anterior (pode ser a última do mês passado). */
+export function previousFeedbackWeek(week: FeedbackWeek): FeedbackWeek {
+  const [y, m, d] = week.start.split("-").map(Number);
+  return feedbackWeekFor(new Date(y, m - 1, d - 1));
 }

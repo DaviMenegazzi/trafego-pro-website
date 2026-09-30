@@ -47,7 +47,10 @@ export function Select({
   return (
     <SelectPrimitive.Root
       value={value === "" ? undefined : value}
-      onValueChange={(next) => onValueChange(next === EMPTY ? "" : next)}
+      // "" cru vem do <select> oculto do Radix quando as opções somem por um
+      // instante (lista recarregando) e apagaria a escolha; o vazio de verdade
+      // chega como EMPTY.
+      onValueChange={(next) => { if (next !== "") onValueChange(next === EMPTY ? "" : next); }}
       disabled={disabled}
       name={name}
       required={required}

@@ -9,6 +9,7 @@ import {
   PanelLeftOpen,
   LogOut,
   MessageSquare,
+  Inbox,
   ShieldCheck,
   UsersRound,
   Tag,
@@ -28,6 +29,7 @@ import { IconButton, Menu, Popover, PopoverClose, Tooltip } from "@/components/d
 import { cn } from "@/lib/utils";
 import { resolveActiveNav } from "@/lib/navigation";
 import { canAccessPixel } from "@/lib/pixelAccessPolicy";
+import { useNavNewBadge } from "@/lib/navNewBadge";
 
 const DURATION = "200ms";
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
@@ -53,13 +55,15 @@ function isAdminUser(): boolean {
 }
 
 // ─── Nav items ──────────────────────────────────────────────────────────────
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
+/** newBadge: chave do selo "Novo", que some depois que a pessoa abre a tela uma vez. */
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; newBadge?: string };
 
 const NAV_BASE: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
   { to: "/dashboard/pixel", label: "Pixel", icon: ScanLine },
   { to: "/dashboard/crm", label: "CRM", icon: SquareKanban },
+  { to: "/dashboard/fechamentos", label: "Fechamentos", icon: MessageSquare, newBadge: "fechamentos" },
   { to: "/dashboard/banco-talentos", label: "Banco de Talentos", icon: UsersRound },
 ];
 
@@ -68,6 +72,7 @@ const PIXEL_NAV_ITEMS = new Set(["/dashboard/pixel", "/dashboard/crm"]);
 const NAV_ADMIN_ONLY: NavItem[] = [
   { to: "/admin/metricas", label: "Métricas da Rede", icon: BarChart3 },
   { to: "/admin/financeiro", label: "Financeiro", icon: DollarSign },
+  { to: "/dashboard/feedback-leads/list", label: "Feedbacks enviados", icon: Inbox },
   { to: "/dashboard/usuarios", label: "Usuários", icon: ShieldCheck },
   { to: "/dashboard/formularios", label: "Formulários", icon: FileSpreadsheet },
 ];
@@ -300,12 +305,16 @@ function AmbientBackground() {
 
 function NavLink({ item, active, collapsed, onNavigate, dense = false }: { item: NavItem; active: boolean; collapsed: boolean; onNavigate: () => void; dense?: boolean }) {
   const Icon = item.icon;
+  const { isNew, dismiss } = useNavNewBadge(item.newBadge, active);
   const link = (
     <Link
       href={item.to}
       aria-current={active ? "page" : undefined}
-      aria-label={collapsed ? item.label : undefined}
-      onClick={onNavigate}
+      aria-label={collapsed ? `${item.label}${isNew ? " (novo)" : ""}` : undefined}
+      onClick={() => {
+        dismiss();
+        onNavigate();
+      }}
       className={cn(
         "group relative flex items-center gap-3 overflow-hidden rounded-lg text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-emerald-400/60",
         collapsed ? "size-10 justify-center" : cn("px-3", dense ? "h-9" : "h-10"),
@@ -317,6 +326,12 @@ function NavLink({ item, active, collapsed, onNavigate, dense = false }: { item:
       {active && <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-emerald-400" />}
       <Icon className={cn("size-4 shrink-0 transition-colors", active ? "text-emerald-300" : "text-zinc-500 group-hover:text-zinc-300")} />
       {!collapsed && <span className="truncate">{item.label}</span>}
+      {isNew && !collapsed && (
+        <span className="ml-auto shrink-0 text-[10px] font-semibold tracking-[0.08em] text-emerald-300">
+          NOVO<span className="sr-only"> (novo)</span>
+        </span>
+      )}
+      {isNew && collapsed && <span aria-hidden className="absolute right-2 top-2 size-1.5 rounded-full bg-emerald-400" />}
     </Link>
   );
   return collapsed ? <Tooltip content={item.label} side="right">{link}</Tooltip> : link;

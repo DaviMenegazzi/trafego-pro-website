@@ -138,6 +138,19 @@ describe("Protected weekly feedback endpoints", () => {
     expect(invalidPeriod.status).toBe(400);
   });
 
+  it("checks the slim weekly form: outcome within received and loss reason only when there are losses", async () => {
+    const post = (payload: Record<string, unknown>) => fetch(`${baseUrl}/api/feedback-leads`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken()}` }, body: JSON.stringify(payload) });
+    const { leadsContacted: _c, leadsResponded: _r, communicationClarity: _cc, ...slim } = validFeedback;
+    const overflow = await post({ ...slim, leadsConverted: 10 });
+    expect(overflow.status).toBe(400);
+    await expect(overflow.json()).resolves.toEqual({ error: "Fecharam + perdidos + em negociação não podem passar dos leads recebidos" });
+    const badSatisfaction = await post({ ...slim, agencySatisfaction: 6 });
+    expect(badSatisfaction.status).toBe(400);
+    const missingReason = await post({ ...slim, lossReason: "" });
+    expect(missingReason.status).toBe(400);
+    await expect(missingReason.json()).resolves.toEqual({ error: "Motivo de perda inválido" });
+  });
+
   it("returns 403 when a restricted user submits an unassigned unit", async () => {
     const token = signToken({ email: "restricted-test@trafego.pro", name: "Restricted Test", role: "client_viewer", id: 998, allowedClientIds: ["client-id-that-does-not-exist"] });
     const response = await fetch(`${baseUrl}/api/feedback-leads`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ ...validFeedback, unit: "__unassigned_test_unit__" }) });
@@ -154,6 +167,15 @@ describe("Protected weekly feedback endpoints", () => {
     const listResponse = await fetch(`${baseUrl}/api/feedback-leads?unit=Ijuí`, { headers: { Authorization: `Bearer ${adminToken()}` } });
     expect(listResponse.status).toBe(200);
     expect((await listResponse.json() as Array<{ id: number }>).some((item) => item.id === created.id)).toBe(true);
+  });
+
+  it("returns the unit's last submission and blocks units outside the session", async () => {
+    const last = await fetch(`${baseUrl}/api/feedback-leads/last?unit=${encodeURIComponent("Ijuí")}`, { headers: { Authorization: `Bearer ${adminToken()}` } });
+    expect(last.status).toBe(200);
+    expect(await last.json()).toMatchObject({ weekStart: "2026-08-10", weekEnd: "2026-08-16" });
+    const token = signToken({ email: "restricted-last@trafego.pro", name: "Restricted", role: "client_viewer", id: 997, allowedClientIds: ["client-id-that-does-not-exist"] });
+    const denied = await fetch(`${baseUrl}/api/feedback-leads/last?unit=__unassigned_test_unit__`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(denied.status).toBe(403);
   });
 
   it("denies listing and exporting feedbacks to non-admin sessions", async () => {

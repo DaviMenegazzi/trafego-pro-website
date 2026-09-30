@@ -10,6 +10,7 @@ import {
   getExternalAiUnit,
   listExternalAiUnits,
 } from "./externalAiApiData.js";
+import { listFeedbackLeadsInPeriodSql, type SqlFeedbackLead } from "./feedbackSql.js";
 import {
   hasExternalAiApiScope,
   isExternalAiApiUnitAllowed,
@@ -27,6 +28,8 @@ export type ExternalAiMcpData = {
   getLeadSummary: typeof getExternalAiLeadSummary;
   getCrmSummary: typeof getExternalAiCrmSummary;
   getCreatives: typeof getExternalAiCreatives;
+  /** Fechamentos semanais da unidade (pelo nome) cujas semanas tocam o período. */
+  getFechamentos: (unitName: string, start: string, end: string) => Promise<SqlFeedbackLead[]>;
 };
 
 const defaultData: ExternalAiMcpData = {
@@ -37,7 +40,53 @@ const defaultData: ExternalAiMcpData = {
   getLeadSummary: getExternalAiLeadSummary,
   getCrmSummary: getExternalAiCrmSummary,
   getCreatives: getExternalAiCreatives,
+  getFechamentos: listFeedbackLeadsInPeriodSql,
 };
+
+/**
+ * Fechamentos no formato da API: números, notas, motivo e comentário da unidade,
+ * sem nome nem e-mail de quem enviou. Se a mesma semana foi enviada mais de uma
+ * vez, todos os envios vêm, e só o mais recente de cada semana entra nos totais.
+ */
+export function fechamentosPayload(rows: SqlFeedbackLead[]) {
+  const seenWeeks = new Set<string>();
+  const items = rows.map((row) => {
+    const week = `${row.weekStart}/${row.weekEnd}`;
+    const isLatestForWeek = !seenWeeks.has(week);
+    seenWeeks.add(week);
+    const comment = [row.observations, row.agencyAdjustment].map((text) => text.trim()).filter(Boolean).join("\n\n");
+    return {
+      weekStart: row.weekStart,
+      weekEnd: row.weekEnd,
+      submittedAt: row.submittedAt,
+      isLatestForWeek,
+      leadsReceived: row.totalLeads,
+      leadsClosed: row.leadsConverted,
+      leadsInNegotiation: row.leadsInNegotiation,
+      leadsLost: row.leadsLost,
+      conversionRate: row.totalLeads > 0 ? Number((row.leadsConverted / row.totalLeads).toFixed(4)) : null,
+      lossReason: row.lossReason || null,
+      leadQuality: row.leadQuality || null,
+      agencySatisfaction: row.agencySatisfaction || null,
+      comment: comment || null,
+    };
+  });
+  const latest = items.filter((item) => item.isLatestForWeek);
+  const sum = (pick: (item: (typeof items)[number]) => number) => latest.reduce((total, item) => total + pick(item), 0);
+  const received = sum((item) => item.leadsReceived);
+  const closed = sum((item) => item.leadsClosed);
+  return {
+    totals: {
+      weeksReported: latest.length,
+      leadsReceived: received,
+      leadsClosed: closed,
+      leadsInNegotiation: sum((item) => item.leadsInNegotiation),
+      leadsLost: sum((item) => item.leadsLost),
+      conversionRate: received > 0 ? Number((closed / received).toFixed(4)) : null,
+    },
+    fechamentos: items,
+  };
+}
 
 const unitIdSchema = z.string().trim().describe("ID da unidade, obtido com list_units");
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -171,6 +220,29 @@ export function createExternalAiMcpServer(
         guard(unit_id, async () => {
           const unit = await data.getUnit(unit_id);
           return json(envelope({ dataClassification: "aggregated", unit, leads: await data.getLeadSummary(unit.name) }));
+        }),
+    );
+  }
+
+  if (can("leads:summary:read")) {
+    server.registerTool(
+      "get_fechamentos",
+      {
+        title: "Fechamentos semanais",
+        description:
+          "Fechamentos que a própria unidade envia toda semana na aba Fechamentos do painel: leads recebidos, fechados, em negociação e perdidos, motivo principal das perdas, nota da qualidade dos leads (1 a 5), satisfação com a Tráfego Pro (1 a 5, null se pulou) e comentário. " +
+          "As semanas seguem a regra do mês (sábado a sexta, com as pontas do mês cortadas), então weekStart/weekEnd podem ter menos de 7 dias. " +
+          "Traz as semanas que tocam o período, da mais recente para a mais antiga; lista vazia significa que a unidade não enviou. Os totais contam só o envio mais recente de cada semana.",
+        inputSchema: periodShape,
+        annotations: { readOnlyHint: true },
+      },
+      async ({ unit_id, start, end }) =>
+        guard(unit_id, async () => {
+          const range = period(start, end);
+          if (!range.ok) return toolError(range.error);
+          const unit = await data.getUnit(unit_id);
+          const rows = await data.getFechamentos(unit.name, range.start, range.end);
+          return json(envelope({ dataClassification: "unit_reported", unit, period: { start: range.start, end: range.end }, ...fechamentosPayload(rows) }));
         }),
     );
   }

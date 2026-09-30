@@ -144,6 +144,14 @@ export async function listFeedbackLeadsSql(filters: { unit?: string; weekStart?:
   return (rows as FeedbackRow[]).map(mapRow);
 }
 
+/** Fechamentos da unidade cujas semanas tocam o período [start, end], da semana mais recente para a mais antiga. */
+export async function listFeedbackLeadsInPeriodSql(unit: string, start: string, end: string): Promise<SqlFeedbackLead[]> {
+  const rows = unwrap(await getSiteSupabase().from("feedback_leads").select(SELECT_COLUMNS).eq("unit", unit)
+    .lte("week_start", end).gte("week_end", start)
+    .order("week_start", { ascending: false }).order("submitted_at", { ascending: false }).limit(200));
+  return (rows as FeedbackRow[]).map(mapRow);
+}
+
 /** Último feedback enviado pela unidade (pela data de envio), ou null. */
 export async function getLastFeedbackLeadSql(unit: string): Promise<SqlFeedbackLead | null> {
   const rows = unwrap(await getSiteSupabase().from("feedback_leads").select(SELECT_COLUMNS).eq("unit", unit)

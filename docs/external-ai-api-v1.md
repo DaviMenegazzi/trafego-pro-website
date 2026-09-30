@@ -11,3 +11,29 @@ Todos os endpoints requerem `Authorization: Bearer <token>` e respeitam as unida
 | `/api/external/v1/targets` | `targets:read` | Preparado para configuração de metas |
 
 Campos sem origem integrada retornam `null`, coleções vazias ou `sourceStatus: "pending_provider_integration"`. A API não estima receitas, metas, estágios ou métricas de mídia ausentes.
+
+## Servidor MCP
+
+`POST /api/mcp` expõe os mesmos dados como servidor MCP (transporte Streamable HTTP, sem sessão, somente leitura). Usa o mesmo token `tpai_live_...` no header `Authorization: Bearer`, com o mesmo rate limit (60 chamadas por minuto, contando cada requisição MCP) e a mesma auditoria. `GET` e `DELETE` em `/api/mcp` retornam 405.
+
+As ferramentas listadas dependem dos escopos do token:
+
+| Ferramenta | Escopo | Parâmetros |
+|---|---|---|
+| `list_units` | qualquer | nenhum |
+| `get_metrics` | `metrics:read` | `unit_id`, `start` e `end` opcionais (YYYY-MM-DD, padrão últimos 30 dias) |
+| `get_ads_metrics` | `ads:metrics:read` | `unit_id`, `start` e `end` opcionais |
+| `get_creatives` | `creatives:read` | `unit_id` |
+| `get_leads_summary` | `leads:summary:read` | `unit_id` |
+| `get_crm_summary` | `crm:summary:read` | `unit_id` |
+
+Unidade fora do token ou período inválido retornam resultado com `isError: true`, sem consultar a fonte de dados.
+
+Para conectar no Claude Code:
+
+```bash
+claude mcp add --transport http trafego-pro https://<dominio>/api/mcp \
+  --header "Authorization: Bearer tpai_live_..."
+```
+
+Conectores personalizados do claude.ai exigem OAuth e ainda não são suportados por este endpoint.

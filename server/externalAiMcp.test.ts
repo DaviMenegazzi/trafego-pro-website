@@ -15,6 +15,7 @@ function fakeData(): ExternalAiMcpData {
     getLeadSummary: vi.fn(async () => ({ totalLeads: 3 })) as any,
     getCrmSummary: vi.fn(async () => ({ totalLeads: 3, stages: {} })) as any,
     getCreatives: vi.fn(async () => ({ creatives: [], sourceStatus: "meta" })) as any,
+    getFechamentos: vi.fn(async () => []) as any,
   };
 }
 
@@ -48,6 +49,29 @@ describe("servidor MCP da API externa", () => {
     expect(result.isError).toBeFalsy();
     expect(data.getMetrics).toHaveBeenCalledWith(UNIT, "2026-09-01", "2026-09-15");
     expect(text(result)).toMatchObject({ apiVersion: "v1", unit: { id: UNIT }, metrics: { totals: { spend: 100 } } });
+  });
+
+  it("entrega os fechamentos da unidade com o escopo de resumo de leads, sem quem enviou", async () => {
+    const data = fakeData();
+    const row = (weekStart: string, weekEnd: string, submittedAt: string, received: number, closed: number) => ({
+      id: 1, unit: "Unidade", responsible: "Fulano", weekStart, weekEnd, totalLeads: received, leadsContacted: 0, leadsResponded: 0,
+      leadsConverted: closed, leadsLost: 2, leadsInNegotiation: 1, lossReason: "Preço", leadQuality: 4, observations: "Semana boa",
+      agencySatisfaction: 0, communicationClarity: "", agencyAdjustment: "", submittedAt, submittedByUserId: "9", submittedByEmail: "fulano@x.com", createdAt: submittedAt,
+    });
+    data.getFechamentos = vi.fn(async () => [
+      row("2026-09-26", "2026-09-30", "2026-09-30T18:00:00.000Z", 20, 5),
+      row("2026-09-26", "2026-09-30", "2026-09-30T12:00:00.000Z", 10, 1),
+      row("2026-09-19", "2026-09-25", "2026-09-25T18:00:00.000Z", 30, 3),
+    ]) as any;
+    const { client } = await connect({ id: "t1", scopes: ["leads:summary:read"], unitIds: [UNIT] }, data);
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toContain("get_fechamentos");
+    const result = await client.callTool({ name: "get_fechamentos", arguments: { unit_id: UNIT, start: "2026-09-19", end: "2026-09-30" } });
+    expect(data.getFechamentos).toHaveBeenCalledWith("Unidade", "2026-09-19", "2026-09-30");
+    const body = text(result);
+    expect(body.totals).toEqual({ weeksReported: 2, leadsReceived: 50, leadsClosed: 8, leadsInNegotiation: 2, leadsLost: 4, conversionRate: 0.16 });
+    expect(body.fechamentos[0]).toMatchObject({ isLatestForWeek: true, leadsClosed: 5, agencySatisfaction: null, comment: "Semana boa", lossReason: "Preço" });
+    expect(body.fechamentos[1].isLatestForWeek).toBe(false);
+    expect(JSON.stringify(body)).not.toMatch(/Fulano|fulano@x\.com/);
   });
 
   it("recusa unidade fora do token sem consultar dados", async () => {

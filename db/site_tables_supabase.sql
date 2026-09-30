@@ -29,6 +29,9 @@ create table if not exists public.feedback_leads (
   submitted_by_email text not null default '',
   created_at timestamptz not null default now()
 );
+-- Fechamentos: se o número de recebidos veio da sugestão da Dashboard ou foi digitado.
+alter table public.feedback_leads add column if not exists total_leads_source text check (total_leads_source in ('dashboard', 'manual'));
+alter table public.feedback_leads add column if not exists total_leads_suggested integer check (total_leads_suggested >= 0);
 create index if not exists idx_feedback_leads_unit_week on public.feedback_leads (unit, week_start desc);
 
 create table if not exists public.form_api_keys (

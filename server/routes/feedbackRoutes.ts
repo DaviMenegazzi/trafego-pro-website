@@ -54,6 +54,8 @@ feedbackRouter.get("/feedback-leads/export", requireAuth, requireAdmin, async (_
       "Semana início": item.weekStart,
       "Semana fim": item.weekEnd,
       "Leads recebidos": item.totalLeads,
+      "Origem dos recebidos": item.totalLeadsSource === "dashboard" ? "Dashboard" : item.totalLeadsSource === "manual" ? "Manual" : "",
+      "Sugestão da Dashboard": item.totalLeadsSuggested ?? "",
       "Leads contatados": item.leadsContacted,
       "Leads respondidos": item.leadsResponded,
       "Leads convertidos": item.leadsConverted,
@@ -132,6 +134,22 @@ feedbackRouter.post("/feedback-leads", requireAuth, async (req, res) => {
     return;
   }
 
+  // Recebidos: veio da sugestão da Dashboard ou foi digitado? Opcional para não quebrar envios antigos.
+  const totalLeadsSource = body.totalLeadsSource === undefined || body.totalLeadsSource === null || body.totalLeadsSource === "" ? null : body.totalLeadsSource;
+  if (totalLeadsSource !== null && totalLeadsSource !== "dashboard" && totalLeadsSource !== "manual") {
+    res.status(400).json({ error: "Origem dos leads recebidos inválida" });
+    return;
+  }
+  const totalLeadsSuggested = body.totalLeadsSuggested === undefined || body.totalLeadsSuggested === null || body.totalLeadsSuggested === "" ? null : Number(body.totalLeadsSuggested);
+  if (totalLeadsSuggested !== null && (!Number.isInteger(totalLeadsSuggested) || totalLeadsSuggested < 0)) {
+    res.status(400).json({ error: "Sugestão de leads recebidos inválida" });
+    return;
+  }
+  if (totalLeadsSource === "dashboard" && totalLeadsSuggested !== counts.totalLeads) {
+    res.status(400).json({ error: "Leads recebidos diferem do valor sugerido pela Dashboard" });
+    return;
+  }
+
   const lossReason = typeof body.lossReason === "string" ? body.lossReason : "";
   const communicationClarity = typeof body.communicationClarity === "string" ? body.communicationClarity : "";
   const leadQuality = Number(body.leadQuality);
@@ -170,6 +188,8 @@ feedbackRouter.post("/feedback-leads", requireAuth, async (req, res) => {
       weekStart,
       weekEnd,
       totalLeads: counts.totalLeads,
+      totalLeadsSource,
+      totalLeadsSuggested,
       leadsContacted: counts.leadsContacted,
       leadsResponded: counts.leadsResponded,
       leadsConverted: counts.leadsConverted,

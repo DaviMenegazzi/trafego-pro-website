@@ -17,6 +17,7 @@ import {
   validateFeedbackCounts,
 } from "./feedbackLeadsConfig";
 import { submitFeedbackLead } from "./feedbackLeadsApi";
+import { buildClientMetricsQuery } from "@/lib/clientMetricsRequest";
 
 export { FALLBACK_UNITS, LOSS_REASONS } from "./feedbackLeadsConfig";
 
@@ -155,7 +156,7 @@ function RatingChoice({ value, onPick, low, high }: { value: string; onPick: (v:
 
 export default function DashboardFeedbackLeads() {
   const { user, loading: authLoading } = useAdminAuth();
-  const { selectedClient, loading: clientsLoading } = useClientContext();
+  const { selectedClient, selectedClientId, loading: clientsLoading } = useClientContext();
   const [, setLocation] = useLocation();
   const currentWeek = useMemo(() => feedbackWeekFor(new Date()), []);
   const lastWeek = useMemo(() => previousFeedbackWeek(currentWeek), [currentWeek]);
@@ -189,6 +190,35 @@ export default function DashboardFeedbackLeads() {
     return () => { active = false; };
   }, [unitName, sent]);
 
+  const customDay = isoToDate(formData.customDate);
+  const week = formData.weekChoice === "previous" ? lastWeek : formData.weekChoice === "custom" && customDay ? feedbackWeekFor(customDay) : currentWeek;
+
+  // Sugestão de recebidos: o que a Dashboard mostra para a unidade na semana escolhida
+  // (conversas iniciadas + leads Meta). Null enquanto carrega ou se não houver dados.
+  const [suggestion, setSuggestion] = useState<LeadsSuggestion | null>(null);
+  useEffect(() => {
+    setSuggestion(null);
+    const token = getToken();
+    if (!selectedClientId || !token) return;
+    let active = true;
+    fetchLeadsSuggestion(selectedClientId, week.start, week.end, token)
+      .then((result) => { if (active) setSuggestion(result); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [selectedClientId, week.start, week.end]);
+
+  // Preenche os recebidos com a sugestão ao chegar na pergunta, uma vez por semana/valor:
+  // se a pessoa apagar para digitar, não volta a preencher.
+  const autoFilled = useRef<{ key: string; value: string } | null>(null);
+  useEffect(() => {
+    if (stepId !== "totalLeads" || !suggestion) return;
+    const key = `${week.start}:${suggestion.total}`;
+    if (autoFilled.current?.key === key) return;
+    const value = String(suggestion.total);
+    setFormData((previous) => (previous.totalLeads === "" || previous.totalLeads === autoFilled.current?.value ? { ...previous, totalLeads: value } : previous));
+    autoFilled.current = { key, value };
+  }, [stepId, suggestion, week.start]);
+
   if (authLoading || !user) return <FeedbackLoading />;
 
   const hasLosses = Number(formData.leadsLost) > 0;
@@ -198,8 +228,6 @@ export default function DashboardFeedbackLeads() {
   const questionCount = steps.length - 1;
   // A unidade é sempre a que está aberta no painel.
   const unit = unitName;
-  const customDay = isoToDate(formData.customDate);
-  const week = formData.weekChoice === "previous" ? lastWeek : formData.weekChoice === "custom" && customDay ? feedbackWeekFor(customDay) : currentWeek;
   const total = Number(formData.totalLeads) || 0;
   const exit = () => setLocation("/dashboard");
 
@@ -278,6 +306,9 @@ export default function DashboardFeedbackLeads() {
     goTo(target, -1);
   };
 
+  // Recebidos vindos da Dashboard só quando o número enviado é exatamente o sugerido.
+  const usedSuggestion = suggestion !== null && formData.totalLeads === String(suggestion.total);
+
   const reviewError = Object.values(validateFeedbackCounts(formData))[0] ?? (hasLosses && !formData.lossReason ? "Falta o motivo das perdas." : "");
 
   const submit = async () => {
@@ -293,6 +324,8 @@ export default function DashboardFeedbackLeads() {
         weekStart: week.start,
         weekEnd: week.end,
         totalLeads: formData.totalLeads,
+        totalLeadsSource: usedSuggestion ? "dashboard" : "manual",
+        totalLeadsSuggested: suggestion?.total ?? null,
         leadsConverted: formData.leadsConverted,
         leadsInNegotiation: formData.leadsInNegotiation,
         leadsLost: formData.leadsLost,
@@ -310,6 +343,7 @@ export default function DashboardFeedbackLeads() {
 
   const startOver = () => {
     setFormData(emptyForm);
+    autoFilled.current = null;
     setSent(false);
     setEditingFromReview(false);
     goTo("week", 1);
@@ -318,7 +352,11 @@ export default function DashboardFeedbackLeads() {
   const reviewRows: { label: string; value: string; step?: StepId; muted?: boolean }[] = [
     { label: "Unidade", value: unit },
     { label: "Semana", value: week.label, step: "week" },
-    ...(Object.keys(COUNT_QUESTIONS) as CountKey[]).map((k) => ({ label: COUNT_QUESTIONS[k].review, value: formData[k] || "0", step: k })),
+    ...(Object.keys(COUNT_QUESTIONS) as CountKey[]).map((k) => ({
+      label: COUNT_QUESTIONS[k].review,
+      value: k === "totalLeads" && suggestion ? `${formData[k] || "0"} · ${usedSuggestion ? "da Dashboard" : "manual"}` : formData[k] || "0",
+      step: k,
+    })),
     ...(hasLosses ? [{ label: "Motivo das perdas", value: formData.lossReason || "—", step: "lossReason" as StepId }] : []),
     { label: "Qualidade dos leads", value: `${formData.leadQuality}/5`, step: "leadQuality" },
     { label: "Satisfação", value: formData.agencySatisfaction ? `${formData.agencySatisfaction}/5` : "Pulado", step: "agencySatisfaction", muted: !formData.agencySatisfaction },
@@ -349,6 +387,20 @@ export default function DashboardFeedbackLeads() {
       const key = stepId as CountKey;
       const q = COUNT_QUESTIONS[key];
       const hint = key === "totalLeads" ? q.hint : `${q.hint} Restam ${remaining(key)} dos ${total} recebidos.`;
+      const suggestionNote = key === "totalLeads" && suggestion ? (
+        <p className="mt-3 text-center text-xs text-zinc-500" aria-live="polite">
+          {usedSuggestion ? (
+            <>Valor da Dashboard: {describeSuggestion(suggestion)}. Ajuste se for diferente.</>
+          ) : (
+            <>
+              A Dashboard mostra {suggestion.total} na semana.{" "}
+              <button type="button" onClick={() => set("totalLeads", String(suggestion.total))} className="rounded font-medium text-emerald-300 outline-none hover:text-emerald-200 focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+                Usar esse valor
+              </button>
+            </>
+          )}
+        </p>
+      ) : null;
       return (
         <>
           <StepTitle title={q.title} hint={hint} />
@@ -367,6 +419,7 @@ export default function DashboardFeedbackLeads() {
             aria-invalid={Boolean(stepError)}
             className="block w-full border-0 border-b-2 border-white/10 bg-transparent pb-2 text-center font-display text-5xl font-semibold tabular-nums text-white caret-emerald-400 outline-none transition-colors duration-150 placeholder:text-zinc-700 focus:border-emerald-400 aria-[invalid=true]:border-rose-400"
           />
+          {suggestionNote}
         </>
       );
     }
@@ -504,6 +557,27 @@ export default function DashboardFeedbackLeads() {
   );
 
   return <AppLayout>{content}</AppLayout>;
+}
+
+type LeadsSuggestion = { total: number; conversations: number; metaLeads: number };
+
+/** Soma, no período, o que a Dashboard mostra como entrada de leads: conversas iniciadas + leads Meta. */
+async function fetchLeadsSuggestion(clientId: string, start: string, end: string, token: string): Promise<LeadsSuggestion | null> {
+  const qs = buildClientMetricsQuery(start, end, clientId);
+  if (!qs) return null;
+  const response = await fetch(`/api/metrics/daily?${qs}`, { headers: { Authorization: `Bearer ${token}` }, credentials: "same-origin" });
+  if (!response.ok) return null;
+  const data = (await response.json()) as { configured?: boolean; rows?: Record<string, unknown>[] };
+  if (data.configured === false || !Array.isArray(data.rows) || data.rows.length === 0) return null;
+  const sum = (key: string) => data.rows!.reduce((total, row) => total + (Number(row[key]) || 0), 0);
+  const conversations = Math.round(sum("total_conversas_iniciadas"));
+  const metaLeads = Math.round(sum("total_leads_meta"));
+  return { total: conversations + metaLeads, conversations, metaLeads };
+}
+
+function describeSuggestion(s: LeadsSuggestion) {
+  const conv = `${s.conversations} ${s.conversations === 1 ? "conversa iniciada" : "conversas iniciadas"}`;
+  return s.metaLeads > 0 ? `${conv} + ${s.metaLeads} ${s.metaLeads === 1 ? "lead Meta" : "leads Meta"}` : conv;
 }
 
 /** "19 a 25/09" a partir de datas AAAA-MM-DD. */

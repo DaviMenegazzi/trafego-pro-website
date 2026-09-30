@@ -6,6 +6,10 @@ export type SqlFeedbackLeadInput = {
   weekStart: string;
   weekEnd: string;
   totalLeads: number;
+  /** De onde veio o número de recebidos: sugestão da Dashboard aceita ou digitado. Null nos envios antigos. */
+  totalLeadsSource: "dashboard" | "manual" | null;
+  /** O número que a Dashboard sugeriu para a semana (null quando não havia sugestão). */
+  totalLeadsSuggested: number | null;
   leadsContacted: number;
   leadsResponded: number;
   leadsConverted: number;
@@ -60,6 +64,8 @@ type FeedbackRow = {
   week_start: string;
   week_end: string;
   total_leads: number;
+  total_leads_source: string | null;
+  total_leads_suggested: number | null;
   leads_contacted: number;
   leads_responded: number;
   leads_converted: number;
@@ -96,6 +102,8 @@ function mapRow(row: FeedbackRow): SqlFeedbackLead {
     weekStart: toDateOnly(row.week_start),
     weekEnd: toDateOnly(row.week_end),
     totalLeads: Number(row.total_leads),
+    totalLeadsSource: row.total_leads_source === "dashboard" || row.total_leads_source === "manual" ? row.total_leads_source : null,
+    totalLeadsSuggested: row.total_leads_suggested == null ? null : Number(row.total_leads_suggested),
     leadsContacted: Number(row.leads_contacted),
     leadsResponded: Number(row.leads_responded),
     leadsConverted: Number(row.leads_converted),
@@ -115,12 +123,12 @@ function mapRow(row: FeedbackRow): SqlFeedbackLead {
 }
 
 const SELECT_COLUMNS =
-  "id, unit, responsible, week_start, week_end, total_leads, leads_contacted, leads_responded, leads_converted, leads_lost, leads_in_negotiation, loss_reason, lead_quality, observations, agency_satisfaction, communication_clarity, agency_adjustment, submitted_at, submitted_by_user_id, submitted_by_email, created_at";
+  "id, unit, responsible, week_start, week_end, total_leads, total_leads_source, total_leads_suggested, leads_contacted, leads_responded, leads_converted, leads_lost, leads_in_negotiation, loss_reason, lead_quality, observations, agency_satisfaction, communication_clarity, agency_adjustment, submitted_at, submitted_by_user_id, submitted_by_email, created_at";
 
 export async function createFeedbackLeadSql(input: SqlFeedbackLeadInput): Promise<SqlFeedbackLead> {
   const row = unwrap(await getSiteSupabase().from("feedback_leads").insert({
     unit: input.unit, responsible: input.responsible, week_start: input.weekStart, week_end: input.weekEnd,
-    total_leads: input.totalLeads, leads_contacted: input.leadsContacted, leads_responded: input.leadsResponded,
+    total_leads: input.totalLeads, total_leads_source: input.totalLeadsSource, total_leads_suggested: input.totalLeadsSuggested, leads_contacted: input.leadsContacted, leads_responded: input.leadsResponded,
     leads_converted: input.leadsConverted, leads_lost: input.leadsLost, leads_in_negotiation: input.leadsInNegotiation,
     main_reason: input.lossReason, loss_reason: input.lossReason, lead_quality: input.leadQuality, creative_feedback: "",
     general_observations: input.observations, observations: input.observations, agency_satisfaction: input.agencySatisfaction,

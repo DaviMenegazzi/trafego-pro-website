@@ -277,6 +277,14 @@
   }
 }
 
+/* Rolagem sem barra visível (ex.: quadro do CRM, que rola arrastando). */
+.dashboard-dark .scrollbar-none {
+  scrollbar-width: none;
+}
+.dashboard-dark .scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Ambient background animation */
 @keyframes ambientPulse {
   0%, 100% {

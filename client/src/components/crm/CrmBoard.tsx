@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -10,10 +10,77 @@ import {
 } from "@dnd-kit/core";
 import { SegmentedControl } from "@/components/ds";
 import { useIsMobile } from "@/hooks/useMobile";
+import { cn } from "@/lib/utils";
 import { findCrmLead } from "@/lib/crmBoardState";
 import { CRM_STAGE_LABELS, CRM_STAGES, resolveCrmDrop, type CrmBoard as CrmBoardData, type CrmLead, type CrmStage } from "../../../../shared/crm";
 import { CrmColumnView } from "./CrmColumn";
 import { CrmCardSummary } from "./CrmLeadCard";
+
+// Onde o clique é do cartão ou de um controle, não do quadro: ali não começa a rolagem por arraste.
+const INTERACTIVE = "button, a, input, select, textarea, [role=button], [role=menuitem], [role=dialog]";
+
+/**
+ * Rolagem horizontal arrastando o fundo do quadro, sem barra visível. As bordas esmaecem
+ * quando ainda há colunas escondidas daquele lado.
+ */
+function useDragScroll() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const drag = useRef<{ pointerId: number; startX: number; startScroll: number } | null>(null);
+  const [panning, setPanning] = useState(false);
+  const [edges, setEdges] = useState({ left: false, right: false });
+
+  const updateEdges = useCallback(() => {
+    const node = ref.current;
+    if (!node) return;
+    const left = node.scrollLeft > 1;
+    const right = node.scrollLeft + node.clientWidth < node.scrollWidth - 1;
+    setEdges((current) => (current.left === left && current.right === right ? current : { left, right }));
+  }, []);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    updateEdges();
+    const observer = new ResizeObserver(updateEdges);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [updateEdges]);
+
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || event.pointerType === "touch") return;
+    if ((event.target as HTMLElement).closest(INTERACTIVE)) return;
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startScroll: event.currentTarget.scrollLeft };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setPanning(true);
+  };
+  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const current = drag.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    event.currentTarget.scrollLeft = current.startScroll - (event.clientX - current.startX);
+  };
+  const stop = (event: PointerEvent<HTMLDivElement>) => {
+    if (drag.current?.pointerId !== event.pointerId) return;
+    drag.current = null;
+    setPanning(false);
+  };
+
+  const mask = edges.left || edges.right
+    ? `linear-gradient(to right, ${edges.left ? "transparent, #000 48px" : "#000"}, ${edges.right ? "#000 calc(100% - 48px), transparent" : "#000"})`
+    : undefined;
+
+  return {
+    panning,
+    props: {
+      ref,
+      onScroll: updateEdges,
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: stop,
+      onPointerCancel: stop,
+      style: mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined,
+    },
+  };
+}
 
 type BoardProps = {
   board: CrmBoardData;
@@ -35,6 +102,7 @@ export function CrmBoard({ board, savingIds, loadingMore, onOpen, onMove, onResu
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   );
+  const dragScroll = useDragScroll();
   const activeLead = useMemo(() => (activeId ? findCrmLead(board, activeId) : null), [activeId, board]);
   const allLeads = useMemo(() => CRM_STAGES.flatMap((stage) => board.columns[stage].items), [board]);
 
@@ -76,7 +144,13 @@ export function CrmBoard({ board, savingIds, loadingMore, onOpen, onMove, onResu
       onDragCancel={() => setActiveId(null)}
       onDragEnd={handleDragEnd}
     >
-      <div className="-mx-4 flex items-start gap-4 overflow-x-auto px-4 pb-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div
+        {...dragScroll.props}
+        className={cn(
+          "scrollbar-none flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto p-4",
+          dragScroll.panning ? "cursor-grabbing select-none" : "cursor-grab",
+        )}
+      >
         {CRM_STAGES.map((stage) => (
           <CrmColumnView
             key={stage}

@@ -62,7 +62,6 @@ const DashboardUsuarios = page(() => import("./pages/DashboardUsuarios"));
 const DashboardExternalAiTokens = page(() => import("./pages/DashboardExternalAiTokens"));
 const DashboardFormularios = page(() => import("./pages/DashboardFormularios"));
 const DashboardPixel = page(() => import("./pages/DashboardPixel"));
-const DashboardCrm = page(() => import("./pages/DashboardCrm"));
 const DashboardGoogle = page(() => import("./pages/DashboardGoogle"));
 const AdminMetricsOverview = page(() => import("./pages/AdminMetricsOverview"));
 const TalentPublicForm = page(() => import("./pages/TalentPublicForm"));
@@ -113,8 +112,9 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/formularios/"} component={DashboardFormularios} />
       <PixelRoute path={"/dashboard/pixel"} component={DashboardPixel} />
       <PixelRoute path={"/dashboard/pixel/"} component={DashboardPixel} />
-      <PixelRoute path={"/dashboard/crm"} component={DashboardCrm} />
-      <PixelRoute path={"/dashboard/crm/"} component={DashboardCrm} />
+      {/* O CRM virou uma aba do Pixel. */}
+      <Route path={"/dashboard/crm"}><Redirect to="/dashboard/pixel?aba=crm" replace /></Route>
+      <Route path={"/dashboard/crm/"}><Redirect to="/dashboard/pixel?aba=crm" replace /></Route>
       <AdminRoute path={"/admin/metricas"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/metricas/"} component={AdminMetricsOverview} />
       <AdminRoute path={"/admin/financeiro"} component={AdminFinanceiro} />

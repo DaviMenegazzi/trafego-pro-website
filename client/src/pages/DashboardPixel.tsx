@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useLocation, useSearch } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import {
   Avatar,
@@ -7,6 +8,7 @@ import {
   Dialog,
   EmptyState,
   Field,
+  FolderTabs,
   IconButton,
   InlineNotice,
   Input,
@@ -20,10 +22,13 @@ import {
   Tooltip,
   toast,
 } from "@/components/ds";
+import { CrmPanel } from "@/components/crm/CrmPanel";
 import { CrmTemperature, relativeTime } from "@/components/crm/crmUi";
 import { useClientContext } from "@/contexts/ClientContext";
 import { getToken, useAdminAuth } from "@/hooks/useAdminAuth";
+import { useScrollFade } from "@/hooks/useScrollFade";
 import { formatPhone } from "@/lib/format";
+import { useNavNewBadge } from "@/lib/navNewBadge";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -38,6 +43,7 @@ import {
   RefreshCw,
   ScanLine,
   Smartphone,
+  SquareKanban,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -217,10 +223,24 @@ function shortTimeLabel(value: string | null): string {
   return new Intl.DateTimeFormat("pt-BR", sameDay ? { timeStyle: "short" } : { day: "2-digit", month: "2-digit" }).format(date);
 }
 
+type PixelTab = "conversas" | "crm";
+
 export default function DashboardPixel() {
   const { user: adminUser, loading: authLoading } = useAdminAuth();
   const canSimulate = import.meta.env.DEV && adminUser?.role === "admin";
   const { selectedClient, selectedClientId, loading: clientsLoading } = useClientContext();
+  const [, setLocation] = useLocation();
+  const searchParams = new URLSearchParams(useSearch());
+  const tab: PixelTab = searchParams.get("aba") === "crm" ? "crm" : "conversas";
+  // ?lead=<id> vem do botão "Ver conversa completa" do CRM: abre Conversas já nesse lead.
+  const leadParam = searchParams.get("lead");
+  const leadListRef = useRef<HTMLDivElement | null>(null);
+  // Listas sem barra de rolagem, com esmaecimento nas pontas (mesmo padrão do CRM).
+  const leadListFade = useScrollFade();
+  const messagesFade = useScrollFade();
+  const rankingFade = useScrollFade();
+  const setLeadListNode = useCallback((node: HTMLDivElement | null) => { leadListRef.current = node; leadListFade.ref(node); }, [leadListFade.ref]);
+  const { isNew: crmIsNew } = useNavNewBadge("crm", tab === "crm");
   const [overview, setOverview] = useState<PixelOverview>(emptyOverview);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -236,6 +256,7 @@ export default function DashboardPixel() {
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const setMessagesNode = useCallback((node: HTMLDivElement | null) => { messagesContainerRef.current = node; messagesFade.ref(node); }, [messagesFade.ref]);
   const MESSAGES_PAGE_SIZE = 20;
   const [attribution, setAttribution] = useState<PixelAttribution | null>(null);
   const [attributionLoading, setAttributionLoading] = useState(false);
@@ -275,6 +296,28 @@ export default function DashboardPixel() {
     () => filteredLeads.find((lead) => lead.id === selectedLeadId) ?? filteredLeads[0] ?? null,
     [filteredLeads, selectedLeadId],
   );
+
+  // Vindo do CRM: seleciona o lead (limpando filtros que o escondam) e tira o ?lead da URL.
+  const scrollToLeadRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!leadParam || loading) return;
+    if (overview.leads.some((lead) => lead.id === leadParam)) {
+      if (!filteredLeads.some((lead) => lead.id === leadParam)) clearFilters();
+      setSelectedLeadId(leadParam);
+      scrollToLeadRef.current = leadParam;
+    } else {
+      toast.info("Essa conversa não aparece na lista do Pixel.");
+    }
+    setLocation("/dashboard/pixel", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadParam, loading, overview.leads]);
+
+  useEffect(() => {
+    const id = scrollToLeadRef.current;
+    if (!id || selectedLead?.id !== id) return;
+    scrollToLeadRef.current = null;
+    leadListRef.current?.querySelector(`[data-lead-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [selectedLead?.id]);
 
   const loadOverview = useCallback(async (background = false) => {
     if (!selectedClientId) {
@@ -525,6 +568,15 @@ export default function DashboardPixel() {
   const dateScope = isTodayFilterActive ? "today" : filterDateFrom || filterDateTo ? "custom" : "all";
   const instanceOptions = overview.instances.map((instance) => ({ value: instance.instanceName, label: instance.displayName || instance.instanceName }));
 
+  function selectTab(next: PixelTab) {
+    // A aba fica na URL para o link /dashboard/pixel?aba=crm abrir direto no CRM.
+    setLocation(next === "crm" ? "/dashboard/pixel?aba=crm" : "/dashboard/pixel", { replace: true });
+  }
+
+  function openConversation(leadId: string) {
+    setLocation(`/dashboard/pixel?lead=${encodeURIComponent(leadId)}`, { replace: true });
+  }
+
   function clearFilters() {
     setFilterInstance("");
     setFilterChannel("");
@@ -567,7 +619,24 @@ export default function DashboardPixel() {
           <>
             {error && <InlineNotice tone="critical" icon={<AlertTriangle />} action={<Button size="sm" variant="ghost" onClick={() => void loadOverview(true)}>Tentar de novo</Button>}>{error}</InlineNotice>}
 
-            <Surface className="overflow-hidden">
+            <div>
+            <FolderTabs
+              aria-label="Seções do Pixel"
+              value={tab}
+              onValueChange={selectTab}
+              tabs={[
+                { value: "conversas", label: "Conversas de leads", icon: <MessageCircleMore />, count: loading ? undefined : overview.summary.visibleLeads },
+                {
+                  value: "crm",
+                  label: "CRM",
+                  icon: <SquareKanban />,
+                  badge: crmIsNew ? <span className="rounded-full bg-emerald-400/10 px-1.5 text-[10px] font-semibold tracking-[0.08em] text-emerald-300">NOVO</span> : undefined,
+                },
+              ]}
+            />
+            <Surface className="flex flex-col overflow-hidden rounded-tl-none lg:h-[680px]">
+              {tab === "crm" ? <CrmPanel onOpenConversations={() => selectTab("conversas")} onOpenConversation={openConversation} /> : (
+              <>
               <SurfaceHeader
                 title="Conversas de leads"
                 description="Entram leads confirmados e contatos com evidência de campanha. Não leads ficam de fora."
@@ -677,9 +746,9 @@ export default function DashboardPixel() {
                 }
               />
 
-              <div className="grid min-h-[520px] lg:grid-cols-[320px_minmax(0,1fr)_280px]">
-                <div className="border-b border-white/[0.06] lg:border-b-0 lg:border-r">
-                  <div className="max-h-[600px] overflow-y-auto p-2">
+              <div className="grid min-h-[520px] lg:min-h-0 lg:flex-1 lg:grid-cols-[320px_minmax(0,1fr)_280px] lg:grid-rows-[minmax(0,1fr)]">
+                <div className="border-b border-white/[0.06] lg:flex lg:min-h-0 lg:flex-col lg:border-b-0 lg:border-r">
+                  <div ref={setLeadListNode} onScroll={leadListFade.onScroll} style={leadListFade.style} className="scrollbar-none max-h-[600px] overflow-y-auto p-2 lg:max-h-none lg:flex-1">
                     {loading ? (
                       <div className="space-y-1 p-1" aria-busy="true" aria-label="Carregando leads">
                         {[0, 1, 2, 3].map((index) => <div key={index} className="h-[72px] animate-pulse rounded-xl bg-white/[0.04]" />)}
@@ -699,6 +768,7 @@ export default function DashboardPixel() {
                           <button
                             key={lead.id}
                             type="button"
+                            data-lead-id={lead.id}
                             onClick={() => setSelectedLeadId(lead.id)}
                             aria-current={selected || undefined}
                             className={cn(
@@ -725,7 +795,7 @@ export default function DashboardPixel() {
                   </div>
                 </div>
 
-                <div className="flex min-h-[520px] min-w-0 flex-col">
+                <div className="flex min-h-[520px] min-w-0 flex-col lg:min-h-0">
                   {selectedLead ? (
                     <>
                       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-3.5">
@@ -771,7 +841,7 @@ export default function DashboardPixel() {
                         </div>
                       )}
 
-                      <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="max-h-[600px] flex-1 space-y-2 overflow-y-auto p-4 sm:p-6">
+                      <div ref={setMessagesNode} onScroll={(event) => { handleMessagesScroll(event); messagesFade.onScroll(); }} style={messagesFade.style} className="scrollbar-none max-h-[600px] min-h-0 flex-1 space-y-2 overflow-y-auto p-4 sm:p-6 lg:max-h-none">
                         {messagesLoading ? (
                           <div className="flex h-full items-center justify-center text-xs text-zinc-500"><Loader2 className="mr-2 size-4 animate-spin" />Carregando conversa…</div>
                         ) : (
@@ -797,12 +867,12 @@ export default function DashboardPixel() {
                   )}
                 </div>
 
-                <aside className="min-w-0 border-t border-white/[0.06] lg:border-l lg:border-t-0">
+                <aside className="min-w-0 border-t border-white/[0.06] lg:flex lg:min-h-0 lg:flex-col lg:border-l lg:border-t-0">
                   <div className="px-4 py-3.5">
                     <h3 className="text-sm font-semibold text-zinc-100">Criativos que mais geraram leads</h3>
                     <p className="mt-0.5 text-xs text-zinc-500">Confirmados no Pixel × conversas da Meta</p>
                   </div>
-                  <div className="max-h-[540px] overflow-y-auto px-2 pb-2">
+                  <div ref={rankingFade.ref} onScroll={rankingFade.onScroll} style={rankingFade.style} className="scrollbar-none max-h-[540px] overflow-y-auto px-2 pb-2 lg:max-h-none lg:min-h-0 lg:flex-1">
                     {overview.creativeRanking.length === 0 ? (
                       <p className="px-2 py-8 text-center text-xs text-zinc-500">Sem dados de criativos ainda.</p>
                     ) : (
@@ -827,7 +897,10 @@ export default function DashboardPixel() {
                   </div>
                 </aside>
               </div>
+              </>
+              )}
             </Surface>
+            </div>
 
             <Surface>
               <SurfaceHeader title="WhatsApps da unidade" description="Cada número fica isolado na unidade selecionada." />

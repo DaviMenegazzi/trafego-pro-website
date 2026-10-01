@@ -61,8 +61,8 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; newBad
 const NAV_BASE: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
-  { to: "/dashboard/pixel", label: "Pixel", icon: ScanLine },
-  { to: "/dashboard/crm", label: "CRM", icon: SquareKanban },
+  { to: "/dashboard/pixel", label: "Pixel", icon: ScanLine, newBadge: "pixel" },
+  { to: "/dashboard/crm", label: "CRM", icon: SquareKanban, newBadge: "crm" },
   { to: "/dashboard/fechamentos", label: "Fechamentos", icon: MessageSquare, newBadge: "fechamentos" },
   { to: "/dashboard/banco-talentos", label: "Banco de Talentos", icon: UsersRound },
 ];

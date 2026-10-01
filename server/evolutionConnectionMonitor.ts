@@ -13,6 +13,8 @@ export type ConnectionMonitorDeps = {
   listInstances: () => Promise<EvolutionInstance[]>;
   notify: (message: NtfyMessage) => Promise<boolean>;
   extraInstances: string[];
+  // true: vigia toda instância que existe na Evolution (inclusive sdr-flow e testes), não só as do painel.
+  watchAll: boolean;
   downAfterMs: number;
   reminderMs: number;
   clickUrl: string | null;
@@ -71,6 +73,9 @@ export function createConnectionMonitor(deps: ConnectionMonitorDeps) {
         await deps.notify({ title: "Evolution API voltou", message: "A Evolution voltou a responder.", priority: 3, tags: ["white_check_mark"] });
       }
       apiDown = null;
+    }
+    if (deps.watchAll) {
+      for (const name of Array.from(states.keys())) if (!labels.has(name)) labels.set(name, name);
     }
 
     for (const name of Array.from(down.keys())) {
@@ -136,6 +141,7 @@ export function startEvolutionConnectionMonitor(): void {
     listInstances: listEvolutionInstancesSupabase,
     notify: sendNtfyNotification,
     extraInstances: (process.env.EVOLUTION_ALERT_EXTRA_INSTANCES ?? "").split(",").map((name) => name.trim()).filter(Boolean),
+    watchAll: process.env.EVOLUTION_ALERT_ALL_INSTANCES?.trim().toLowerCase() === "true",
     downAfterMs: envMinutes("EVOLUTION_ALERT_DOWN_MINUTES", 5) * 60_000,
     reminderMs: envMinutes("EVOLUTION_ALERT_REMINDER_HOURS", 24) * 3_600_000,
     clickUrl: appUrl ? `${appUrl}/pixel` : null,

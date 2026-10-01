@@ -18,6 +18,7 @@ function setup(overrides: Partial<ConnectionMonitorDeps> = {}) {
     listInstances: vi.fn(async () => [instance("pixel-a", "Vida Card Ijuí"), instance("__teste", null)]),
     notify: vi.fn(async (message: NtfyMessage) => { sent.push(message); return true; }),
     extraInstances: [],
+    watchAll: false,
     downAfterMs: 5 * MIN,
     reminderMs: 24 * 60 * MIN,
     clickUrl: "https://www.trafego.pro/pixel",
@@ -83,6 +84,18 @@ describe("monitor de conexão da Evolution", () => {
     await monitor.tick(0);
     await monitor.tick(10 * MIN);
     expect(sent.map((m) => m.title)).toEqual(["WhatsApp desconectado: whatsapp-teste"]);
+  });
+
+  it("com watchAll vigia toda instância da Evolution, mantendo o nome da unidade quando existe", async () => {
+    const { monitor, sent, setState } = setup({ watchAll: true });
+    setState("pixel-a", "close");
+    setState("sdr_8ac450c6_x", "connecting");
+    await monitor.tick(0);
+    await monitor.tick(5 * MIN);
+    expect(sent.map((m) => m.title).sort()).toEqual([
+      "WhatsApp desconectado: Vida Card Ijuí · Atendimento",
+      "WhatsApp desconectado: sdr_8ac450c6_x",
+    ]);
   });
 
   it("alerta quando a própria Evolution para de responder", async () => {

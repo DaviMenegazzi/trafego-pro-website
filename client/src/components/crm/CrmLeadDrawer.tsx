@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
-import { Copy, ExternalLink, Hand, Loader2, Sparkles } from "lucide-react";
+import { Copy, Hand, Loader2, MessageCircleMore, Sparkles } from "lucide-react";
 import { Avatar, Button, EmptyState, IconButton, Select, Sheet, toast } from "@/components/ds";
 import { cn } from "@/lib/utils";
 import {
@@ -24,6 +23,8 @@ type DrawerProps = {
   onMove: (lead: CrmLead, stage: CrmStage) => void;
   onResume: (leadId: string) => void;
   onLeadLoaded: (lead: CrmLead) => void;
+  /** Leva para a aba Conversas do Pixel já com este lead aberto. */
+  onOpenConversation: (leadId: string) => void;
 };
 
 const ORIGIN_LABELS: Record<string, string> = { meta: "Meta Ads", google_ads: "Google Ads", mixed: "Meta e Google", unknown: "Não identificada" };
@@ -53,7 +54,7 @@ function historyTitle(event: CrmHistoryEvent): string {
   return event.fromStage ? `${CRM_STAGE_LABELS[event.fromStage]} → ${CRM_STAGE_LABELS[event.toStage]}` : `Entrou em ${CRM_STAGE_LABELS[event.toStage]}`;
 }
 
-export function CrmLeadDrawer({ unitId, leadId, boardLead, saving, onClose, onMove, onResume, onLeadLoaded }: DrawerProps) {
+export function CrmLeadDrawer({ unitId, leadId, boardLead, saving, onClose, onMove, onResume, onLeadLoaded, onOpenConversation }: DrawerProps) {
   const [detail, setDetail] = useState<CrmLead | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [messages, setMessages] = useState<CrmMessage[] | null>(null);
@@ -211,12 +212,7 @@ export function CrmLeadDrawer({ unitId, leadId, boardLead, saving, onClose, onMo
           )}
 
           <section className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <h3 className="text-xs font-medium text-zinc-500">Conversa</h3>
-              <Link href="/dashboard/pixel" className="inline-flex items-center gap-1 text-xs text-zinc-400 transition-colors hover:text-zinc-100">
-                Abrir no Pixel <ExternalLink className="size-3" />
-              </Link>
-            </div>
+            <h3 className="px-1 text-xs font-medium text-zinc-500">Conversa</h3>
             {messages === null ? (
               <p className="px-1 text-sm text-zinc-500">Carregando…</p>
             ) : messages.length === 0 ? (
@@ -237,6 +233,9 @@ export function CrmLeadDrawer({ unitId, leadId, boardLead, saving, onClose, onMo
                 ))}
               </div>
             )}
+            <Button variant="secondary" className="w-full" onClick={() => onOpenConversation(lead.id)}>
+              <MessageCircleMore />Ver conversa completa
+            </Button>
           </section>
 
           <section className="space-y-2">

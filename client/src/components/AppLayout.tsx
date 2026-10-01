@@ -21,7 +21,6 @@ import {
   Check,
   Search,
   ScanLine,
-  SquareKanban,
   Globe,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
@@ -64,12 +63,11 @@ const NAV_BASE: NavItem[] = [
   { to: "/dashboard/google", label: "Google Analytics", icon: Globe, newBadge: "google-analytics" },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
   { to: "/dashboard/pixel", label: "Pixel", icon: ScanLine, newBadge: "pixel" },
-  { to: "/dashboard/crm", label: "CRM", icon: SquareKanban, newBadge: "crm" },
   { to: "/dashboard/fechamentos", label: "Fechamentos", icon: MessageSquare, newBadge: "fechamentos" },
   { to: "/dashboard/banco-talentos", label: "Banco de Talentos", icon: UsersRound },
 ];
 
-const PIXEL_NAV_ITEMS = new Set(["/dashboard/pixel", "/dashboard/crm"]);
+const PIXEL_NAV_ITEMS = new Set(["/dashboard/pixel"]);
 
 const NAV_ADMIN_ONLY: NavItem[] = [
   { to: "/admin/metricas", label: "Métricas da Rede", icon: BarChart3 },
@@ -443,7 +441,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const visibleNavBase = useMemo(
     () => {
-      // CRM segue a mesma permissão do Pixel.
+      // Pixel (com a aba CRM) só aparece para quem tem a permissão.
       const base = NAV_BASE.filter((item) => !PIXEL_NAV_ITEMS.has(item.to) || pixelAllowed);
       return admin || clientFormsVisible ? [...base, FORMS_ITEM] : base;
     },

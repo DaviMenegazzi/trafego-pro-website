@@ -12,4 +12,4 @@ export { DatePicker, DateRangePicker, isoToDate, dateToIso, type IsoRange } from
 export { PageHeader, Page, Surface, SurfaceHeader, StatTile, StatusBadge, EmptyState, InlineNotice, IconChip, Sparkline, DeltaPill, Meter, Avatar, ACCENTS, type Accent, type Delta, type BadgeTone } from "./layout";
 export { toast, toastWithUndo } from "./toast";
 export { CurrencyInput } from "./currency-input";
-export { TabBar } from "./tabs";
+export { TabBar, FolderTabs } from "./tabs";

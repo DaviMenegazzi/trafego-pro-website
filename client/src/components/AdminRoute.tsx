@@ -39,7 +39,7 @@ function AccessDeniedRedirect({ setLocation }: { setLocation: (to: string) => vo
       // ignore
     }
     toast.error("Acesso negado: área restrita a administradores.");
-    setLocation("/dashboard");
+    setLocation("/dashboard/meta");
   }, [setLocation]);
 
   return (

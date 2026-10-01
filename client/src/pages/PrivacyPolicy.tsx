@@ -4,7 +4,7 @@ import { openConsentPreferences } from "@/lib/consent";
 
 // Pedidos de titulares chegam pelo WhatsApp. Quando houver CNPJ e e-mail do
 // encarregado definidos, incluí-los na seção "Quem somos".
-const CONTACT_URL = "https://wa.me/55999940634";
+const CONTACT_URL = "https://wa.me/5555999940634";
 const UPDATED_AT = "25 de setembro de 2026";
 
 export default function PrivacyPolicy() {

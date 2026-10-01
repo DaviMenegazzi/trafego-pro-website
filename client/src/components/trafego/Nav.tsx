@@ -1,5 +1,5 @@
 const WA_URL =
-  "https://wa.me/55999940634?text=Ol%C3%A1!%20Olhei%20o%20site%20da%20Tr%C3%A1fego%20Pro%20e%20queria%20saber%20mais.";
+  "https://wa.me/5555999940634?text=Ol%C3%A1!%20Olhei%20o%20site%20da%20Tr%C3%A1fego%20Pro%20e%20queria%20saber%20mais.";
 
 const LOGO_SRC = "/brand/logo_trafego_pro_white_9daf2f2e.webp";
 

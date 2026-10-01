@@ -25,7 +25,7 @@ export default function Login() {
 
   useEffect(() => {
     const token = localStorage.getItem("tp_token");
-    if (token) navigate("/dashboard");
+    if (token) navigate("/dashboard/meta");
 
     const savedIdentifier = localStorage.getItem("tp_remember_identifier");
     if (savedIdentifier) {
@@ -75,7 +75,7 @@ export default function Login() {
       sessionStorage.removeItem("tp_cached_clients");
       localStorage.removeItem("tp_db");
       markDashboardPostLoginRefresh();
-      navigate("/dashboard");
+      navigate("/dashboard/meta");
     } catch {
       setError("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
     } finally {

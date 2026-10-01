@@ -63,6 +63,7 @@ const DashboardExternalAiTokens = page(() => import("./pages/DashboardExternalAi
 const DashboardFormularios = page(() => import("./pages/DashboardFormularios"));
 const DashboardPixel = page(() => import("./pages/DashboardPixel"));
 const DashboardCrm = page(() => import("./pages/DashboardCrm"));
+const DashboardGoogle = page(() => import("./pages/DashboardGoogle"));
 const AdminMetricsOverview = page(() => import("./pages/AdminMetricsOverview"));
 const TalentPublicForm = page(() => import("./pages/TalentPublicForm"));
 const TalentBankAdmin = page(() => import("./pages/TalentBankAdmin"));
@@ -85,8 +86,11 @@ function ExistingSiteRoutes() {
       {/* Endereços antigos do feedback semanal: a tela agora é Fechamentos. */}
       <Route path={"/feedback-leads"}><Redirect to="/dashboard/fechamentos" replace /></Route>
       <Route path={"/feedback-leads/"}><Redirect to="/dashboard/fechamentos" replace /></Route>
-      <Route path={"/dashboard"} component={Dashboard} />
-      <Route path={"/dashboard/"} component={Dashboard} />
+      {/* A tela principal virou Meta Ads; /dashboard continua valendo para links e favoritos antigos. */}
+      <Route path={"/dashboard"}><Redirect to="/dashboard/meta" replace /></Route>
+      <Route path={"/dashboard/"}><Redirect to="/dashboard/meta" replace /></Route>
+      <Route path={"/dashboard/meta"} component={Dashboard} />
+      <Route path={"/dashboard/meta/"} component={Dashboard} />
       <Route path={"/dashboard/configuracoes"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/configuracoes/"} component={DashboardConfiguracoes} />
       <Route path={"/dashboard/feedback-leads"}><Redirect to="/dashboard/fechamentos" replace /></Route>
@@ -95,6 +99,8 @@ function ExistingSiteRoutes() {
       <Route path={"/dashboard/fechamentos/"} component={DashboardFeedbackLeads} />
       <AdminRoute path={"/dashboard/feedback-leads/list"} component={DashboardFeedbackLeadsList} />
       <AdminRoute path={"/dashboard/feedback-leads/list/"} component={DashboardFeedbackLeadsList} />
+      <Route path={"/dashboard/google"} component={DashboardGoogle} />
+      <Route path={"/dashboard/google/"} component={DashboardGoogle} />
       <Route path={"/dashboard/anuncios"} component={DashboardAnuncios} />
       <Route path={"/dashboard/anuncios/"} component={DashboardAnuncios} />
       <AdminRoute path={"/dashboard/usuarios"} component={DashboardUsuarios} />

@@ -16,6 +16,7 @@ function fakeData(): ExternalAiMcpData {
     getCrmSummary: vi.fn(async () => ({ totalLeads: 3, stages: {} })) as any,
     getCreatives: vi.fn(async () => ({ creatives: [], sourceStatus: "meta" })) as any,
     getFechamentos: vi.fn(async () => []) as any,
+    getGoogleAnalytics: vi.fn(async () => ({ sourceStatus: "ga4", landingPages: [{ landingPage: { name: "LP" }, totals: { sessions: 10 } }] })) as any,
   };
 }
 
@@ -33,7 +34,7 @@ describe("servidor MCP da API externa", () => {
   it("expõe apenas as ferramentas cobertas pelos escopos do token", async () => {
     const { client } = await connect({ id: "t1", scopes: ["metrics:read"], unitIds: [UNIT] });
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name).sort()).toEqual(["get_metrics", "list_units"]);
+    expect(tools.map((tool) => tool.name).sort()).toEqual(["get_google_analytics", "get_metrics", "list_units"]);
   });
 
   it("lista só as unidades vinculadas ao token", async () => {
@@ -41,6 +42,21 @@ describe("servidor MCP da API externa", () => {
     const result = text(await client.callTool({ name: "list_units", arguments: {} }));
     expect(data.listUnits).toHaveBeenCalledWith([UNIT]);
     expect(result.units).toEqual([{ id: UNIT, name: "Unidade 0cf9" }]);
+  });
+
+  it("entrega o Google Analytics da unidade com o escopo de métricas", async () => {
+    const { client, data } = await connect({ id: "t1", scopes: ["metrics:read"], unitIds: [UNIT] });
+    const result = await client.callTool({ name: "get_google_analytics", arguments: { unit_id: UNIT, start: "2026-09-01", end: "2026-09-30" } });
+    expect(result.isError).toBeFalsy();
+    expect(data.getGoogleAnalytics).toHaveBeenCalledWith(UNIT, "2026-09-01", "2026-09-30");
+    expect(text(result)).toMatchObject({ apiVersion: "v1", unit: { id: UNIT }, sourceStatus: "ga4", landingPages: [{ totals: { sessions: 10 } }] });
+  });
+
+  it("não consulta o Google Analytics de unidade fora do token", async () => {
+    const { client, data } = await connect({ id: "t1", scopes: ["metrics:read"], unitIds: [UNIT] });
+    const result = await client.callTool({ name: "get_google_analytics", arguments: { unit_id: OTHER_UNIT } });
+    expect(result.isError).toBe(true);
+    expect(data.getGoogleAnalytics).not.toHaveBeenCalled();
   });
 
   it("retorna métricas da unidade permitida no período informado", async () => {

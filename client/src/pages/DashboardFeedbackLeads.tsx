@@ -229,7 +229,7 @@ export default function DashboardFeedbackLeads() {
   // A unidade é sempre a que está aberta no painel.
   const unit = unitName;
   const total = Number(formData.totalLeads) || 0;
-  const exit = () => setLocation("/dashboard");
+  const exit = () => setLocation("/dashboard/meta");
 
   const set = (name: keyof FormData, value: string) => {
     setStepError("");

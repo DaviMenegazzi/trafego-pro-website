@@ -5,6 +5,7 @@ import {
   getExternalAiAdsMetrics,
   getExternalAiCreatives,
   getExternalAiCrmSummary,
+  getExternalAiGoogleAnalytics,
   getExternalAiLeadSummary,
   getExternalAiMetrics,
   getExternalAiUnit,
@@ -30,6 +31,7 @@ export type ExternalAiMcpData = {
   getCreatives: typeof getExternalAiCreatives;
   /** Fechamentos semanais da unidade (pelo nome) cujas semanas tocam o período. */
   getFechamentos: (unitName: string, start: string, end: string) => Promise<SqlFeedbackLead[]>;
+  getGoogleAnalytics: typeof getExternalAiGoogleAnalytics;
 };
 
 const defaultData: ExternalAiMcpData = {
@@ -41,6 +43,7 @@ const defaultData: ExternalAiMcpData = {
   getCrmSummary: getExternalAiCrmSummary,
   getCreatives: getExternalAiCreatives,
   getFechamentos: listFeedbackLeadsInPeriodSql,
+  getGoogleAnalytics: getExternalAiGoogleAnalytics,
 };
 
 /**
@@ -174,6 +177,29 @@ export function createExternalAiMcpServer(
           if (!range.ok) return toolError(range.error);
           const [unit, metrics] = await Promise.all([data.getUnit(unit_id), data.getMetrics(unit_id, range.start, range.end)]);
           return json(envelope({ dataClassification: "aggregated", unit, metrics }));
+        }),
+    );
+  }
+
+  if (can("metrics:read")) {
+    server.registerTool(
+      "get_google_analytics",
+      {
+        title: "Google Analytics da Landing Page",
+        description:
+          "Dados do GA4 da(s) Landing Page(s) da unidade no período, comparados com o período anterior de mesmo tamanho: sessões, usuários, taxa de engajamento, tempo médio de engajamento, conversões (por tipo, ex.: WhatsApp, Formulário) e taxa de conversão (sessões com conversão ÷ sessões). " +
+          "Também traz as campanhas do Google Ads (custo, cliques, impressões, conversões, custo por conversão), páginas de entrada, cidades e origem/mídia, além da série diária. " +
+          "Taxas vêm como fração (0.139 = 13,9%). sourceStatus: 'ga4' com dados; 'not_linked' se a unidade não tem Landing Page vinculada; 'not_configured' se a conexão com o Google não está ativa. " +
+          "googleAdsCampaigns é null quando a consulta de campanhas falhou; lista vazia significa que a conta do Google Ads não está vinculada ao GA4 ou não houve campanha. Zero sessões costuma indicar a tag do GA4 ausente na LP.",
+        inputSchema: periodShape,
+        annotations: { readOnlyHint: true },
+      },
+      async ({ unit_id, start, end }) =>
+        guard(unit_id, async () => {
+          const range = period(start, end);
+          if (!range.ok) return toolError(range.error);
+          const [unit, analytics] = await Promise.all([data.getUnit(unit_id), data.getGoogleAnalytics(unit_id, range.start, range.end)]);
+          return json(envelope({ dataClassification: "aggregated", unit, ...analytics }));
         }),
     );
   }

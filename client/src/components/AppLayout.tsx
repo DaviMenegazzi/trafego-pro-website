@@ -22,6 +22,7 @@ import {
   Search,
   ScanLine,
   SquareKanban,
+  Globe,
 } from "lucide-react";
 import { useClientContext } from "@/contexts/ClientContext";
 import { canSeeAdminFeedbacks } from "@/components/adminNavigationPolicy";
@@ -59,7 +60,8 @@ function isAdminUser(): boolean {
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; newBadge?: string };
 
 const NAV_BASE: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard/meta", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard/google", label: "Google Analytics", icon: Globe, newBadge: "google-analytics" },
   { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
   { to: "/dashboard/pixel", label: "Pixel", icon: ScanLine, newBadge: "pixel" },
   { to: "/dashboard/crm", label: "CRM", icon: SquareKanban, newBadge: "crm" },
@@ -468,7 +470,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Marca */}
       <div className={cn("flex h-16 shrink-0 items-center px-4", isCollapsed ? "justify-center" : "justify-between")}>
         {!isCollapsed && (
-          <Link href="/dashboard" onClick={closeMobile} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+          <Link href="/dashboard/meta" onClick={closeMobile} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
             <img src={LOGO_SRC} alt="Tráfego Pro" width={164} height={13} className="block h-[13px] w-auto" />
           </Link>
         )}
@@ -517,7 +519,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           paddingTop: "env(safe-area-inset-top, 0px)",
         }}
       >
-        <Link href="/dashboard" className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+        <Link href="/dashboard/meta" className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
           <img src={LOGO_SRC} alt="Tráfego Pro" width={126} height={10} className="block h-2.5 w-auto" />
         </Link>
         <div className="flex items-center gap-1.5">
@@ -592,7 +594,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         }}
       >
         {[
-          { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+          { to: "/dashboard/meta", label: "Dashboard", icon: LayoutDashboard },
           { to: "/dashboard/anuncios", label: "Anúncios", icon: Tag },
         ].map((item) => {
           const active = activeTo === item.to;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   DndContext,
   DragOverlay,
@@ -163,13 +164,17 @@ export function CrmBoard({ board, savingIds, loadingMore, onOpen, onMove, onResu
           />
         ))}
       </div>
-      <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
-        {activeLead ? (
-          <div className="w-[268px] rotate-[1.5deg] cursor-grabbing rounded-xl border border-white/[0.14] bg-zinc-800 p-3 shadow-2xl shadow-black/60">
-            <CrmCardSummary lead={activeLead} />
-          </div>
-        ) : null}
-      </DragOverlay>
+      {/* No body: um ancestral com transform (animação da Surface) deslocaria o cartão do cursor. */}
+      {createPortal(
+        <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
+          {activeLead ? (
+            <div className="w-[268px] rotate-[1.5deg] cursor-grabbing rounded-xl border border-white/[0.14] bg-zinc-800 p-3 shadow-2xl shadow-black/60">
+              <CrmCardSummary lead={activeLead} />
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body,
+      )}
     </DndContext>
   );
 }

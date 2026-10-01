@@ -168,6 +168,34 @@ export async function logoutEvolutionInstance(instanceName: string): Promise<boo
   }
 }
 
+export function isEvolutionApiConfigured(): boolean {
+  return Boolean(process.env.EVOLUTION_API_URL?.trim() && process.env.EVOLUTION_API_KEY?.trim());
+}
+
+// Estado de conexão de todas as instâncias da Evolution ("open", "connecting", "close").
+// Usa só URL e chave: o monitor de conexão não depende da configuração do webhook.
+export async function fetchEvolutionConnectionStates(): Promise<Map<string, string>> {
+  const baseUrl = process.env.EVOLUTION_API_URL?.trim().replace(/\/$/, "");
+  const apiKey = process.env.EVOLUTION_API_KEY?.trim();
+  if (!baseUrl || !apiKey) throw new Error("Evolution API não configurada. Defina EVOLUTION_API_URL e EVOLUTION_API_KEY.");
+  const response = await fetch(`${baseUrl}/instance/fetchInstances`, {
+    headers: { apikey: apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`Evolution API respondeu com status ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) throw new Error("Resposta inesperada da Evolution API em fetchInstances.");
+  const states = new Map<string, string>();
+  for (const item of payload) {
+    const row = asRecord(item);
+    const instance = asRecord(row.instance);
+    const name = typeof row.name === "string" ? row.name : typeof instance.instanceName === "string" ? instance.instanceName : null;
+    const state = typeof row.connectionStatus === "string" ? row.connectionStatus : typeof instance.status === "string" ? instance.status : "unknown";
+    if (name) states.set(name, state);
+  }
+  return states;
+}
+
 export async function setEvolutionInstanceWebhook(instanceName: string): Promise<boolean> {
   const { webhookUrl, webhookSecret } = evolutionConfig();
   await evolutionRequest(`/webhook/set/${encodeURIComponent(instanceName)}`, {

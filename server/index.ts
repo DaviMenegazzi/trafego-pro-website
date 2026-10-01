@@ -45,6 +45,7 @@ import { financialRouter } from "./routes/financialRoutes.js";
 import { startDailyMetricsBackupScheduler } from "./dailyMetricsBackupService.js";
 import { startEvolutionLiveAiFlushLoop } from "./evolutionLeadStageBuffer.js";
 import { startLeadClassificationLoop } from "./evolutionLiveClassification.js";
+import { startEvolutionConnectionMonitor } from "./evolutionConnectionMonitor.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -167,6 +168,7 @@ export async function startServer({ listen = true }: { listen?: boolean } = {}) 
       startEvolutionLiveAiFlushLoop(flushIntervalMinutes * 60_000);
       const layaIntervalMinutes = Number(process.env.LAYA_CLASSIFY_INTERVAL_MINUTES) || 15;
       startLeadClassificationLoop(layaIntervalMinutes * 60_000);
+      startEvolutionConnectionMonitor();
     });
   }
 

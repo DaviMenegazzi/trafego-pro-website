@@ -38,7 +38,7 @@ function useAuthGuard() {
       const user = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
       const isAdmin = user.role === "admin" || user.allowedClientIds?.includes("*");
       if (!isAdmin) {
-        setLocation("/dashboard");
+        setLocation("/dashboard/meta");
         return;
       }
     } catch {

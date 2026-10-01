@@ -49,7 +49,7 @@ function useAdminGuard() {
     const token = localStorage.getItem("tp_token");
     if (!token) { setLocation("/login"); return; }
     try {
-      if (JSON.parse(localStorage.getItem("tp_user") ?? "{}").role !== "admin") setLocation("/dashboard");
+      if (JSON.parse(localStorage.getItem("tp_user") ?? "{}").role !== "admin") setLocation("/dashboard/meta");
     } catch { setLocation("/login"); }
   }, [setLocation]);
 }
@@ -80,7 +80,7 @@ export default function DashboardFeedbackLeadsList() {
         credentials: "include",
       });
       if (response.status === 401) { setLocation("/login"); return; }
-      if (response.status === 403) { toast.error("Esta aba é exclusiva para administradores."); setLocation("/dashboard"); return; }
+      if (response.status === 403) { toast.error("Esta aba é exclusiva para administradores."); setLocation("/dashboard/meta"); return; }
       if (!response.ok) throw new Error("Falha ao carregar feedbacks");
       setFeedbacks(await response.json());
     } catch { toast.error("Não foi possível carregar os feedbacks armazenados."); }
@@ -97,7 +97,7 @@ export default function DashboardFeedbackLeadsList() {
         credentials: "include",
       });
       if (response.status === 401) { setLocation("/login"); return; }
-      if (response.status === 403) { toast.error("A exportação é exclusiva para administradores."); setLocation("/dashboard"); return; }
+      if (response.status === 403) { toast.error("A exportação é exclusiva para administradores."); setLocation("/dashboard/meta"); return; }
       if (!response.ok) throw new Error("Falha ao exportar");
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);

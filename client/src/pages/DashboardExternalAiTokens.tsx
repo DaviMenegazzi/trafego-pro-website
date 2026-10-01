@@ -43,7 +43,7 @@ type PageData = {
 };
 
 const SCOPES: Record<string, { label: string; description: string }> = {
-  "metrics:read": { label: "Métricas", description: "Investimento, conversas e custo por unidade" },
+  "metrics:read": { label: "Métricas", description: "Meta Ads e Google Analytics: investimento, conversas, visitas e conversões por unidade" },
   "leads:summary:read": { label: "Leads", description: "Totais por origem, sem nomes ou telefones" },
   "crm:summary:read": { label: "CRM", description: "Resumo do funil, sem dados pessoais" },
   "ads:metrics:read": { label: "Anúncios", description: "Métricas por anúncio" },
@@ -66,7 +66,7 @@ function useAdminGuard() {
     try {
       const user = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
       if (!localStorage.getItem("tp_token")) setLocation("/login");
-      else if (user.role !== "admin") setLocation("/dashboard");
+      else if (user.role !== "admin") setLocation("/dashboard/meta");
     } catch {
       setLocation("/login");
     }
@@ -275,7 +275,7 @@ export default function DashboardExternalAiTokens() {
     try {
       const response = await fetch("/api/external-ai/tokens", { headers: headers() });
       if (response.status === 401) { window.location.href = "/login"; return; }
-      if (response.status === 403) { window.location.href = "/dashboard"; return; }
+      if (response.status === 403) { window.location.href = "/dashboard/meta"; return; }
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         toast.error(body.error ?? "Não foi possível carregar as integrações");

@@ -1,5 +1,8 @@
 import { listEvolutionInstancesSupabase, listEvolutionLeadsForAiClassificationSupabase, type EvolutionCrmStage } from "./evolutionSupabaseStore.js";
 import { getAuthedSupabase } from "./supabase.js";
+import { getGa4Report, isGa4Configured } from "./ga4Service.js";
+import { listLandingPagesForUnit } from "./ga4LandingPageStore.js";
+import type { Ga4LandingPage, Ga4Report, Ga4Totals } from "../shared/google.js";
 import { isMetaDirectActive, isMetaDirectEnabled, getMetaDirectClients, getMetaDirectDaily, getMetaDirectOffers, getMetaDirectAvailableFunds } from "./metaDirectService.js";
 
 type MetricRow = Record<string, unknown>;
@@ -110,4 +113,74 @@ export async function getExternalAiCreatives(unitId?: string) {
   } catch {
     return { creatives: [], sourceStatus: "pending_provider_integration" };
   }
+}
+
+// ─── Google Analytics (GA4 das Landing Pages vinculadas à unidade) ──────────
+const rate = (value: number) => Number(value.toFixed(4));
+
+function ga4TotalsPayload(totals: Ga4Totals) {
+  return {
+    sessions: totals.sessions,
+    users: totals.users,
+    newUsers: totals.newUsers,
+    engagedSessions: totals.engagedSessions,
+    engagementRate: rate(totals.engagementRate),
+    avgEngagementSeconds: Math.round(totals.avgEngagementSeconds),
+    conversions: totals.keyEvents,
+    conversionRate: rate(totals.conversionRate),
+    googleAdsCost: Number(totals.adCost.toFixed(2)),
+    googleAdsClicks: totals.adClicks,
+    googleAdsImpressions: totals.adImpressions,
+  };
+}
+
+/** Relatório do GA4 para a API externa: listas limitadas às linhas mais relevantes para caber numa resposta de IA. */
+export function googleAnalyticsPayload(landingPage: Ga4LandingPage, report: Ga4Report) {
+  const share = (part: number, whole: number) => (whole > 0 ? rate(part / whole) : 0);
+  return {
+    landingPage: { name: landingPage.name, siteUrl: landingPage.siteUrl, ga4PropertyId: landingPage.propertyId },
+    period: { start: report.start, end: report.end },
+    previousPeriod: { start: report.previousStart, end: report.previousEnd },
+    totals: ga4TotalsPayload(report.totals),
+    previousTotals: ga4TotalsPayload(report.previousTotals),
+    conversionsByType: report.keyEventsByName.map((row) => ({ type: row.label, ga4Event: row.eventName, conversions: row.count })),
+    daily: report.daily.map((row) => ({ date: row.date, sessions: row.sessions, conversions: row.keyEvents })),
+    googleAdsCampaigns: report.campaignsError
+      ? null
+      : report.campaigns.map((row) => ({
+          campaign: row.campaign,
+          cost: Number(row.cost.toFixed(2)),
+          impressions: row.impressions,
+          clicks: row.clicks,
+          sessions: row.sessions,
+          conversions: row.keyEvents,
+          costPerConversion: row.keyEvents > 0 ? Number((row.cost / row.keyEvents).toFixed(2)) : null,
+        })),
+    landingPages: report.landingPages.slice(0, 15).map((row) => ({
+      host: row.hostName,
+      page: row.landingPage,
+      sessions: row.sessions,
+      engagementRate: share(row.engagedSessions, row.sessions),
+      conversions: row.keyEvents,
+      conversionRate: share(row.convertedSessions, row.sessions),
+    })),
+    cities: report.cities.map((row) => ({
+      city: row.city,
+      sessions: row.sessions,
+      shareOfSessions: share(row.sessions, report.totals.sessions),
+      conversions: row.keyEvents,
+      conversionRate: share(row.convertedSessions, row.sessions),
+    })),
+    sourceMedium: report.sources.slice(0, 15).map((row) => ({ sourceMedium: row.sourceMedium, sessions: row.sessions, conversions: row.keyEvents })),
+  };
+}
+
+export async function getExternalAiGoogleAnalytics(unitId: string, start: string, end: string) {
+  const landingPages = await listLandingPagesForUnit(unitId);
+  if (!landingPages.length) return { sourceStatus: "not_linked" as const, landingPages: [] };
+  if (!isGa4Configured()) return { sourceStatus: "not_configured" as const, landingPages: [] };
+  const reports = await Promise.all(
+    landingPages.map(async (landingPage) => googleAnalyticsPayload(landingPage, await getGa4Report(landingPage, start, end))),
+  );
+  return { sourceStatus: "ga4" as const, landingPages: reports };
 }

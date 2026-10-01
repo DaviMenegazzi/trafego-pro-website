@@ -100,14 +100,14 @@ export default function DashboardFormularios() {
         if (cancelled) return;
         if (!res.ok || !data.hasEndpoint) {
           toast.error("Nenhum formulário disponível para sua unidade ainda.");
-          setLocation("/dashboard");
+          setLocation("/dashboard/meta");
           return;
         }
         setAccess({ ready: true, isAdmin: false });
       } catch {
         if (cancelled) return;
         toast.error("Falha ao verificar acesso aos formulários");
-        setLocation("/dashboard");
+        setLocation("/dashboard/meta");
       }
     })();
     return () => {
@@ -158,7 +158,7 @@ export default function DashboardFormularios() {
         return;
       }
       if (res.status === 403) {
-        setLocation("/dashboard");
+        setLocation("/dashboard/meta");
         return;
       }
       const data = await res.json();

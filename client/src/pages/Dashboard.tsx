@@ -108,7 +108,7 @@ function ChartPanel({ title, description, children, className, icon, accent }: {
 export default function DashboardPage() {
   useAuthGuard();
   const [, setLocation] = useLocation();
-  useEffect(() => { document.title = "Tráfego Pro — Dashboard"; }, []);
+  useEffect(() => { document.title = "Tráfego Pro — Meta Ads"; }, []);
 
   const [period, setPeriod] = useState<PeriodValue>("30");
   const [customRange, setCustomRange] = useState(() => getPresetDashboardDateRange("30"));
@@ -475,7 +475,7 @@ export default function DashboardPage() {
     <AppLayout>
       <Page>
         <PageHeader
-          title="Resultados"
+          title="Meta Ads"
           subtitle={`${selectedClient?.name ?? "Nenhuma unidade selecionada"} · ${periodLabel}`}
           actions={
             <>

@@ -21,7 +21,7 @@ export default function NotFound() {
       <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-400">
         O endereço pode ter mudado ou não existe mais. Confira o link ou volte para o início.
       </p>
-      <Button variant="primary" size="lg" className="mt-8" onClick={() => setLocation(hasSession ? "/dashboard" : "/")}>
+      <Button variant="primary" size="lg" className="mt-8" onClick={() => setLocation(hasSession ? "/dashboard/meta" : "/")}>
         <ArrowLeft />
         {hasSession ? "Voltar para a Dashboard" : "Voltar ao início"}
       </Button>

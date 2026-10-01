@@ -33,7 +33,8 @@ Express ─────┼── Supabase principal: unidades, permissões e Met
 |---|---|---|
 | `/` | Site institucional | Público |
 | `/login` | Login com Supabase Auth | Público |
-| `/dashboard` | KPIs, campanhas, períodos e unidades | Sessão autorizada |
+| `/dashboard/meta` | Meta Ads: KPIs, campanhas, períodos e unidades (`/dashboard` redireciona para cá) | Sessão autorizada |
+| `/dashboard/google` | Google Analytics das Landing Pages e campanhas do Google Ads | Sessão autorizada |
 | `/dashboard/anuncios` | Anúncios, ofertas e criativos | Sessão autorizada |
 | `/dashboard/feedback-leads` | Formulário semanal por unidade | Sessão autorizada |
 | `/dashboard/feedback-leads/list` | Consulta e XLSX de feedbacks | Admin |

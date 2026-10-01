@@ -122,11 +122,11 @@ export default function AdminMetricsOverviewPage() {
       const user = JSON.parse(localStorage.getItem("tp_user") ?? "{}");
       if (user?.role !== "admin") {
         toast.error("Acesso restrito a administradores.");
-        setLocation("/dashboard");
+        setLocation("/dashboard/meta");
         return;
       }
     } catch {
-      setLocation("/dashboard");
+      setLocation("/dashboard/meta");
       return;
     }
 

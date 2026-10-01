@@ -38,7 +38,7 @@ export default function AdminFinanceiroPage() {
         // ignore
       }
       toast.error("Acesso negado: o módulo financeiro é restrito a administradores.");
-      setLocation("/dashboard");
+      setLocation("/dashboard/meta");
     }
   }, [isAuthorizedAdmin, setLocation]);
 

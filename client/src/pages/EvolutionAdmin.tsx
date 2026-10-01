@@ -728,7 +728,7 @@ export default function EvolutionAdmin() {
 
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/dashboard/meta")}
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2.5 text-xs text-zinc-300 transition-all duration-150 hover:border-white/20 hover:bg-white/[.06] hover:text-white active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
             >
               <ArrowLeft className="h-3.5 w-3.5" />

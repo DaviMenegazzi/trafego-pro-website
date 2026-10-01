@@ -84,7 +84,7 @@ export default function TalentBankAdmin() {
       }
       if (res.status === 403) {
         toast.error("Acesso restrito ao Banco de Talentos.");
-        setLocation("/dashboard");
+        setLocation("/dashboard/meta");
         return;
       }
       const data = await res.json();

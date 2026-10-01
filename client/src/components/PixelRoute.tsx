@@ -38,12 +38,12 @@ function PixelAccessGate({ component: Component, params }: { component: React.Co
         setAllowed(hasAccess);
         if (!hasAccess) {
           toast.error("O Pixel não está liberado para este usuário.");
-          setLocation("/dashboard");
+          setLocation("/dashboard/meta");
         }
       })
       .catch((error) => {
         toast.error(error instanceof Error ? error.message : "Falha ao validar o acesso ao Pixel.");
-        setLocation("/dashboard");
+        setLocation("/dashboard/meta");
       });
   }, [setLocation]);
 

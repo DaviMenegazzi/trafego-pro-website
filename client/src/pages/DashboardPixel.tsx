@@ -1,43 +1,46 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { Button } from "@/components/ui/button";
 import {
+  Avatar,
+  Button,
+  DatePicker,
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+  EmptyState,
+  Field,
+  IconButton,
+  InlineNotice,
+  Input,
+  Page,
+  PageHeader,
+  Popover,
+  SegmentedControl,
+  Select,
+  Surface,
+  SurfaceHeader,
+  Tooltip,
+  toast,
+} from "@/components/ds";
+import { CrmTemperature, relativeTime } from "@/components/crm/crmUi";
 import { useClientContext } from "@/contexts/ClientContext";
 import { getToken, useAdminAuth } from "@/hooks/useAdminAuth";
+import { formatPhone } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
-  CalendarDays,
-  CheckCircle2,
-  CircleDashed,
-  ExternalLink,
+  AlertTriangle,
+  Check,
   Filter,
   FlaskConical,
   ImageOff,
-  Info,
   Loader2,
   MessageCircleMore,
   Plus,
   QrCode,
   RefreshCw,
   ScanLine,
-  ShieldCheck,
   Smartphone,
-  Sparkles,
-  Trophy,
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { toast } from "sonner";
 
 type PixelInstance = {
   instanceName: string;
@@ -182,27 +185,36 @@ function isConnected(status: string): boolean {
   return ["open", "connected"].includes(status.toLowerCase());
 }
 
-// Temperatura do lead vinda da Laya (score de interesse 0–100), mesmo critério do SDR Flow.
-const TEMPERATURE_CONFIG: Record<"HOT" | "WARM" | "COLD", { label: string; className: string }> = {
-  HOT: { label: "Quente", className: "border-rose-400/25 bg-rose-400/10 text-rose-300" },
-  WARM: { label: "Morno", className: "border-amber-400/25 bg-amber-400/10 text-amber-300" },
-  COLD: { label: "Frio", className: "border-sky-400/25 bg-sky-400/10 text-sky-300" },
-};
+const ORIGIN_LABELS: Record<string, string> = { meta: "Meta Ads", google_ads: "Google Ads", mixed: "Meta e Google", unknown: "Origem não identificada" };
 
-function TemperatureBadge({ lead }: { lead: PixelLead }) {
-  if (!lead.temperature) return null;
-  const config = TEMPERATURE_CONFIG[lead.temperature];
-  return <span title={`Interesse de compra (Laya): ${lead.leadScore ?? "—"}/100`} className={cn("rounded-full border px-1.5 py-0.5 text-[9px] font-semibold", config.className)}>{config.label}{lead.leadScore != null ? ` · ${lead.leadScore}` : ""}</span>;
+// Cor só no ponto; o texto diz o estado.
+function LeadStatus({ lead, className }: { lead: PixelLead; className?: string }) {
+  const confirmed = lead.classification === "lead";
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap text-zinc-400", className)}>
+      <span className={cn("size-1.5 rounded-full", confirmed ? "bg-emerald-400" : "bg-amber-400")} aria-hidden />
+      {confirmed ? "Lead confirmado" : lead.classification === "nao_lead" ? "Não lead" : "A confirmar"}
+    </span>
+  );
 }
 
 function phoneLabel(lead: PixelLead): string {
-  const digits = lead.contactPhone?.replace(/\D/g, "");
-  return digits ? `+${digits}` : lead.phoneLast4 ? `•••• ${lead.phoneLast4}` : "Número protegido";
+  if (lead.contactPhone?.replace(/\D/g, "")) return formatPhone(lead.contactPhone);
+  return lead.phoneLast4 ? `•••• ${lead.phoneLast4}` : "Número protegido";
 }
 
 function dateLabel(value: string | null): string {
   if (!value) return "Sem atividade";
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+/** Hora para hoje, data curta para os outros dias (como na lista do Mensagens). */
+function shortTimeLabel(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return new Intl.DateTimeFormat("pt-BR", sameDay ? { timeStyle: "short" } : { day: "2-digit", month: "2-digit" }).format(date);
 }
 
 export default function DashboardPixel() {
@@ -258,16 +270,6 @@ export default function DashboardPixel() {
   const activeFilterCount = [filterInstance, filterChannel, filterDateFrom, filterDateTo].filter(Boolean).length;
   const today = todayDateString();
   const isTodayFilterActive = filterDateFrom === today && filterDateTo === today;
-
-  function toggleTodayFilter() {
-    if (isTodayFilterActive) {
-      setFilterDateFrom("");
-      setFilterDateTo("");
-    } else {
-      setFilterDateFrom(today);
-      setFilterDateTo(today);
-    }
-  }
 
   const selectedLead = useMemo(
     () => filteredLeads.find((lead) => lead.id === selectedLeadId) ?? filteredLeads[0] ?? null,
@@ -514,253 +516,417 @@ export default function DashboardPixel() {
     }
   }
 
+  const selectedClientName = selectedClient?.name ?? "Nenhuma unidade selecionada";
+  const subtitle = [
+    selectedClientName,
+    selectedClientId ? `${overview.summary.connectedInstances} de ${overview.summary.totalInstances} WhatsApps conectados` : null,
+    selectedClientId ? `${overview.summary.visibleLeads} ${overview.summary.visibleLeads === 1 ? "lead" : "leads"}` : null,
+  ].filter(Boolean).join(" · ");
+  const dateScope = isTodayFilterActive ? "today" : filterDateFrom || filterDateTo ? "custom" : "all";
+  const instanceOptions = overview.instances.map((instance) => ({ value: instance.instanceName, label: instance.displayName || instance.instanceName }));
+
+  function clearFilters() {
+    setFilterInstance("");
+    setFilterChannel("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+  }
+
   if (authLoading || clientsLoading) {
-    return <AppLayout><div className="flex min-h-[70vh] items-center justify-center text-sm text-zinc-400"><Loader2 className="mr-2 size-4 animate-spin" /> Preparando o Pixel…</div></AppLayout>;
+    return <AppLayout><div className="flex min-h-[70vh] items-center justify-center text-sm text-zinc-500"><Loader2 className="mr-2 size-4 animate-spin" /> Preparando o Pixel…</div></AppLayout>;
   }
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-[1500px] space-y-6 px-4 py-6 md:px-8">
-        <header className="platform-page-header flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-emerald-400"><ScanLine className="size-4" /> Pixel de mensagens</div>
-              {!overview.provisioningConfigured && (
-                <span title="Configure a URL e a chave da Evolution no servidor para liberar o botão Nova instância. Nenhuma chave é enviada ao navegador." className="flex items-center gap-1 rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300"><ShieldCheck className="size-3" /> Sem credenciais</span>
+      <Page>
+        <PageHeader
+          title="Pixel"
+          subtitle={subtitle}
+          actions={
+            <>
+              {!overview.provisioningConfigured && selectedClientId && (
+                <Tooltip content="Configure a URL e a chave da Evolution no servidor para liberar novas instâncias. Nenhuma chave é enviada ao navegador.">
+                  <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400"><span className="size-1.5 rounded-full bg-amber-400" aria-hidden />Sem credenciais</span>
+                </Tooltip>
               )}
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Conversas que viraram oportunidade</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">WhatsApp, conta Meta e leads separados por unidade. Nesta tela entram apenas leads confirmados ou contatos com evidência de campanha.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {selectedClientId && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button type="button" title="Detalhes da unidade" className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[.03] text-zinc-300 transition hover:bg-white/[.06]"><Info className="size-4" /></button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-72 border-white/10 bg-[#151417] p-4 text-zinc-100">
-                  <div className="space-y-3 text-xs">
-                    <div><p className="text-zinc-500">Unidade / conta Meta</p><p className="mt-0.5 truncate text-sm font-semibold text-white">{selectedClient?.name}</p><p className="mt-0.5 truncate font-mono text-[10px] text-zinc-500">{selectedClientId}</p></div>
-                    <div className="flex items-center justify-between border-t border-white/8 pt-3"><span className="text-zinc-500">WhatsApps conectados</span><span className="font-semibold text-white">{overview.summary.connectedInstances} / {overview.summary.totalInstances}</span></div>
-                    <div className="flex items-center justify-between border-t border-white/8 pt-3"><span className="text-zinc-500">Leads visíveis</span><span className="font-semibold text-emerald-300">{overview.summary.visibleLeads}</span></div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
-            <Button variant="outline" onClick={() => void loadOverview(true)} disabled={refreshing || !selectedClientId} className="border-white/10 bg-white/[.03]"><RefreshCw className={cn("size-4", refreshing && "animate-spin")} /> Atualizar</Button>
-            <Button onClick={openCreate} disabled={!selectedClientId || !overview.provisioningConfigured} className="bg-emerald-400 text-zinc-950 hover:bg-emerald-300"><Plus className="size-4" /> Nova instância</Button>
-          </div>
-        </header>
+              <IconButton
+                label="Atualizar"
+                variant="secondary"
+                icon={<RefreshCw className={refreshing ? "animate-spin" : undefined} />}
+                onClick={() => void loadOverview(true)}
+                disabled={refreshing || !selectedClientId}
+              />
+              <Button variant="primary" onClick={openCreate} disabled={!selectedClientId || !overview.provisioningConfigured}><Plus />Nova instância</Button>
+            </>
+          }
+        />
 
         {!selectedClientId ? (
-          <div className="rounded-2xl border border-dashed border-white/15 bg-white/[.02] p-10 text-center text-sm text-zinc-400">Selecione uma unidade no menu para abrir o Pixel.</div>
+          <Surface><EmptyState icon={<ScanLine />} title="Selecione uma unidade" description="Escolha a unidade no menu para abrir o Pixel." /></Surface>
         ) : (
           <>
-            {error && <div className="rounded-xl border border-rose-400/20 bg-rose-400/[.06] px-4 py-3 text-sm text-rose-200">{error}</div>}
+            {error && <InlineNotice tone="critical" icon={<AlertTriangle />} action={<Button size="sm" variant="ghost" onClick={() => void loadOverview(true)}>Tentar de novo</Button>}>{error}</InlineNotice>}
 
-            <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d0f10]">
-              <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
-                <div>
-                  <div className="flex items-center gap-2"><Sparkles className="size-4 text-emerald-300" /><h2 className="text-base font-semibold text-white">Mensagens de leads</h2></div>
-                  <p className="mt-1 text-xs text-zinc-500">Conversas classificadas como não lead não aparecem aqui.</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={toggleTodayFilter}
-                    title="Filtrar leads que chegaram hoje"
-                    className={cn(
-                      "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition",
-                      isTodayFilterActive ? "border-emerald-400/30 bg-emerald-400/15 text-emerald-300" : "border-white/10 bg-white/[.03] text-zinc-300 hover:bg-white/[.06]",
-                    )}
-                  >
-                    <CalendarDays className="size-3.5" /> Leads hoje
-                  </button>
-                  <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" title="Filtrar conversas" className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[.03] text-zinc-300 transition hover:bg-white/[.06]">
-                        <Filter className="size-4" />
-                        {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-emerald-400 text-[9px] font-bold text-zinc-950">{activeFilterCount}</span>}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-72 border-white/10 bg-[#151417] p-4 text-zinc-100">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[.14em] text-zinc-300"><Filter className="size-3.5" /> Filtros</span>
-                        {activeFilterCount > 0 && <button type="button" onClick={() => { setFilterInstance(""); setFilterChannel(""); setFilterDateFrom(""); setFilterDateTo(""); }} className="text-[11px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline">Limpar</button>}
-                      </div>
-                      <div className="grid gap-3">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="filter-instance" className="text-xs text-zinc-400">Instância</Label>
-                          <select id="filter-instance" value={filterInstance} onChange={(event) => setFilterInstance(event.target.value)} className="h-9 w-full rounded-md border border-white/10 bg-black/30 px-2 text-sm text-zinc-100">
-                            <option value="">Todas</option>
-                            {overview.instances.map((instance) => <option key={instance.instanceName} value={instance.instanceName}>{instance.displayName || instance.instanceName}</option>)}
-                          </select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="filter-channel" className="text-xs text-zinc-400">Canal</Label>
-                          <select id="filter-channel" value={filterChannel} onChange={(event) => setFilterChannel(event.target.value as "" | "meta" | "google_ads")} className="h-9 w-full rounded-md border border-white/10 bg-black/30 px-2 text-sm text-zinc-100">
-                            <option value="">Todos</option>
-                            <option value="meta">Meta</option>
-                            <option value="google_ads">Google Ads</option>
-                          </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="filter-date-from" className="text-xs text-zinc-400">De</Label>
-                            <Input id="filter-date-from" type="date" value={filterDateFrom} onChange={(event) => setFilterDateFrom(event.target.value)} className="border-white/10 bg-black/30 text-sm" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="filter-date-to" className="text-xs text-zinc-400">Até</Label>
-                            <Input id="filter-date-to" type="date" value={filterDateTo} onChange={(event) => setFilterDateTo(event.target.value)} className="border-white/10 bg-black/30 text-sm" />
-                          </div>
-                        </div>
-                        <p className="text-[11px] text-zinc-500">{filteredLeads.length} de {overview.leads.length} conversas</p>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  {canSimulate && (
-                  <Popover open={simOpen} onOpenChange={setSimOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" title="Simular mensagem (admin)" className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-300 transition hover:bg-fuchsia-400/20">
-                        <FlaskConical className="size-4" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-[380px] max-w-[92vw] border-fuchsia-400/20 bg-[#151417] p-4 text-zinc-100">
-                      <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[.14em] text-fuchsia-300"><FlaskConical className="size-4" /> Simular mensagem</div>
-                      <form onSubmit={simulateMessage} className="grid gap-3">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="sim-instance" className="text-xs text-zinc-400">Instância</Label>
-                          <select id="sim-instance" value={simInstance} onChange={(event) => setSimInstance(event.target.value)} className="h-9 w-full rounded-md border border-white/10 bg-black/30 px-2 text-sm text-zinc-100">
-                            {overview.instances.map((instance) => <option key={instance.instanceName} value={instance.instanceName}>{instance.displayName || instance.instanceName}</option>)}
-                            {selectedClientId && <option value={`sim-${selectedClientId}-dev`}>➕ Instância de teste (criada automaticamente)</option>}
-                          </select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="sim-channel" className="text-xs text-zinc-400">Canal de origem</Label>
-                          <select id="sim-channel" value={simChannel} onChange={(event) => setSimChannel(event.target.value as SimulationChannel)} className="h-9 w-full rounded-md border border-white/10 bg-black/30 px-2 text-sm text-zinc-100">
-                            {SIMULATION_CHANNEL_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                          </select>
-                        </div>
-                        {simIsMetaChannel && (
-                          <div className="space-y-1.5">
-                            <Label htmlFor="sim-ad" className="text-xs text-zinc-400">Anúncio específico (cruzamento com a dashboard)</Label>
-                            <select id="sim-ad" value={simAdId} onChange={(event) => setSimAdId(event.target.value)} disabled={simAdsLoading} className="h-9 w-full rounded-md border border-white/10 bg-black/30 px-2 text-sm text-zinc-100">
-                              <option value="">{simAdsLoading ? "Carregando anúncios…" : simAds.length === 0 ? "Nenhum anúncio sincronizado — usa um ID fictício" : "Aleatório (qualquer anúncio sincronizado)"}</option>
-                              {simAds.map((ad) => (
-                                <option key={ad.adId} value={ad.adId}>
-                                  {(ad.adName || ad.creativeName || ad.adId)}{ad.campaignName ? ` — ${ad.campaignName}` : ""}{typeof ad.totalConversas === "number" ? ` (${ad.totalConversas} conversas na Meta)` : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                        <div className="space-y-1.5">
-                          <Label htmlFor="sim-classification" className="text-xs text-zinc-400">É lead mesmo?</Label>
-                          <select id="sim-classification" value={simClassification} onChange={(event) => setSimClassification(event.target.value as "pendente" | "lead" | "nao_lead")} className="h-9 w-full rounded-md border border-white/10 bg-black/30 px-2 text-sm text-zinc-100">
-                            {SIMULATION_CLASSIFICATION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                          </select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="sim-text" className="text-xs text-zinc-400">Texto da mensagem</Label>
-                          <Input id="sim-text" value={simText} onChange={(event) => setSimText(event.target.value)} maxLength={300} className="border-white/10 bg-black/30" />
-                        </div>
-                        <Button type="submit" size="sm" disabled={simSubmitting || !simInstance} className="w-full bg-fuchsia-400 text-zinc-950 hover:bg-fuchsia-300">
-                          {simSubmitting ? <><Loader2 className="size-3.5 animate-spin" />Simulando…</> : <><FlaskConical className="size-3.5" />Disparar mensagem simulada</>}
+            <Surface className="overflow-hidden">
+              <SurfaceHeader
+                title="Conversas de leads"
+                description="Entram leads confirmados e contatos com evidência de campanha. Não leads ficam de fora."
+                actions={
+                  <>
+                    <SegmentedControl
+                      size="sm"
+                      aria-label="Período"
+                      value={dateScope}
+                      onValueChange={(value) => {
+                        if (value === "today") { setFilterDateFrom(today); setFilterDateTo(today); }
+                        else { setFilterDateFrom(""); setFilterDateTo(""); }
+                      }}
+                      options={[{ value: "all", label: "Todos" }, { value: "today", label: "Hoje" }]}
+                    />
+                    <Popover
+                      open={filterOpen}
+                      onOpenChange={setFilterOpen}
+                      align="end"
+                      trigger={
+                        <Button variant="secondary" size="sm">
+                          <Filter />
+                          Filtros
+                          {activeFilterCount > 0 && <span className="rounded bg-white/[0.08] px-1 tabular-nums text-zinc-200">{activeFilterCount}</span>}
                         </Button>
-                        <p className="text-[11px] leading-5 text-zinc-500">Usa o mesmo pipeline do webhook real. Só visível para administradores em ambiente de desenvolvimento.</p>
-                      </form>
-                    </PopoverContent>
-                  </Popover>
-                  )}
-                </div>
-              </div>
-              <div className="grid min-h-[480px] lg:grid-cols-[330px_1fr_260px]">
-                <div className="border-b border-white/10 lg:border-b-0 lg:border-r">
-                  <div className="max-h-[560px] overflow-y-auto p-2">
-                    {loading ? (
-                      <div className="p-8 text-center text-xs text-zinc-500"><Loader2 className="mx-auto mb-2 size-4 animate-spin" />Carregando leads…</div>
-                    ) : filteredLeads.length === 0 ? (
-                      <div className="p-8 text-center">
-                        <MessageCircleMore className="mx-auto size-7 text-zinc-600" />
-                        <p className="mt-3 text-sm text-zinc-300">{overview.leads.length === 0 ? "Nenhum lead identificado" : "Nenhum lead com esse filtro"}</p>
-                        <p className="mt-1 text-xs leading-5 text-zinc-500">{overview.leads.length === 0 ? "Quando chegar uma conversa com evidência de campanha ou classificação confirmada, ela aparecerá aqui." : "Ajuste ou limpe os filtros para ver mais conversas."}</p>
+                      }
+                    >
+                      <div className="space-y-4 p-4">
+                        <div className="flex h-8 items-center justify-between">
+                          <p className="text-sm font-semibold text-zinc-100">Filtros</p>
+                          {activeFilterCount > 0 && <Button size="sm" variant="ghost" className="-mr-2" onClick={clearFilters}>Limpar</Button>}
+                        </div>
+                        <Field label="Instância" htmlFor="filter-instance">
+                          <Select id="filter-instance" value={filterInstance} onValueChange={setFilterInstance} options={[{ value: "", label: "Todas" }, ...instanceOptions]} />
+                        </Field>
+                        <Field label="Canal" htmlFor="filter-channel">
+                          <Select
+                            id="filter-channel"
+                            value={filterChannel}
+                            onValueChange={(value) => setFilterChannel(value as "" | "meta" | "google_ads")}
+                            options={[{ value: "", label: "Todos" }, { value: "meta", label: "Meta Ads" }, { value: "google_ads", label: "Google Ads" }]}
+                          />
+                        </Field>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Field label="De" htmlFor="filter-date-from"><DatePicker id="filter-date-from" value={filterDateFrom} onChange={setFilterDateFrom} max={filterDateTo || undefined} /></Field>
+                          <Field label="Até" htmlFor="filter-date-to"><DatePicker id="filter-date-to" value={filterDateTo} onChange={setFilterDateTo} min={filterDateFrom || undefined} /></Field>
+                        </div>
+                        <p className="text-xs tabular-nums text-zinc-500">{filteredLeads.length} de {overview.leads.length} conversas</p>
                       </div>
-                    ) : (
-                      filteredLeads.map((lead) => <button key={lead.id} type="button" onClick={() => setSelectedLeadId(lead.id)} className={cn("mb-1 w-full rounded-xl px-3 py-3 text-left transition", selectedLead?.id === lead.id ? "bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20" : "hover:bg-white/[.04]")}><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-medium text-zinc-100">{lead.contactName || "Contato sem nome"}</p>{lead.classification === "lead" ? <CheckCircle2 className="size-3.5 shrink-0 text-emerald-300" /> : <CircleDashed className="size-3.5 shrink-0 text-amber-300" />}</div><p className="mt-1 text-xs text-zinc-500">{phoneLabel(lead)}</p><div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-zinc-500"><span className="truncate">{lead.instanceName}</span><span className="flex shrink-0 items-center gap-1.5"><TemperatureBadge lead={lead} />{lead.messagesReceived + lead.messagesSent} msgs</span></div></button>)
+                    </Popover>
+                    {canSimulate && (
+                      <Popover
+                        open={simOpen}
+                        onOpenChange={setSimOpen}
+                        align="end"
+                        tooltip="Simular mensagem"
+                        className="w-[380px]"
+                        trigger={<Button variant="ghost" size="icon-sm" aria-label="Simular mensagem"><FlaskConical /></Button>}
+                      >
+                        <form onSubmit={simulateMessage} className="max-h-[70vh] space-y-4 overflow-y-auto p-4">
+                          <div>
+                            <p className="text-sm font-semibold text-zinc-100">Simular mensagem</p>
+                            <p className="mt-0.5 text-xs leading-5 text-zinc-500">Usa o mesmo pipeline do webhook real. Só para administradores em desenvolvimento.</p>
+                          </div>
+                          <Field label="Instância" htmlFor="sim-instance">
+                            <Select
+                              id="sim-instance"
+                              value={simInstance}
+                              onValueChange={setSimInstance}
+                              options={[...instanceOptions, ...(selectedClientId ? [{ value: `sim-${selectedClientId}-dev`, label: "Instância de teste (criada automaticamente)" }] : [])]}
+                            />
+                          </Field>
+                          <Field label="Canal de origem" htmlFor="sim-channel">
+                            <Select id="sim-channel" value={simChannel} onValueChange={(value) => setSimChannel(value as SimulationChannel)} options={SIMULATION_CHANNEL_OPTIONS} />
+                          </Field>
+                          {simIsMetaChannel && (
+                            <Field label="Anúncio" htmlFor="sim-ad" hint="Cruza com os anúncios sincronizados da dashboard.">
+                              <Select
+                                id="sim-ad"
+                                value={simAdId}
+                                onValueChange={setSimAdId}
+                                disabled={simAdsLoading}
+                                options={[
+                                  { value: "", label: simAdsLoading ? "Carregando anúncios…" : simAds.length === 0 ? "Nenhum anúncio sincronizado (ID fictício)" : "Aleatório" },
+                                  ...simAds.map((ad) => ({
+                                    value: ad.adId,
+                                    label: ad.adName || ad.creativeName || ad.adId,
+                                    description: [ad.campaignName, typeof ad.totalConversas === "number" ? `${ad.totalConversas} conversas na Meta` : null].filter(Boolean).join(" · ") || undefined,
+                                  })),
+                                ]}
+                              />
+                            </Field>
+                          )}
+                          <Field label="É lead mesmo?" htmlFor="sim-classification">
+                            <Select id="sim-classification" value={simClassification} onValueChange={(value) => setSimClassification(value as "pendente" | "lead" | "nao_lead")} options={SIMULATION_CLASSIFICATION_OPTIONS} />
+                          </Field>
+                          <Field label="Texto da mensagem" htmlFor="sim-text">
+                            <Input id="sim-text" value={simText} onChange={(event) => setSimText(event.target.value)} maxLength={300} />
+                          </Field>
+                          <Button type="submit" variant="primary" className="w-full" loading={simSubmitting} disabled={!simInstance}>
+                            {!simSubmitting && <FlaskConical />}{simSubmitting ? "Simulando…" : "Disparar mensagem simulada"}
+                          </Button>
+                        </form>
+                      </Popover>
                     )}
-                  </div>
-                </div>
-                <div className="flex min-h-[480px] flex-col">{selectedLead ? <><div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4"><div className="min-w-0"><p className="text-sm font-semibold text-white">{selectedLead.contactName || "Contato sem nome"}</p><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500"><span>{phoneLabel(selectedLead)}</span><span>·</span><span>{selectedLead.classification === "lead" ? "Lead confirmado" : selectedLead.classification === "nao_lead" ? "Não lead" : `Detectado por ${selectedLead.originPlatform}`}</span><TemperatureBadge lead={selectedLead} /></div></div>{selectedLead.classification === "pendente" && <div className="flex shrink-0 gap-1.5"><Button type="button" size="sm" variant="ghost" disabled={classifyingLead} onClick={() => void classifyLead(selectedLead.id, "lead")} className="h-7 gap-1 border border-emerald-400/20 bg-emerald-400/10 px-2 text-[11px] text-emerald-300 hover:bg-emerald-400/20"><CheckCircle2 className="size-3.5" /> Confirmar lead</Button><Button type="button" size="sm" variant="ghost" disabled={classifyingLead} onClick={() => void classifyLead(selectedLead.id, "nao_lead")} className="h-7 gap-1 border border-white/10 px-2 text-[11px] text-zinc-400 hover:bg-white/[.06]">Não é lead</Button></div>}</div>{selectedLead.originPlatform === "meta" && (attributionLoading || attribution) && <div className="flex items-center gap-3 border-b border-white/8 bg-white/[.02] px-5 py-3">{attributionLoading ? <span className="flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="size-3.5 animate-spin" />Buscando anúncio de origem…</span> : attribution?.matchStatus === "matched" ? <><SafeImage src={attribution.adImageUrl} alt={attribution.creativeName ?? "Criativo do anúncio"} className="size-12 shrink-0 rounded-lg" /><div className="min-w-0"><p className="truncate text-xs font-semibold text-emerald-300">{attribution.creativeName || attribution.adName || "Anúncio identificado"}</p><p className="mt-0.5 truncate text-[11px] text-zinc-500">{[attribution.adName !== attribution.creativeName ? attribution.adName : null, attribution.campaignName, attribution.adsetName].filter(Boolean).join(" · ") || "Campanha não identificada"}</p></div></> : <span className="text-xs text-zinc-500">Origem Meta detectada, mas não foi possível identificar o anúncio específico.</span>}</div>}<div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">{messagesLoading ? <div className="flex h-full items-center justify-center text-xs text-zinc-500"><Loader2 className="mr-2 size-4 animate-spin" />Carregando conversa…</div> : <>{loadingMoreMessages && <div className="flex items-center justify-center py-2 text-[11px] text-zinc-500"><Loader2 className="mr-1.5 size-3 animate-spin" />Carregando mensagens anteriores…</div>}{messages.map((message) => <div key={message.id} className={cn("flex", message.direction === "outgoing" ? "justify-end" : "justify-start")}><div className={cn("max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6", message.direction === "outgoing" ? "rounded-br-md bg-emerald-400 text-zinc-950" : "rounded-bl-md border border-white/10 bg-white/[.055] text-zinc-200")}><p className="whitespace-pre-wrap break-words">{message.bodyText}</p><p className={cn("mt-1 text-right text-[9px]", message.direction === "outgoing" ? "text-zinc-800/65" : "text-zinc-500")}>{dateLabel(message.sentAt)}</p></div></div>)}</>}</div></> : <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-sm text-zinc-500"><MessageCircleMore className="mb-3 size-8 text-zinc-700" />Selecione um lead para ler a conversa.</div>}</div>
-                <aside className="border-t border-white/10 lg:border-l lg:border-t-0">
-                  <div className="border-b border-white/10 px-3 py-3"><div className="flex items-center gap-1.5 text-xs font-semibold text-white"><Trophy className="size-3.5 text-amber-300" /> Ranking de criativos</div><p className="mt-0.5 text-[10px] text-zinc-500">Confirmadas (Pixel) × reportado pela Meta</p></div>
-                  <div className="max-h-[480px] space-y-2 overflow-y-auto p-2">
-                    {overview.creativeRanking.length === 0 ? (
-                      <p className="px-2 py-6 text-center text-[11px] text-zinc-600">Sem dados de criativos ainda.</p>
+                  </>
+                }
+              />
+
+              <div className="grid min-h-[520px] lg:grid-cols-[320px_minmax(0,1fr)_280px]">
+                <div className="border-b border-white/[0.06] lg:border-b-0 lg:border-r">
+                  <div className="max-h-[600px] overflow-y-auto p-2">
+                    {loading ? (
+                      <div className="space-y-1 p-1" aria-busy="true" aria-label="Carregando leads">
+                        {[0, 1, 2, 3].map((index) => <div key={index} className="h-[72px] animate-pulse rounded-xl bg-white/[0.04]" />)}
+                      </div>
+                    ) : filteredLeads.length === 0 ? (
+                      <EmptyState
+                        icon={<MessageCircleMore />}
+                        title={overview.leads.length === 0 ? "Nenhum lead identificado" : "Nenhum lead com esses filtros"}
+                        description={overview.leads.length === 0 ? "Conversas com evidência de campanha ou confirmadas aparecem aqui." : undefined}
+                        action={overview.leads.length > 0 ? <Button size="sm" onClick={clearFilters}>Limpar filtros</Button> : undefined}
+                        className="py-12"
+                      />
                     ) : (
-                      overview.creativeRanking.map((row, index) => {
-                        const secondaryLine = [row.adName && row.adName !== row.creativeName ? row.adName : null, row.campaignName, row.adsetName].filter(Boolean).join(" · ");
+                      filteredLeads.map((lead) => {
+                        const selected = selectedLead?.id === lead.id;
                         return (
-                          <button key={row.creativeId ?? row.adId ?? index} type="button" onClick={() => setSelectedRanking(row)} className="flex w-full items-center gap-2 rounded-lg border border-white/10 bg-white/[.02] p-2 text-left transition hover:border-amber-400/30 hover:bg-amber-400/[.05]">
-                            <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-amber-400/15 text-[9px] font-bold text-amber-300">{index + 1}</span>
-                            <SafeImage src={row.adImageUrl} alt={row.creativeName ?? "Criativo"} className="size-10 shrink-0 rounded-md" />
+                          <button
+                            key={lead.id}
+                            type="button"
+                            onClick={() => setSelectedLeadId(lead.id)}
+                            aria-current={selected || undefined}
+                            className={cn(
+                              "mb-0.5 flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-emerald-400/60",
+                              selected ? "bg-white/[0.07]" : "hover:bg-white/[0.04]",
+                            )}
+                          >
+                            <Avatar name={lead.contactName || "?"} size="sm" className="mt-0.5" />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-[11px] font-semibold text-zinc-100">{row.creativeName || row.adName || "Criativo sem nome"}</p>
-                              <p className="truncate text-[10px] text-zinc-500">{secondaryLine || "Campanha não identificada"}</p>
-                              <div className="mt-1 flex items-center gap-2 text-[10px]"><span className="text-emerald-300">{row.pixelConfirmedLeads} Pixel</span><span className="text-zinc-500">{row.metaConversasIniciadas ?? "—"} Meta</span></div>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="truncate text-sm font-medium text-zinc-100">{lead.contactName || "Contato sem nome"}</p>
+                                <span className="shrink-0 text-xs tabular-nums text-zinc-500">{shortTimeLabel(lead.lastMessageAt)}</span>
+                              </div>
+                              <p className="mt-0.5 truncate text-xs text-zinc-500">{phoneLabel(lead)}</p>
+                              <div className="mt-1.5 flex items-center gap-3 text-xs">
+                                <LeadStatus lead={lead} />
+                                {lead.temperature && <CrmTemperature lead={{ temperature: lead.temperature, leadScore: lead.leadScore ?? null }} />}
+                              </div>
                             </div>
                           </button>
                         );
                       })
                     )}
                   </div>
+                </div>
+
+                <div className="flex min-h-[520px] min-w-0 flex-col">
+                  {selectedLead ? (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-3.5">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Avatar name={selectedLead.contactName || "?"} />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-white">{selectedLead.contactName || "Contato sem nome"}</p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+                              <span>{phoneLabel(selectedLead)}</span>
+                              <span aria-hidden>·</span>
+                              <span>{ORIGIN_LABELS[selectedLead.originPlatform] ?? selectedLead.originPlatform}</span>
+                              <span aria-hidden>·</span>
+                              <span>{selectedLead.messagesReceived + selectedLead.messagesSent} mensagens</span>
+                            </div>
+                          </div>
+                        </div>
+                        {selectedLead.classification === "pendente" ? (
+                          <div className="flex shrink-0 gap-2">
+                            <Button size="sm" variant="ghost" disabled={classifyingLead} onClick={() => void classifyLead(selectedLead.id, "nao_lead")}>Não é lead</Button>
+                            <Button size="sm" variant="primary" loading={classifyingLead} onClick={() => void classifyLead(selectedLead.id, "lead")}>{!classifyingLead && <Check />}Confirmar lead</Button>
+                          </div>
+                        ) : (
+                          <LeadStatus lead={selectedLead} className="text-xs" />
+                        )}
+                      </div>
+
+                      {selectedLead.originPlatform === "meta" && (attributionLoading || attribution) && (
+                        <div className="flex items-center gap-3 border-b border-white/[0.06] px-5 py-3">
+                          {attributionLoading ? (
+                            <span className="flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="size-3.5 animate-spin" />Buscando anúncio de origem…</span>
+                          ) : attribution?.matchStatus === "matched" ? (
+                            <>
+                              <SafeImage src={attribution.adImageUrl} alt={attribution.creativeName ?? "Criativo do anúncio"} className="size-11 shrink-0 rounded-lg" />
+                              <div className="min-w-0">
+                                <p className="text-xs text-zinc-500">Veio do anúncio</p>
+                                <p className="truncate text-sm font-medium text-zinc-100">{attribution.creativeName || attribution.adName || "Anúncio identificado"}</p>
+                                <p className="truncate text-xs text-zinc-500">{[attribution.adName !== attribution.creativeName ? attribution.adName : null, attribution.campaignName, attribution.adsetName].filter(Boolean).join(" · ") || "Campanha não identificada"}</p>
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-xs text-zinc-500">Origem Meta detectada, mas o anúncio específico não foi identificado.</span>
+                          )}
+                        </div>
+                      )}
+
+                      <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="max-h-[600px] flex-1 space-y-2 overflow-y-auto p-4 sm:p-6">
+                        {messagesLoading ? (
+                          <div className="flex h-full items-center justify-center text-xs text-zinc-500"><Loader2 className="mr-2 size-4 animate-spin" />Carregando conversa…</div>
+                        ) : (
+                          <>
+                            {loadingMoreMessages && <div className="flex items-center justify-center py-2 text-xs text-zinc-500"><Loader2 className="mr-1.5 size-3 animate-spin" />Carregando mensagens anteriores…</div>}
+                            {messages.map((message) => {
+                              const outgoing = message.direction === "outgoing";
+                              return (
+                                <div key={message.id} className={cn("flex", outgoing ? "justify-end" : "justify-start")}>
+                                  <div className={cn("max-w-[78%] rounded-2xl px-3.5 py-2 text-sm leading-6", outgoing ? "rounded-br-md bg-emerald-500 text-zinc-950" : "rounded-bl-md bg-white/[0.07] text-zinc-100")}>
+                                    <p className="whitespace-pre-wrap break-words">{message.bodyText}</p>
+                                    <p className={cn("mt-0.5 text-right text-[11px] tabular-nums", outgoing ? "text-zinc-900/60" : "text-zinc-500")}>{dateLabel(message.sentAt)}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <EmptyState icon={<MessageCircleMore />} title="Nenhuma conversa aberta" description="Selecione um lead para ler a conversa." className="flex-1" />
+                  )}
+                </div>
+
+                <aside className="min-w-0 border-t border-white/[0.06] lg:border-l lg:border-t-0">
+                  <div className="px-4 py-3.5">
+                    <h3 className="text-sm font-semibold text-zinc-100">Criativos que mais geraram leads</h3>
+                    <p className="mt-0.5 text-xs text-zinc-500">Confirmados no Pixel × conversas da Meta</p>
+                  </div>
+                  <div className="max-h-[540px] overflow-y-auto px-2 pb-2">
+                    {overview.creativeRanking.length === 0 ? (
+                      <p className="px-2 py-8 text-center text-xs text-zinc-500">Sem dados de criativos ainda.</p>
+                    ) : (
+                      overview.creativeRanking.map((row, index) => (
+                        <button
+                          key={row.creativeId ?? row.adId ?? index}
+                          type="button"
+                          onClick={() => setSelectedRanking(row)}
+                          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left outline-none transition-colors duration-150 hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                        >
+                          <span className="w-4 shrink-0 text-center text-xs font-medium tabular-nums text-zinc-500">{index + 1}</span>
+                          <SafeImage src={row.adImageUrl} alt={row.creativeName ?? "Criativo"} className="size-10 shrink-0 rounded-lg" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm text-zinc-100">{row.creativeName || row.adName || "Criativo sem nome"}</p>
+                            <p className="mt-0.5 text-xs tabular-nums text-zinc-500">
+                              <span className="font-medium text-zinc-200">{row.pixelConfirmedLeads}</span> Pixel · {row.metaConversasIniciadas ?? "—"} Meta
+                            </p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </aside>
               </div>
-            </section>
+            </Surface>
 
-            <section>
-              <div className="mb-3 flex items-center justify-between"><div><h2 className="text-base font-semibold text-white">Instâncias da unidade</h2><p className="mt-1 text-xs text-zinc-500">Cada número fica isolado no contexto selecionado.</p></div></div>
+            <Surface>
+              <SurfaceHeader title="WhatsApps da unidade" description="Cada número fica isolado na unidade selecionada." />
               {overview.instances.length === 0 ? (
-                <button type="button" onClick={openCreate} disabled={!overview.provisioningConfigured} className="flex w-full flex-col items-center rounded-2xl border border-dashed border-white/15 bg-white/[.02] px-6 py-9 text-center transition hover:border-emerald-400/30 hover:bg-emerald-400/[.03] disabled:cursor-not-allowed"><QrCode className="size-8 text-zinc-500" /><span className="mt-3 text-sm font-medium text-zinc-200">Nenhum WhatsApp conectado</span><span className="mt-1 text-xs text-zinc-500">Crie uma instância e escaneie o QR Code.</span></button>
+                <EmptyState
+                  icon={<QrCode />}
+                  title="Nenhum WhatsApp conectado"
+                  description="Crie uma instância e escaneie o QR Code para começar a capturar conversas."
+                  action={<Button variant="primary" size="sm" onClick={openCreate} disabled={!overview.provisioningConfigured}><Plus />Nova instância</Button>}
+                />
               ) : (
-                <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{overview.instances.map((instance) => {
-                  const connected = isConnected(instance.connectionStatus);
-                  return <article key={instance.instanceName} className="rounded-2xl border border-white/10 bg-[#111315] p-4"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", connected ? "bg-emerald-400/10 text-emerald-300" : "bg-zinc-800 text-zinc-400")}>{connected ? <Wifi className="size-5" /> : <WifiOff className="size-5" />}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{instance.displayName || instance.instanceName}</p><p className="mt-0.5 truncate font-mono text-[10px] text-zinc-500">{instance.instanceName}</p></div></div><span className={cn("rounded-full border px-2 py-1 text-[10px] font-semibold uppercase", connected ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-white/10 bg-white/[.03] text-zinc-400")}>{connected ? "Conectado" : instance.connectionStatus}</span></div><div className="mt-4 flex items-center justify-between border-t border-white/8 pt-3"><span className="text-[10px] text-zinc-500">{dateLabel(instance.lastMessageAt || instance.lastEventAt)}</span>{!connected && <Button size="sm" variant="ghost" onClick={() => void refreshQr(instance.instanceName)}><QrCode className="size-3.5" /> Ver QR</Button>}</div></article>;
-                })}</div>
+                <ul className="divide-y divide-white/[0.06]">
+                  {overview.instances.map((instance) => {
+                    const connected = isConnected(instance.connectionStatus);
+                    const lastActivity = instance.lastMessageAt || instance.lastEventAt;
+                    return (
+                      <li key={instance.instanceName} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5">
+                        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] [&_svg]:size-4", connected ? "text-zinc-200" : "text-zinc-500")}>
+                          {connected ? <Wifi /> : <WifiOff />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-zinc-100">{instance.displayName || instance.instanceName}</p>
+                          <p className="mt-0.5 truncate text-xs text-zinc-500">
+                            <span className="font-mono">{instance.instanceName}</span>
+                            {lastActivity && <> · Última atividade {relativeTime(lastActivity)}</>}
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+                          <span className={cn("size-1.5 rounded-full", connected ? "bg-emerald-400" : "bg-zinc-500")} aria-hidden />
+                          {connected ? "Conectado" : "Desconectado"}
+                        </span>
+                        {!connected && <Button size="sm" onClick={() => void refreshQr(instance.instanceName)}><QrCode />Conectar</Button>}
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
-            </section>
+            </Surface>
           </>
         )}
-      </div>
+      </Page>
 
-      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setQrDataUrl(null); setQrInstance(null); } }}>
-        <DialogContent className="border-white/10 bg-[#111315] text-white sm:max-w-md">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><QrCode className="size-5 text-emerald-300" />{qrInstance ? "Conectar WhatsApp" : "Nova instância"}</DialogTitle><DialogDescription>{qrInstance ? "No WhatsApp, abra Aparelhos conectados e escaneie este código." : `A instância será vinculada à unidade ${selectedClient?.name || "selecionada"}.`}</DialogDescription></DialogHeader>
-          {qrInstance ? <div className="flex flex-col items-center py-3">{creating ? <div className="flex size-72 items-center justify-center rounded-2xl bg-white text-zinc-700"><Loader2 className="size-7 animate-spin" /></div> : qrDataUrl ? <img src={qrDataUrl} alt="QR Code para conectar o WhatsApp" className="size-72 rounded-2xl bg-white p-3" /> : <div className="flex size-72 flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 text-center text-xs text-zinc-500"><QrCode className="mb-3 size-8" />QR Code indisponível.<Button variant="ghost" size="sm" className="mt-2" onClick={() => void refreshQr(qrInstance)}>Tentar novamente</Button></div>}<p className="mt-4 flex items-center gap-1.5 text-xs text-zinc-500"><Smartphone className="size-3.5" /> O código expira por segurança.</p></div> : <form onSubmit={createInstance} className="space-y-4"><div className="space-y-2"><Label htmlFor="pixel-display-name">Nome deste WhatsApp</Label><Input id="pixel-display-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} minLength={2} maxLength={80} required placeholder="Ex.: Comercial da unidade" className="border-white/10 bg-black/30" /></div><div className="rounded-xl border border-white/10 bg-white/[.025] p-3 text-xs text-zinc-400"><p className="flex items-center gap-2 text-zinc-200"><ExternalLink className="size-3.5 text-emerald-300" /> Vínculo automático</p><p className="mt-1.5 leading-5">Conta Meta/unidade: <span className="text-white">{selectedClient?.name}</span>. O webhook será configurado na criação.</p></div><DialogFooter><Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>Cancelar</Button><Button type="submit" disabled={creating || displayName.trim().length < 2} className="bg-emerald-400 text-zinc-950 hover:bg-emerald-300">{creating ? <><Loader2 className="size-4 animate-spin" />Criando…</> : <><QrCode className="size-4" />Criar e gerar QR</>}</Button></DialogFooter></form>}
-        </DialogContent>
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => { setCreateOpen(open); if (!open) { setQrDataUrl(null); setQrInstance(null); } }}
+        size="sm"
+        title={qrInstance ? "Conectar WhatsApp" : "Nova instância"}
+        description={qrInstance ? "No WhatsApp, abra Aparelhos conectados e escaneie este código." : `A instância será vinculada à unidade ${selectedClient?.name || "selecionada"}.`}
+        footer={qrInstance ? undefined : (
+          <>
+            <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+            <Button type="submit" form="pixel-create-form" variant="primary" loading={creating} disabled={displayName.trim().length < 2}>{!creating && <QrCode />}{creating ? "Criando…" : "Criar e gerar QR"}</Button>
+          </>
+        )}
+      >
+        {qrInstance ? (
+          <div className="flex flex-col items-center py-2">
+            {creating ? (
+              <div className="flex size-64 items-center justify-center rounded-2xl bg-white text-zinc-700"><Loader2 className="size-7 animate-spin" /></div>
+            ) : qrDataUrl ? (
+              <img src={qrDataUrl} alt="QR Code para conectar o WhatsApp" className="size-64 rounded-2xl bg-white p-3" />
+            ) : (
+              <EmptyState icon={<QrCode />} title="QR Code indisponível" action={<Button size="sm" onClick={() => void refreshQr(qrInstance)}>Tentar de novo</Button>} className="size-64 rounded-2xl ring-1 ring-inset ring-white/10" />
+            )}
+            <p className="mt-4 flex items-center gap-1.5 text-xs text-zinc-500"><Smartphone className="size-3.5" /> O código expira por segurança.</p>
+          </div>
+        ) : (
+          <form id="pixel-create-form" onSubmit={createInstance}>
+            <Field label="Nome deste WhatsApp" htmlFor="pixel-display-name" hint={`Conta Meta: ${selectedClient?.name ?? "—"}. O webhook é configurado na criação.`}>
+              <Input id="pixel-display-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} minLength={2} maxLength={80} required placeholder="Ex.: Comercial da unidade" autoFocus />
+            </Field>
+          </form>
+        )}
       </Dialog>
 
-      <Dialog open={Boolean(selectedRanking)} onOpenChange={(open) => { if (!open) setSelectedRanking(null); }}>
-        <DialogContent className="border-white/10 bg-[#111315] text-white sm:max-w-lg">
-          {selectedRanking && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><Trophy className="size-5 text-amber-300" />{selectedRanking.creativeName || selectedRanking.adName || "Criativo sem nome"}</DialogTitle>
-                <DialogDescription>{[selectedRanking.adName && selectedRanking.adName !== selectedRanking.creativeName ? selectedRanking.adName : null, selectedRanking.campaignName, selectedRanking.adsetName].filter(Boolean).join(" · ") || "Campanha não identificada"}</DialogDescription>
-              </DialogHeader>
-              <SafeImage src={selectedRanking.adImageUrl} alt={selectedRanking.creativeName ?? "Criativo"} className="h-72 w-full rounded-2xl" />
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="rounded-xl border border-emerald-400/15 bg-emerald-400/[.04] p-3"><p className="text-[11px] text-emerald-200/70">Confirmadas (Pixel)</p><p className="mt-1 text-2xl font-semibold text-emerald-300">{selectedRanking.pixelConfirmedLeads}</p></div>
-                <div className="rounded-xl border border-white/10 bg-white/[.03] p-3"><p className="text-[11px] text-zinc-500">Conversas (Meta)</p><p className="mt-1 text-2xl font-semibold text-white">{selectedRanking.metaConversasIniciadas ?? "—"}</p></div>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm">
-                <span className="text-zinc-500">Gasto reportado</span>
-                <span className="font-semibold text-zinc-200">{formatCurrencyBRL(selectedRanking.metaSpend)}</span>
-              </div>
-            </>
-          )}
-        </DialogContent>
+      <Dialog
+        open={Boolean(selectedRanking)}
+        onOpenChange={(open) => { if (!open) setSelectedRanking(null); }}
+        title={selectedRanking?.creativeName || selectedRanking?.adName || "Criativo sem nome"}
+        description={selectedRanking ? [selectedRanking.adName && selectedRanking.adName !== selectedRanking.creativeName ? selectedRanking.adName : null, selectedRanking.campaignName, selectedRanking.adsetName].filter(Boolean).join(" · ") || "Campanha não identificada" : undefined}
+      >
+        {selectedRanking && (
+          <div className="space-y-4">
+            <SafeImage src={selectedRanking.adImageUrl} alt={selectedRanking.creativeName ?? "Criativo"} className="h-72 w-full rounded-xl" />
+            <div className="grid grid-cols-3 divide-x divide-white/[0.06] overflow-hidden rounded-xl bg-white/[0.03] ring-1 ring-inset ring-white/[0.06]">
+              {[
+                { label: "Confirmados (Pixel)", value: String(selectedRanking.pixelConfirmedLeads) },
+                { label: "Conversas (Meta)", value: selectedRanking.metaConversasIniciadas === null ? "—" : String(selectedRanking.metaConversasIniciadas) },
+                { label: "Investimento", value: formatCurrencyBRL(selectedRanking.metaSpend) },
+              ].map((stat) => (
+                <div key={stat.label} className="min-w-0 px-3.5 py-3">
+                  <p className="truncate text-xs text-zinc-500">{stat.label}</p>
+                  <p className="mt-1 truncate font-display text-xl font-semibold tabular-nums text-white">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </Dialog>
     </AppLayout>
   );
 }
-

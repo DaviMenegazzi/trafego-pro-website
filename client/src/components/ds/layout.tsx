@@ -48,7 +48,6 @@ export function Sparkline({ values, accent = "brand", className }: { values: num
   const xy = pts.map((v, i) => [(i / (pts.length - 1)) * w, h - 3 - ((v - min) / span) * (h - 6)] as const);
   const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
   const color = ACCENTS[accent].line;
-  const [lx, ly] = xy[xy.length - 1];
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className={cn("h-7 w-full overflow-visible", className)} aria-hidden>
       <defs>
@@ -59,7 +58,6 @@ export function Sparkline({ values, accent = "brand", className }: { values: num
       </defs>
       <path d={`${line} L${w},${h} L0,${h} Z`} fill={`url(#${id})`} />
       <path d={line} fill="none" stroke={color} strokeWidth={1.75} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={lx} cy={ly} r={2.5} fill={color} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

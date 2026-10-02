@@ -13,6 +13,7 @@ import {
 } from "../ga4Service.js";
 import { createLandingPage, deleteLandingPage, findLandingPage, listLandingPagesForUnit } from "../ga4LandingPageStore.js";
 import type { Ga4LandingPagesResponse } from "../../shared/google.js";
+import { checkUserHasMetaAccountAccess } from "./metricsRoutes.js";
 
 // GA4 das Landing Pages e campanhas do Google Ads (via vínculo Ads ↔ GA4). Cada Landing Page é
 // vinculada por um administrador à unidade (conta da Meta); a tela consulta pela unidade selecionada.
@@ -32,10 +33,13 @@ function sendError(res: Response, error: unknown) {
   res.status(500).json({ error: "Não foi possível carregar os dados do Google." });
 }
 
-function requireUnit(req: Request): string {
+/** Acesso pela conta (act_…) nas claims; se o acesso foi gravado com o ID do cadastro, usa a mesma regra das métricas. */
+async function requireUnit(req: Request): Promise<string> {
   const unitId = typeof req.query.unitId === "string" ? normalizeUnitId(req.query.unitId) : "";
   if (!unitId) throw new Ga4Error(400, "Selecione uma unidade.");
-  if (!canAccessUnit(unitId, req.claims)) throw new Ga4Error(403, "Sem acesso a essa unidade.");
+  if (!canAccessUnit(unitId, req.claims) && !(await checkUserHasMetaAccountAccess(req, unitId))) {
+    throw new Ga4Error(403, "Sem acesso a essa unidade.");
+  }
   return unitId;
 }
 
@@ -43,7 +47,7 @@ function requireUnit(req: Request): string {
 // Lista vazia = unidade sem Landing Page vinculada (a tela mostra o contato do suporte).
 googleRouter.get("/google/landing-pages", requireAuth, async (req, res) => {
   try {
-    const unitId = requireUnit(req);
+    const unitId = await requireUnit(req);
     const canManage = isAdminRole(req.claims!.role);
     const body: Ga4LandingPagesResponse = {
       unitId,
@@ -90,7 +94,7 @@ googleRouter.delete("/google/landing-pages/:id", requireAuth, requireAdmin, asyn
 // ─── GET /api/google/report?unitId=&landingPageId=&start=&end= ──────────────
 googleRouter.get("/google/report", requireAuth, async (req, res) => {
   try {
-    const unitId = requireUnit(req);
+    const unitId = await requireUnit(req);
     if (!isGa4Configured()) throw new Ga4Error(503, "A conexão com o Google Analytics ainda não foi ativada.");
     const landingPageId = typeof req.query.landingPageId === "string" ? req.query.landingPageId : "";
     const landingPage = await findLandingPage(landingPageId);

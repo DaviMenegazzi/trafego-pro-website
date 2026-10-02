@@ -7,12 +7,38 @@ import {
   listAllFeedbackLeadsForExportSql,
   listFeedbackLeadsSql,
 } from "../feedbackSql.js";
+import { getLastKnownClients, getMetaDirectClients, normalizeUnitString } from "../metaDirectService.js";
+import { checkUserHasMetaAccountAccess } from "./metricsRoutes.js";
 
 export const feedbackRouter = Router();
 
-/** Admin acessa tudo; os demais só as unidades liberadas na sessão. Devolve o status de erro, ou null se pode. */
-async function unitAccessError(req: Request, unit: string): Promise<{ status: number; error: string } | null> {
+/** A unidade enviada (nome) é a mesma conta do painel (clientId)? Os nomes da Meta e do cadastro diferem ("Vida Card | Bento"). */
+async function unitMatchesClient(req: Request, unit: string, clientId: string): Promise<boolean> {
+  const target = normalizeUnitString(unit);
+  if (!target) return false;
+  const meta = await getMetaDirectClients().catch(() => getLastKnownClients());
+  const account = meta.find((c) => c.id === clientId || c.account_id === clientId || `act_${c.account_id}` === clientId);
+  if (account && normalizeUnitString(account.name) === target) return true;
+  const sb = getSupabaseForRequest(req);
+  if (!sb) return false;
+  const column = clientId.startsWith("act_") ? "meta_account_id" : "id";
+  const { data } = await sb.from("clients").select("name").eq(column, clientId).maybeSingle();
+  return Boolean(data && normalizeUnitString(data.name) === target);
+}
+
+/**
+ * Admin acessa tudo; os demais só as unidades liberadas na sessão. Com clientId, usa a mesma regra
+ * das métricas do painel; sem ele (tela antiga em cache), cai na busca pelo nome no cadastro.
+ * Devolve o status de erro, ou null se pode.
+ */
+async function unitAccessError(req: Request, unit: string, clientId = ""): Promise<{ status: number; error: string } | null> {
   if (isAdmin(req.claims!)) return null;
+  if (clientId) {
+    if (!(await checkUserHasMetaAccountAccess(req, clientId)) || !(await unitMatchesClient(req, unit, clientId))) {
+      return { status: 403, error: "Sem acesso a essa unidade" };
+    }
+    return null;
+  }
   const sb = getSupabaseForRequest(req);
   if (!sb) return { status: 403, error: "Sem acesso a essa unidade" };
   const { data: client, error } = await sb.from("clients").select("id").eq("name", unit).maybeSingle();
@@ -29,7 +55,8 @@ feedbackRouter.get("/feedback-leads/last", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Unidade obrigatória" });
     return;
   }
-  const denied = await unitAccessError(req, unit);
+  const clientId = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
+  const denied = await unitAccessError(req, unit, clientId);
   if (denied) {
     res.status(denied.status).json({ error: denied.error });
     return;
@@ -169,7 +196,8 @@ feedbackRouter.post("/feedback-leads", requireAuth, async (req, res) => {
     return;
   }
 
-  const denied = await unitAccessError(req, unit);
+  const clientId = typeof body.clientId === "string" ? body.clientId.trim() : "";
+  const denied = await unitAccessError(req, unit, clientId);
   if (denied) {
     res.status(denied.status).json({ error: denied.error });
     return;

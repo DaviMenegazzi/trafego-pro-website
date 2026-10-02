@@ -183,12 +183,13 @@ export default function DashboardFeedbackLeads() {
     const token = getToken();
     if (!unitName || !token) return;
     let active = true;
-    fetch(`/api/feedback-leads/last?unit=${encodeURIComponent(unitName)}`, { headers: { Authorization: `Bearer ${token}` } })
+    const qs = new URLSearchParams({ unit: unitName, clientId: selectedClientId ?? "" });
+    fetch(`/api/feedback-leads/last?${qs}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((response) => (response.ok ? response.json() : null))
       .then((data: LastFeedback | null) => { if (active) setLastSent(data); })
       .catch(() => {});
     return () => { active = false; };
-  }, [unitName, sent]);
+  }, [unitName, selectedClientId, sent]);
 
   const customDay = isoToDate(formData.customDate);
   const week = formData.weekChoice === "previous" ? lastWeek : formData.weekChoice === "custom" && customDay ? feedbackWeekFor(customDay) : currentWeek;
@@ -319,6 +320,7 @@ export default function DashboardFeedbackLeads() {
     try {
       await submitFeedbackLead({
         unit,
+        clientId: selectedClientId,
         // O responsável é quem está logado; o campo saiu do formulário.
         responsible: user.name || user.email,
         weekStart: week.start,

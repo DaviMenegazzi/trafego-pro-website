@@ -184,6 +184,17 @@ describe("Protected weekly feedback endpoints", () => {
     expect(denied.status).toBe(403);
   });
 
+  it("accepts the panel's Meta account even when the registry name differs, and rejects a unit that is not that account", async () => {
+    const token = signToken({ email: "bento-test@trafego.pro", name: "Bento", role: "client_viewer", id: 995, allowedClientIds: ["act_918438482061312"] });
+    const headers = { Authorization: `Bearer ${token}` };
+    const allowed = await fetch(`${baseUrl}/api/feedback-leads/last?${new URLSearchParams({ unit: "Vida Card Bento Gonçalves", clientId: "act_918438482061312" })}`, { headers });
+    expect(allowed.status).toBe(200);
+    const otherUnit = await fetch(`${baseUrl}/api/feedback-leads/last?${new URLSearchParams({ unit: "Vida Card Ijuí", clientId: "act_918438482061312" })}`, { headers });
+    expect(otherUnit.status).toBe(403);
+    const otherAccount = await fetch(`${baseUrl}/api/feedback-leads/last?${new URLSearchParams({ unit: "Vida Card Ijuí", clientId: "act_1234567890" })}`, { headers });
+    expect(otherAccount.status).toBe(403);
+  });
+
   it("denies listing and exporting feedbacks to non-admin sessions", async () => {
     const token = signToken({ email: "viewer@trafego.pro", name: "Viewer", role: "client_viewer", id: 996, allowedClientIds: ["client-id-that-does-not-exist"] });
     const list = await fetch(`${baseUrl}/api/feedback-leads`, { headers: { Authorization: `Bearer ${token}` } });
